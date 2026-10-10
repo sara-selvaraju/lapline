@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<title>Lapline, car picker</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0E1626}
+a{color:#F2EBDD}a:hover{color:#FFFFFF}
+button{font:inherit;color:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; display: flex; flex-direction: column; background: #0E1626; color: #F2EBDD; font-family: 'Barlow Semi Condensed', sans-serif; font-variant-numeric: tabular-nums; overflow: hidden">
+
+  <div role="status" aria-label="Track green" style="height: 4px; background: #2BB673; flex: none"></div>
+
+  <header style="height: 56px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 4px 0 16px; gap: 8px">
+    <div style="display: flex; align-items: baseline; gap: 8px">
+      <span style="font-size: 21px; font-weight: 600">Harbourfront</span>
+      <span style="font-size: 17px; color: #8C9AB5">Lap <b style="color: #F2EBDD; font-weight: 600">23</b>/62</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 2px">
+      <button aria-label="Live, 10 seconds behind real time. Open sync." style="display: flex; align-items: center; gap: 7px; height: 44px; padding: 0 10px; background: none; border: 0">
+        <span style="width: 8px; height: 8px; border-radius: 50%; background: #E5383B"></span>
+        <span style="font-size: 16px; font-weight: 600">Live</span>
+        <span style="font-size: 15px; color: #8C9AB5">10 s behind</span>
+      </button>
+      <button aria-label="Settings" style="width: 44px; height: 44px; display: grid; place-items: center; background: none; border: 0">
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="#F2EBDD" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <section aria-label="Track" style="position: relative; height: 290px; flex: none">
+    <svg width="390" height="290" viewBox="0 0 390 290" role="img" aria-label="3D track view" style="position: absolute; inset: 0">
+      <path d="{{track}}" fill="none" stroke="#F2EBDD" stroke-width="11" stroke-linejoin="round" opacity="0.1"/>
+      <path d="{{track}}" fill="none" stroke="#F2EBDD" stroke-width="3.4" stroke-linejoin="round"/>
+    </svg>
+    <svg width="390" height="290" viewBox="0 0 390 290" aria-hidden="true" style="position: absolute; inset: 0">
+      <path d="M281 158L286 156L292 155L298 153L304 152L310 150L316 148L322 145L329 143L334 140L340 136L345 133L349 130L352 126L354 123L355 121L356 119L356 117L355 116L354 115L352 113" fill="none" stroke="#8C9AB5" stroke-width="1.6" stroke-dasharray="3 3"/>
+      <path d="M361 122L367 125M352 106L355 100M315 96L317 89M276 88L278 81M244 80L245 73M210 77L210 70M172 80L171 74M140 88L138 81M116 98L113 92M91 108L89 102M69 115L66 109M58 123L52 120M53 137L47 135M40 156L35 152M21 178L15 174M22 204L16 207M59 226L57 232M117 226L118 233M168 213L170 219M204 203L205 209M231 195L233 202M251 182L255 187M270 168L273 174M299 159L301 165M337 144L340 151" stroke="#8C9AB5" stroke-width="1" opacity="0.45"/>
+      <path d="M80 115L76 102M144 217L148 230" stroke="#F2EBDD" stroke-width="2.2" stroke-linecap="round"/>
+      <text x="83" y="131" fill="#C9D1DE" font-size="12" font-weight="600" font-family="Barlow Semi Condensed, sans-serif">S2</text>
+      <path d="M350 130L360 142" stroke="#0E1626" stroke-width="4"/>
+      <path d="M350 130L360 142" stroke="#F2EBDD" stroke-width="4" stroke-dasharray="2 2"/>
+      <text x="363" y="154" fill="#C9D1DE" font-size="11" font-weight="600" font-family="Barlow Semi Condensed, sans-serif">S1</text>
+      <path d="M338 84l-8 3 8 4z" fill="#8C9AB5"/>
+    </svg>
+    <sc-for list="{{turns}}" as="tn" hint-placeholder-count="9">
+      <span style="position: absolute; left: {{tn.l}}px; top: {{tn.t}}px; width: 17px; height: 17px; box-sizing: border-box; border-radius: 50%; border: 1px solid #3A4D74; background: #15213A; color: #C9D1DE; font-size: 10px; font-weight: 700; display: grid; place-items: center">{{tn.n}}</span>
+    </sc-for>
+    <sc-for list="{{cars}}" as="c" hint-placeholder-count="20">
+      <span style="position: absolute; left: {{c.l}}px; top: {{c.t}}px; width: 10px; height: 10px; border-radius: 50%; background: {{c.col}}; box-shadow: 0 0 0 1.5px #0E1626"></span>
+    </sc-for>
+    <span aria-hidden="true" style="position: absolute; left: 206px; top: 60px; width: 44px; height: 30px; border-radius: 15px; border: 2px dashed #F2EBDD; box-sizing: border-box"></span>
+
+    <div role="dialog" aria-label="Cars near your tap" style="position: absolute; left: 120px; top: 100px; width: 220px; background: #15213A; border: 1px solid #283857; border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.45); padding: 6px; box-sizing: border-box; display: flex; flex-direction: column">
+      <span style="font-size: 14px; color: #8C9AB5; padding: 6px 10px 4px">4 cars here. Pick one.</span>
+      <sc-for list="{{near}}" as="n" hint-placeholder-count="4">
+        <button style="height: 48px; display: grid; grid-template-columns: 4px 28px 1fr auto; gap: 10px; align-items: center; padding: 0 10px; border: 0; border-radius: 10px; background: {{n.bg}}; text-align: left; font-size: 18px">
+          <span style="height: 22px; border-radius: 2px; background: {{n.col}}"></span>
+          <span style="color: #8C9AB5">P{{n.p}}</span>
+          <span style="font-weight: 700">{{n.code}}</span>
+          <span style="font-size: 16px; color: #C9D1DE">{{n.int}}</span>
+        </button>
+      </sc-for>
+    </div>
+  </section>
+
+  <section aria-label="Selected driver" style="flex: none; height: 88px; box-sizing: border-box; padding: 10px 16px; background: #15213A; border-top: 1px solid #283857; border-bottom: 1px solid #283857; display: flex; align-items: center; gap: 12px; opacity: .5">
+    <span style="width: 4px; align-self: stretch; border-radius: 2px; background: #E80020"></span>
+    <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; color: #8C9AB5">P3</span><span style="font-size: 24px; font-weight: 700; line-height: 1">EMI</span></div>
+    <span style="font-size: 36px; font-weight: 700; margin-left: 20px">287</span>
+  </section>
+
+  <section aria-label="Timing" style="flex: 1; min-height: 0; overflow: hidden; opacity: .5">
+    <sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
+      <div style="height: 36px; display: grid; grid-template-columns: 26px 4px 1fr 78px; gap: 10px; align-items: center; padding: 0 16px; font-size: 17px; border-bottom: 1px solid rgba(40,56,87,.55)">
+        <span style="text-align: right; color: #8C9AB5">{{r.p}}</span><span style="height: 20px; border-radius: 2px; background: {{r.col}}"></span><span style="font-weight: 700">{{r.code}}</span><span style="text-align: right; color: #C9D1DE">{{r.int}}</span>
+      </div>
+    </sc-for>
+  </section>
+
+  <footer style="flex: none; height: 68px; box-sizing: border-box; padding: 0 16px 8px; display: flex; align-items: center; background: #15213A; border-top: 1px solid #283857; font-size: 15px; color: #8C9AB5">Tap one car to select it. Tap outside the list to close it.</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const pos = '139,84 149,82 154,80 165,78 178,76 184,75 197,74 216,74 222,74 234,75 239,76 250,78 277,85 283,86 296,89 302,90 309,91 323,94 330,95 343,99'.split(' ').map((p) => p.split(',').map(Number));
+    const order = ['#E8702A','#E8702A','#E80020','#3671C6','#27F4D2','#3671C6','#E80020','#229971','#27F4D2','#FF87BC','#229971','#FF87BC','#64C4FF','#64C4FF','#B6BABD','#52E252','#B6BABD','#6692FF','#52E252','#6692FF'];
+    const rows = [['AVA','#E8702A','Leader'],['BEN','#E8702A','+1.204'],['EMI','#E80020','+0.812'],['CRU','#3671C6','+0.684'],['GIO','#27F4D2','+2.305'],['DEL','#3671C6','+0.433'],['FIN','#E80020','+3.914'],['ISL','#229971','+1.008'],['HUX','#27F4D2','+0.902'],['KAI','#FF87BC','+2.611']].map((r, i) => ({ p: i + 1, code: r[0], col: r[1], int: r[2] }));
+    const near = [rows[7], rows[8], rows[9], { p: 11, code: 'JUN', col: '#229971', int: '+1.330' }].map((r, i) => ({ ...r, bg: i === 0 ? '#0E1626' : 'transparent' }));
+    const turns = [[1,374,113],[2,275,70],[3,189,61],[4,102,96],[5,55,103],[6,36,133],[7,9,213]].map(([n, x, y]) => ({ n, l: x - 8.5, t: y - 8.5 }));
+    return {
+      rows, near, turns,
+      cars: pos.map(([x, y], i) => ({ l: x - 5, t: y - 5, col: order[i] })),
+      track: 'M355 136L359 132L362 128L364 124L365 120L365 116L363 112L361 109L358 106L353 103L348 101L343 99L336 97L330 95L323 94L316 93L309 91L302 90L296 89L289 88L283 86L277 85L271 83L266 82L260 80L255 79L250 78L244 77L239 76L234 75L228 74L222 74L216 74L210 74L203 74L197 74L191 75L184 75L178 76L171 77L165 78L160 79L154 80L149 82L144 83L139 84L134 86L130 88L126 89L122 91L118 93L114 95L110 97L106 98L102 100L98 102L94 103L90 105L86 106L82 108L78 109L74 110L71 111L67 112L64 113L62 115L60 116L58 118L56 119L55 121L54 123L53 126L52 128L52 131L51 133L50 136L49 139L47 142L45 145L43 148L40 151L37 154L34 157L31 161L27 164L24 168L21 172L18 176L16 181L15 185L14 190L15 195L16 200L19 206L23 210L28 215L34 219L41 223L49 226L58 229L67 231L77 232L87 232L98 232L108 231L118 230L128 228L137 226L146 223L154 221L162 218L169 216L176 214L182 212L188 210L194 209L199 207L204 206L209 205L214 204L219 203L223 201L228 200L232 198L236 197L240 194L243 192L247 190L250 187L253 185L256 182L259 180L262 177L265 175L268 173L272 171L275 169L279 168L284 166L289 165L294 163L300 162L306 160L312 158L319 156L326 154L332 151L339 148L345 144L350 140Z',
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0E1626">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Lapline">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Lapline</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="flagband" class="flag-GREEN" role="status"></div>
+
+  <header id="top">
+    <div class="title">
+      <span id="sessname">Connecting</span>
+      <span id="lap" class="lap"></span>
+    </div>
+    <div class="right">
+      <span id="modebadge" class="badge"></span>
+      <button id="menuBtn" class="iconbtn" aria-label="Open settings">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="19" cy="12" r="2" fill="currentColor"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div id="rc" class="rc" aria-live="polite"></div>
+
+  <main id="layout">
+    <section id="viewwrap">
+      <canvas id="view" aria-label="3D track view. Drag to rotate, pinch to zoom, tap a car to select it."></canvas>
+      <div id="overlay" class="overlay" hidden></div>
+      <div class="viewbtns">
+        <button id="followBtn" class="chip" aria-pressed="false">Follow</button>
+        <button id="resetBtn" class="chip">Reset view</button>
+      </div>
+    </section>
+
+    <section id="side">
+      <section id="tele" class="tele" aria-label="Selected car telemetry">
+        <div class="tele-head">
+          <span class="swatch" id="tSwatch"></span>
+          <span class="tpos" id="tPos">–</span>
+          <span class="tcode" id="tCode">Tap a car</span>
+          <span class="tteam" id="tTeam"></span>
+          <span class="ttyre" id="tTyre"></span>
+        </div>
+        <div class="tele-body">
+          <div class="speed"><span id="tSpeed">–</span><small>km/h</small></div>
+          <div class="gear"><span id="tGear">–</span><small>gear</small></div>
+          <div class="bars">
+            <div class="bar"><label>Throttle</label><div class="track"><div id="bThr" class="fill thr"></div></div></div>
+            <div class="bar"><label>Brake</label><div class="track"><div id="bBrk" class="fill brk"></div></div></div>
+            <div class="bar"><label>RPM</label><div class="track"><div id="bRpm" class="fill rpm"></div></div><span id="tRpm" class="rpmval"></span></div>
+          </div>
+        </div>
+        <canvas id="spark" class="spark" height="38" aria-label="Speed over the last 30 seconds"></canvas>
+        <div class="tele-foot">
+          <span>Gap <b id="tGap">–</b></span>
+          <span>Last <b id="tLast">–</b></span>
+          <span>Best <b id="tBest">–</b></span>
+        </div>
+      </section>
+
+      <section id="tower" class="tower" aria-label="Timing">
+        <div class="tower-head">
+          <span>Pos</span><span></span><span>Driver</span>
+          <button id="gapToggle" class="gaptoggle">Interval</button>
+          <span>Tyre</span><span class="hide-narrow">Last lap</span>
+        </div>
+        <ol id="rows"></ol>
+      </section>
+    </section>
+  </main>
+
+  <footer id="controls">
+    <div id="replayCtl" class="ctl" hidden>
+      <button id="playBtn" class="iconbtn big" aria-label="Pause">
+        <svg id="playIcon" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"></svg>
+      </button>
+      <span id="clock" class="clock">0:00:00</span>
+      <input id="scrub" type="range" min="0" max="1000" value="0" aria-label="Replay position">
+      <button id="speedBtn" class="chip">1×</button>
+      <button id="toLiveBtn" class="chip" hidden>Go live</button>
+    </div>
+    <div id="liveCtl" class="ctl" hidden>
+      <span class="livedot" aria-hidden="true"></span>
+      <span class="delaylabel">Delay <b id="delayVal">10</b> s</span>
+      <button id="delayMinus" class="chip" aria-label="Reduce delay by 5 seconds">−5 s</button>
+      <button id="delayPlus" class="chip" aria-label="Add 5 seconds of delay">+5 s</button>
+      <button id="fromStartBtn" class="chip">Replay from start</button>
+    </div>
+  </footer>
+
+  <dialog id="menu">
+    <form method="dialog" class="sheet">
+      <h2>Settings</h2>
+      <label class="field">Session
+        <select id="sessSelect"></select>
+      </label>
+      <button type="button" id="autoBtn" class="chip wide">Follow live sessions automatically</button>
+      <label class="field">Elevation scale <output id="zxVal">4×</output>
+        <input id="zx" type="range" min="1" max="12" step="1" value="4">
+      </label>
+      <label class="check"><input id="allLabels" type="checkbox"> Show every driver code on the track</label>
+      <label class="check"><input id="wake" type="checkbox" checked> Keep the screen on</label>
+      <p id="statusText" class="status"></p>
+      <button class="chip wide" value="close">Done</button>
+    </form>
+  </dialog>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

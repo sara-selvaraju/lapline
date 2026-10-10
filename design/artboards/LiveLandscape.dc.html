@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<title>Lapline, live landscape</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0E1626}
+a{color:#F2EBDD}a:hover{color:#FFFFFF}
+button{font:inherit;color:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 844px; height: 390px; box-sizing: border-box; display: flex; flex-direction: column; background: #0E1626; color: #F2EBDD; font-family: 'Barlow Semi Condensed', sans-serif; font-variant-numeric: tabular-nums; overflow: hidden">
+
+  <div role="status" aria-label="Track green" style="height: 4px; background: #2BB673; flex: none"></div>
+
+  <div style="flex: 1; min-height: 0; display: flex">
+    <section aria-label="Track" style="position: relative; width: 470px; flex: none">
+      <header style="position: absolute; left: 16px; top: 8px; display: flex; align-items: baseline; gap: 8px; z-index: 1">
+        <span style="font-size: 21px; font-weight: 600">Harbourfront</span>
+        <span style="font-size: 17px; color: #8C9AB5">Lap <b style="color: #F2EBDD; font-weight: 600">23</b>/62</span>
+      </header>
+      <svg width="470" height="322" viewBox="0 0 470 322" role="img" aria-label="3D track view with cars" style="position: absolute; left: 0; top: 30px">
+        <path d="{{ground}}" fill="none" stroke="#283857" stroke-width="1.2"/>
+        <path d="{{track}}" fill="none" stroke="#F2EBDD" stroke-width="12" stroke-linejoin="round" opacity="0.1"/>
+        <path d="{{track}}" fill="none" stroke="#F2EBDD" stroke-width="3.6" stroke-linejoin="round"/>
+      </svg>
+      <sc-if value="{{showPit}}" hint-placeholder-val="{{true}}">
+        <svg width="470" height="322" viewBox="0 0 470 322" aria-hidden="true" style="position: absolute; left: 0; top: 30px">
+          <path d="M342 179L348 177L355 176L362 174L369 172L377 169L385 167L393 164L400 160L408 156L415 152L421 148L426 144L430 139L433 135L434 132L435 129L435 126L434 124L432 122L430 119" fill="none" stroke="#8C9AB5" stroke-width="1.6" stroke-dasharray="3 3"/>
+          <text x="366" y="162" fill="#8C9AB5" font-size="13" font-family="Barlow Semi Condensed, sans-serif">Pit lane</text>
+        </svg>
+      </sc-if>
+      <sc-if value="{{showSectors}}" hint-placeholder-val="{{true}}">
+        <svg width="470" height="322" viewBox="0 0 470 322" aria-hidden="true" style="position: absolute; left: 0; top: 30px">
+          <path d="M440 134L446 136M428 111L432 105M383 98L385 91M335 88L337 81M295 77L297 71M253 73L253 66M207 76L206 70M167 86L165 80M137 99L134 93M107 112L105 106M79 122L77 116M66 133L59 130M60 152L53 149M44 175L38 170M21 203L14 200M21 237L15 241M67 264L65 271M139 265L141 272M202 248L204 254M246 234L248 241M279 224L282 231M304 208L309 213M328 191L331 197M363 179L365 186M410 161L414 167" stroke="#8C9AB5" stroke-width="1" opacity="0.45"/>
+          <path d="M93 121L89 107M172 253L176 267" stroke="#F2EBDD" stroke-width="2.2" stroke-linecap="round"/>
+          <text x="97" y="137" fill="#C9D1DE" font-size="13" font-weight="600" font-family="Barlow Semi Condensed, sans-serif">S2</text>
+          <text x="156" y="244" fill="#C9D1DE" font-size="13" font-weight="600" font-family="Barlow Semi Condensed, sans-serif">S3</text>
+          <path d="M358 96L360 83" stroke="#8C9AB5" stroke-width="1.6" stroke-linecap="round"/>
+          <text x="364" y="80" fill="#8C9AB5" font-size="13" font-family="Barlow Semi Condensed, sans-serif">Speed trap</text>
+          <path d="M29 186L25 191L21 196L17 202L15 207L13 213L12 220L13 226L15 232" fill="none" stroke="#F5B700" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span style="position: absolute; left: 34px; top: 240px; padding: 1px 6px; border-radius: 4px; background: #F5B700; color: #0E1626; font-size: 12px; font-weight: 700">Yellow</span>
+      </sc-if>
+      <svg width="470" height="322" viewBox="0 0 470 322" aria-hidden="true" style="position: absolute; left: 0; top: 30px">
+        <path d="M427 145L438 156" stroke="#0E1626" stroke-width="4.5"/>
+        <path d="M427 145L438 156" stroke="#F2EBDD" stroke-width="4.5" stroke-dasharray="2 2"/>
+        <text x="440" y="172" fill="#C9D1DE" font-size="12" font-weight="600" font-family="Barlow Semi Condensed, sans-serif">S1</text>
+        <path d="M414 88l-9 3 9 4z" fill="#8C9AB5"/>
+      </svg>
+      <sc-if value="{{showTurns}}" hint-placeholder-val="{{true}}">
+        <sc-for list="{{turns}}" as="tn" hint-placeholder-count="9">
+          <span style="position: absolute; left: {{tn.l}}px; top: {{tn.t}}px; width: 18px; height: 18px; box-sizing: border-box; border-radius: 50%; border: 1px solid #3A4D74; background: #15213A; color: #C9D1DE; font-size: 11px; font-weight: 700; display: grid; place-items: center">{{tn.n}}</span>
+        </sc-for>
+      </sc-if>
+      <sc-for list="{{cars}}" as="c" hint-placeholder-count="20">
+        <span style="position: absolute; left: {{c.l}}px; top: {{c.t}}px; width: 11px; height: 11px; border-radius: 50%; background: {{c.col}}; box-shadow: 0 0 0 1.5px #0E1626"></span>
+      </sc-for>
+      <span aria-hidden="true" style="position: absolute; left: 175px; top: 98px; width: 18px; height: 18px; border-radius: 50%; border: 2px solid #F2EBDD; box-sizing: border-box"></span>
+      <span style="position: absolute; left: 122px; top: 104px; padding: 1px 5px; border-radius: 4px; background: rgba(14,22,38,.88); font-size: 13px; font-weight: 700; border-bottom: 2px solid #E8702A">AVA</span>
+      <span style="position: absolute; left: 160px; top: 78px; padding: 1px 5px; border-radius: 4px; background: rgba(14,22,38,.88); font-size: 13px; font-weight: 700; border-bottom: 2px solid #E8702A">BEN</span>
+      <span style="position: absolute; left: 170px; top: 122px; padding: 2px 7px; border-radius: 4px; background: #F2EBDD; color: #0E1626; font-size: 15px; font-weight: 700; border-bottom: 3px solid #E80020">EMI</span>
+      <div role="group" aria-label="Camera" style="position: absolute; left: 12px; bottom: 10px; display: flex; padding: 3px; gap: 2px; border-radius: 12px; background: rgba(21,33,58,.92); border: 1px solid #283857">
+        <button style="height: 38px; padding: 0 12px; border: 0; border-radius: 9px; background: none; color: #8C9AB5; font-size: 15px">Map</button>
+        <button aria-pressed="true" style="height: 38px; padding: 0 12px; border: 0; border-radius: 9px; background: #F2EBDD; color: #0E1626; font-size: 15px; font-weight: 600">Tilt</button>
+        <button style="height: 38px; padding: 0 12px; border: 0; border-radius: 9px; background: none; color: #8C9AB5; font-size: 15px">Chase</button>
+      </div>
+    </section>
+
+    <section style="flex: 1; min-width: 0; display: flex; flex-direction: column; border-left: 1px solid #283857">
+      <div style="height: 46px; flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 2px; padding: 0 4px 0 12px">
+        <button aria-label="Live, 10 seconds behind real time. Open sync." style="display: flex; align-items: center; gap: 7px; height: 44px; padding: 0 10px; background: none; border: 0">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: #E5383B"></span>
+          <span style="font-size: 16px; font-weight: 600">Live</span>
+          <span style="font-size: 15px; color: #8C9AB5">10 s behind</span>
+        </button>
+        <button style="height: 36px; padding: 0 12px; border-radius: 10px; border: 0; background: #F2EBDD; color: #0E1626; font-size: 15px; font-weight: 600">Sync</button>
+        <button aria-label="Settings" style="width: 44px; height: 44px; display: grid; place-items: center; background: none; border: 0">
+          <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="#F2EBDD" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+        </button>
+      </div>
+
+      <div aria-label="Selected driver" style="flex: none; height: 74px; box-sizing: border-box; padding: 8px 12px; background: #15213A; border-top: 1px solid #283857; border-bottom: 1px solid #283857; display: flex; align-items: center; gap: 12px">
+        <span style="width: 4px; align-self: stretch; border-radius: 2px; background: #E80020"></span>
+        <div style="display: flex; flex-direction: column; width: 56px"><span style="font-size: 14px; color: #8C9AB5">P3</span><span style="font-size: 23px; font-weight: 700; line-height: 1">EMI</span></div>
+        <div style="display: flex; flex-direction: column; align-items: flex-end"><span style="font-size: 34px; font-weight: 700; line-height: 1">287</span><span style="font-size: 12px; color: #8C9AB5">km/h</span></div>
+        <div style="display: flex; flex-direction: column; align-items: center"><span style="font-size: 34px; font-weight: 500; line-height: 1">7</span><span style="font-size: 12px; color: #8C9AB5">gear</span></div>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 8px">
+          <div aria-label="Throttle 92 percent" style="height: 7px; border-radius: 4px; background: #0E1626; overflow: hidden"><div style="width: 92%; height: 100%; background: #2BB673"></div></div>
+          <div aria-label="Brake off" style="height: 7px; border-radius: 4px; background: #0E1626"></div>
+        </div>
+      </div>
+
+      <div style="flex: 1; min-height: 0; overflow: hidden">
+        <sc-for list="{{rows}}" as="r" hint-placeholder-count="7">
+          <div style="height: 36px; display: grid; grid-template-columns: 22px 4px 1fr 72px 46px 68px; gap: 8px; align-items: center; padding: 0 12px; font-size: 17px; border-bottom: 1px solid rgba(40,56,87,.55); background: {{r.bg}}">
+            <span style="text-align: right; color: #8C9AB5">{{r.p}}</span>
+            <span style="height: 20px; border-radius: 2px; background: {{r.col}}"></span>
+            <span style="font-weight: 700">{{r.code}}</span>
+            <span style="justify-self: end; padding: 1px 6px; border-radius: 5px; background: {{r.gapBg}}; color: {{r.gapCol}}">{{r.int}}</span>
+            <span style="display: flex; align-items: center; gap: 4px; font-size: 13px; color: #8C9AB5"><span style="width: 19px; height: 19px; box-sizing: border-box; border-radius: 50%; border: 2.5px solid {{r.tc}}; color: {{r.tc}}; font-size: 10px; font-weight: 700; display: grid; place-items: center">{{r.t}}</span>{{r.age}}</span>
+            <span style="text-align: right; color: {{r.lc}}">{{r.last}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"showTurns":{"editor":"boolean","default":true,"section":"Track detail"},"showSectors":{"editor":"boolean","default":true,"section":"Track detail"},"showPit":{"editor":"boolean","default":true,"section":"Track detail"},"$preview":{"width":844,"height":390}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const tyre = { S: '#FF4D4F', M: '#FFD12E', H: '#F2EBDD' };
+    const pos = '166,83 178,79 184,77 199,74 214,72 222,71 237,70 261,69 268,70 282,71 289,73 302,76 336,84 343,86 359,90 367,91 376,93 393,96 401,98 417,103'.split(' ').map((p) => p.split(',').map(Number));
+    const order = ['#E8702A','#E8702A','#E80020','#3671C6','#27F4D2','#3671C6','#E80020','#229971','#27F4D2','#FF87BC','#229971','#FF87BC','#64C4FF','#64C4FF','#B6BABD','#52E252','#B6BABD','#6692FF','#52E252','#6692FF'];
+    const field = [
+      ['AVA', '#E8702A', 'Leader', 'M', 15, '1:42.318'], ['BEN', '#E8702A', '+1.204', 'H', 6, '1:41.902', 'fastest'],
+      ['EMI', '#E80020', '+0.812', 'M', 15, '1:42.690'], ['CRU', '#3671C6', '+0.684', 'M', 15, '1:42.551'],
+      ['GIO', '#27F4D2', '+2.305', 'H', 6, '1:42.988'], ['DEL', '#3671C6', '+0.433', 'H', 7, '1:42.871', 'pb'],
+      ['FIN', '#E80020', '+3.914', 'M', 15, '1:43.201'],
+    ];
+    const rows = field.map((f, i) => {
+      const n = parseFloat(f[2].replace('+', ''));
+      const battle = !Number.isNaN(n) && n < 1;
+      return { p: i + 1, code: f[0], col: f[1], int: f[2], t: f[3], tc: tyre[f[3]], age: f[4], last: f[5],
+        lc: f[6] === 'fastest' ? '#B794FF' : f[6] === 'pb' ? '#4CD08E' : '#8C9AB5',
+        gapBg: battle ? '#283857' : 'transparent', gapCol: battle ? '#F2EBDD' : '#C9D1DE', bg: f[0] === 'EMI' ? '#15213A' : 'transparent' };
+    });
+    const turns = [[1,460,152],[2,333,97],[3,228,84],[4,110,128],[5,62,139],[6,40,177],[7,9,277],[8,298,266],[9,337,238]].map(([n, x, y]) => ({ n, l: x - 9, t: y - 9 }));
+    return {
+      rows, turns,
+      showTurns: this.props.showTurns ?? true,
+      showSectors: this.props.showSectors ?? true,
+      showPit: this.props.showPit ?? true,
+      cars: pos.map(([x, y], i) => ({ l: x - 5.5, t: y - 5.5 + 30, col: order[i] })),
+      track: 'M432 150L437 145L441 140L443 135L444 130L444 125L442 120L439 116L435 112L430 108L424 105L417 103L409 100L401 98L393 96L384 94L376 93L367 91L359 90L351 88L343 86L336 84L329 83L322 81L315 79L309 77L302 76L296 74L289 73L282 71L275 70L268 70L261 69L253 69L245 69L237 70L230 70L222 71L214 72L206 73L199 74L191 76L184 77L178 79L172 81L166 83L160 85L155 87L150 89L145 92L140 94L135 96L131 99L126 101L121 103L116 105L111 107L106 109L101 111L96 112L91 114L86 116L82 117L78 119L74 121L71 122L68 124L66 127L64 129L62 132L61 134L60 137L59 140L58 144L58 147L56 150L55 154L53 157L51 161L48 165L45 169L41 173L37 177L33 181L29 186L25 191L21 196L17 202L15 207L13 213L12 220L13 226L15 232L18 239L23 245L29 251L36 256L45 261L55 264L66 268L78 270L90 271L102 272L115 271L128 270L140 268L152 266L163 263L174 260L184 257L194 254L203 251L211 248L219 245L227 243L234 241L240 239L247 238L253 236L259 235L264 233L270 231L275 229L280 227L285 225L290 223L295 220L299 217L303 214L307 211L310 208L314 204L318 201L321 199L325 196L329 194L334 192L339 190L344 188L350 186L357 184L364 182L372 180L380 178L388 175L396 172L404 168L412 164L419 160L426 155Z',
+      ground: 'M432 162L437 158L441 153L443 149L444 144L444 139L442 135L439 130L435 126L430 122L424 118L417 115L409 112L401 109L393 106L384 104L376 102L367 100L359 99L351 97L343 95L336 94L329 92L322 90L315 88L309 87L302 85L296 83L289 81L282 79L275 77L268 76L261 74L253 73L245 72L237 72L230 72L222 72L214 73L206 74L199 76L191 77L184 79L178 81L172 84L166 86L160 89L155 91L150 94L145 96L140 98L135 101L131 103L126 105L121 107L116 109L111 110L106 112L101 114L96 116L91 118L86 121L82 123L78 126L74 128L71 131L68 134L66 137L64 140L62 143L61 146L60 150L59 153L58 156L58 159L56 162L55 165L53 169L51 172L48 176L45 180L41 184L37 188L33 193L29 198L25 203L21 209L17 214L15 220L13 227L12 233L13 239L15 245L18 251L23 256L29 261L36 266L45 269L55 272L66 275L78 276L90 277L102 277L115 276L128 275L140 273L152 270L163 268L174 265L184 262L194 259L203 256L211 253L219 250L227 248L234 245L240 243L247 240L253 238L259 236L264 234L270 232L275 230L280 228L285 226L290 224L295 222L299 219L303 217L307 215L310 212L314 210L318 208L321 206L325 204L329 202L334 200L339 198L344 196L350 194L357 192L364 190L372 188L380 186L388 183L396 181L404 177L412 174L419 170L426 166Z',
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<title>Lapline, sync with TV</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0E1626}
+a{color:#F2EBDD}a:hover{color:#FFFFFF}
+button{font:inherit;color:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; position: relative; background: #0E1626; color: #F2EBDD; font-family: 'Barlow Semi Condensed', sans-serif; font-variant-numeric: tabular-nums; overflow: hidden">
+
+  <div aria-hidden="true" style="position: absolute; inset: 0; display: flex; flex-direction: column; opacity: 0.35">
+    <div style="height: 4px; background: #2BB673"></div>
+    <div style="height: 56px; display: flex; align-items: center; padding: 0 16px; gap: 8px"><span style="font-size: 21px; font-weight: 600">Harbourfront</span><span style="font-size: 17px; color: #8C9AB5">Lap 23/62</span></div>
+    <svg width="390" height="290" viewBox="0 0 390 290"><path d="M355 136L365 116L348 101L316 93L283 86L255 79L228 74L197 74L165 78L139 84L118 93L98 102L78 109L62 115L54 123L50 136L40 151L24 168L14 190L28 215L67 231L118 230L162 218L194 209L219 203L240 194L256 182L272 171L294 163L326 154Z" fill="none" stroke="#F2EBDD" stroke-width="3.4" stroke-linejoin="round"/></svg>
+    <div style="height: 88px; background: #15213A"></div>
+  </div>
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(5,9,18,.55)"></div>
+
+  <section role="dialog" aria-modal="true" aria-labelledby="syncTitle" style="position: absolute; left: 0; right: 0; bottom: 0; background: #15213A; border-top: 1px solid #283857; border-radius: 20px 20px 0 0; padding: 10px 16px 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px">
+    <span aria-hidden="true" style="align-self: center; width: 40px; height: 5px; border-radius: 3px; background: #283857"></span>
+    <div style="display: flex; align-items: center; justify-content: space-between">
+      <h2 id="syncTitle" style="margin: 0; font-size: 24px; font-weight: 600">Sync with TV</h2>
+      <button onClick="{{close}}" style="height: 44px; padding: 0 12px; border: 0; background: none; font-size: 17px; color: #F2EBDD">Done</button>
+    </div>
+
+    <sc-if value="{{waiting}}" hint-placeholder-val="{{true}}">
+      <div style="display: flex; flex-direction: column; gap: 16px">
+        <p style="margin: 0; font-size: 18px; line-height: 1.4; color: #C9D1DE">Watch the TV. Tap the button at the moment the leader, <b style="color: #F2EBDD">AVA</b>, crosses the start/finish line. Lapline works out how far behind real time your broadcast is.</p>
+        <button onClick="{{mark}}" style="height: 96px; border-radius: 18px; border: 0; background: #F2EBDD; color: #0E1626; font-size: 24px; font-weight: 700">AVA crossed the line</button>
+        <p style="margin: 0; font-size: 15px; color: #8C9AB5">AVA is about 1.4 km from the line on lap 23. Next crossing in roughly 38 s.</p>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{done}}" hint-placeholder-val="{{false}}">
+      <div style="display: flex; flex-direction: column; gap: 16px">
+        <div style="display: flex; align-items: baseline; gap: 10px">
+          <span style="font-size: 64px; font-weight: 700; line-height: 1">{{delay}} s</span>
+          <span style="font-size: 18px; color: #8C9AB5">behind real time</span>
+        </div>
+        <p style="margin: 0; font-size: 18px; line-height: 1.4; color: #C9D1DE">Cars on Lapline now move with the TV. Fine-tune if they look early or late.</p>
+        <div role="group" aria-label="Fine-tune delay" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px">
+          <button onClick="{{minus5}}" style="height: 52px; border-radius: 12px; border: 1px solid #283857; background: #0E1626; font-size: 18px">−5 s</button>
+          <button onClick="{{minus1}}" style="height: 52px; border-radius: 12px; border: 1px solid #283857; background: #0E1626; font-size: 18px">−1 s</button>
+          <button onClick="{{plus1}}" style="height: 52px; border-radius: 12px; border: 1px solid #283857; background: #0E1626; font-size: 18px">+1 s</button>
+          <button onClick="{{plus5}}" style="height: 52px; border-radius: 12px; border: 1px solid #283857; background: #0E1626; font-size: 18px">+5 s</button>
+        </div>
+        <button onClick="{{again}}" style="height: 48px; border-radius: 12px; border: 1px solid #283857; background: none; font-size: 17px">Mark the line again</button>
+      </div>
+    </sc-if>
+
+    <p style="margin: 0; font-size: 14px; color: #8C9AB5; line-height: 1.4">Your sync is remembered for this session on this phone. Data from OpenF1 itself arrives about 3 s after real time, so delays under 4 s aren't possible.</p>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { step: 'waiting', delay: 14 };
+  }
+  renderVals() {
+    const set = (d) => this.setState({ delay: Math.max(4, Math.min(180, d)) });
+    return {
+      waiting: this.state.step === 'waiting',
+      done: this.state.step === 'done',
+      delay: this.state.delay,
+      mark: () => this.setState({ step: 'done', delay: 14 }),
+      again: () => this.setState({ step: 'waiting' }),
+      close: () => this.setState({ step: 'waiting' }),
+      minus5: () => set(this.state.delay - 5),
+      minus1: () => set(this.state.delay - 1),
+      plus1: () => set(this.state.delay + 1),
+      plus5: () => set(this.state.delay + 5),
+    };
+  }
+}
+</script>
+</body>
+</html>
