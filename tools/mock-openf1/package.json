@@ -1,0 +1,11 @@
+{
+  "name": "@lapline/mock-openf1",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p .",
+    "dev": "tsc -p . --watch --preserveWatchOutput",
+    "start": "node dist/src/index.js"
+  }
+}
