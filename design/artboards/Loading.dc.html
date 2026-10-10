@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<title>Lapline, loading</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0E1626}
+a{color:#F2EBDD}a:hover{color:#FFFFFF}
+button{font:inherit;color:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; display: flex; flex-direction: column; background: #0E1626; color: #F2EBDD; font-family: 'Barlow Semi Condensed', sans-serif; font-variant-numeric: tabular-nums; overflow: hidden">
+
+  <div aria-hidden="true" style="height: 4px; background: #283857; flex: none"></div>
+
+  <header style="height: 56px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 4px 0 16px; gap: 8px">
+    <div style="display: flex; align-items: baseline; gap: 8px">
+      <span style="font-size: 21px; font-weight: 600">Harbourfront</span>
+      <span style="font-size: 17px; color: #8C9AB5">Sprint replay</span>
+    </div>
+    <button aria-label="Settings" style="width: 44px; height: 44px; display: grid; place-items: center; background: none; border: 0">
+      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="#F2EBDD" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+    </button>
+  </header>
+
+  <section aria-label="Track" style="position: relative; height: 290px; flex: none">
+    <svg width="390" height="290" viewBox="0 0 390 290" role="img" aria-label="Track outline being built" style="position: absolute; inset: 0">
+      <path d="M355 136L365 116L348 101L316 93L283 86L255 79L228 74L197 74L165 78L139 84L118 93L98 102L78 109L62 115L54 123L50 136L40 151L24 168L14 190L28 215L67 231L118 230L162 218L194 209L219 203L240 194L256 182L272 171L294 163L326 154Z" fill="none" stroke="#283857" stroke-width="3.4" stroke-linejoin="round" stroke-dasharray="6 6"/>
+      <path d="M355 136L365 116L348 101L316 93L283 86L255 79L228 74L197 74L165 78L139 84L118 93L98 102L78 109L62 115" fill="none" stroke="#F2EBDD" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+    </svg>
+  </section>
+
+  <section aria-label="Loading progress" style="flex: 1; display: flex; flex-direction: column; gap: 18px; padding: 8px 24px 0">
+    <h2 style="margin: 0; font-size: 24px; font-weight: 600">Getting the Sprint ready</h2>
+    <ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px">
+      <sc-for list="{{steps}}" as="s" hint-placeholder-count="5">
+        <li style="display: flex; align-items: center; gap: 12px; font-size: 18px; color: {{s.col}}">
+          <span aria-hidden="true" style="width: 22px; height: 22px; box-sizing: border-box; border-radius: 50%; border: 2px solid {{s.ring}}; background: {{s.fill}}; display: grid; place-items: center; color: #0E1626; font-size: 13px; font-weight: 700">{{s.mark}}</span>
+          <span style="flex: 1">{{s.label}}</span>
+          <span style="font-size: 15px; color: #8C9AB5">{{s.state}}</span>
+        </li>
+      </sc-for>
+    </ol>
+    <p style="margin: 0; font-size: 16px; line-height: 1.45; color: #8C9AB5">Free OpenF1 access spaces requests out, so a replay takes about 20 seconds to open. Cars appear as soon as the first positions arrive.</p>
+  </section>
+
+  <footer style="flex: none; height: 68px; box-sizing: border-box; padding: 0 16px 8px; display: flex; align-items: center; background: #15213A; border-top: 1px solid #283857">
+    <button style="height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid #283857; background: #0E1626; font-size: 16px">Choose a different session</button>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const done = { col: '#F2EBDD', ring: '#F2EBDD', fill: '#F2EBDD', mark: '✓', state: 'Done' };
+    const now = { col: '#F2EBDD', ring: '#F2EBDD', fill: 'transparent', mark: '', state: 'Loading' };
+    const next = { col: '#8C9AB5', ring: '#283857', fill: 'transparent', mark: '', state: '' };
+    return {
+      steps: [
+        { label: 'Session and drivers', ...done },
+        { label: 'Laps, tyres and pit stops', ...done },
+        { label: 'Track outline from the fastest lap', ...now, state: 'Half drawn' },
+        { label: 'Race order and gaps', ...next },
+        { label: 'Car positions and telemetry', ...next },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

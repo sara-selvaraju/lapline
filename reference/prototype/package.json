@@ -1,0 +1,18 @@
+{
+  "name": "lapline",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Personal F1 live viewer: 3D track, cars, timing and telemetry from OpenF1.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "mock": "node mock/mock-openf1.js",
+    "dev": "OPENF1_BASE=http://localhost:4001 LIVE_TRANSPORT=rest node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "mqtt": "^5.10.0"
+  }
+}

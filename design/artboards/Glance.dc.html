@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<title>Lapline, glance mode</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0E1626}
+a{color:#F2EBDD}a:hover{color:#FFFFFF}
+button{font:inherit;color:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 844px; height: 390px; box-sizing: border-box; display: flex; flex-direction: column; background: #0E1626; color: #F2EBDD; font-family: 'Barlow Semi Condensed', sans-serif; font-variant-numeric: tabular-nums; overflow: hidden">
+
+  <div role="status" aria-label="Track green" style="height: 6px; background: #2BB673; flex: none"></div>
+
+  <div style="flex: 1; min-height: 0; display: flex; gap: 8px; padding: 14px 20px 14px 24px">
+    <section aria-label="Top five" style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+      <div style="display: flex; align-items: baseline; gap: 14px; margin-bottom: 8px">
+        <span style="font-size: 44px; font-weight: 700; line-height: 1">Lap 23</span>
+        <span style="font-size: 26px; color: #8C9AB5">of 62</span>
+      </div>
+      <ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column">
+        <sc-for list="{{rows}}" as="r" hint-placeholder-count="5">
+          <li style="height: 54px; display: grid; grid-template-columns: 34px 6px 1fr 130px; gap: 14px; align-items: center; border-bottom: 1px solid rgba(40,56,87,.6); background: {{r.bg}}">
+            <span style="font-size: 30px; color: #8C9AB5; text-align: right">{{r.p}}</span>
+            <span style="height: 34px; border-radius: 3px; background: {{r.col}}"></span>
+            <span style="font-size: 40px; font-weight: 700; line-height: 1">{{r.code}}</span>
+            <span style="font-size: 34px; text-align: right; color: {{r.gapCol}}">{{r.int}}</span>
+          </li>
+        </sc-for>
+      </ol>
+    </section>
+
+    <section aria-label="Track map" style="position: relative; width: 340px; flex: none; display: flex; flex-direction: column; justify-content: space-between">
+      <div style="display: flex; justify-content: flex-end; align-items: center; gap: 4px">
+        <span style="display: flex; align-items: center; gap: 7px; font-size: 18px"><span style="width: 9px; height: 9px; border-radius: 50%; background: #E5383B"></span>Live</span>
+        <button aria-label="Leave glance mode" style="width: 44px; height: 44px; display: grid; place-items: center; background: none; border: 0">
+          <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" fill="none" stroke="#F2EBDD" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+      <svg width="340" height="230" viewBox="0 30 390 230" role="img" aria-label="Track map with the leaders highlighted">
+        <path d="M355 136L365 116L348 101L316 93L283 86L255 79L228 74L197 74L165 78L139 84L118 93L98 102L78 109L62 115L54 123L50 136L40 151L24 168L14 190L28 215L67 231L118 230L162 218L194 209L219 203L240 194L256 182L272 171L294 163L326 154Z" fill="none" stroke="#F2EBDD" stroke-width="4" stroke-linejoin="round" opacity=".55"/>
+        <g stroke="#0E1626" stroke-width="2">
+          <circle cx="139" cy="84" r="8" fill="#E8702A"/>
+          <circle cx="152" cy="81" r="8" fill="#E8702A"/>
+          <circle cx="165" cy="78" r="8" fill="#E80020"/>
+          <circle cx="180" cy="76" r="8" fill="#3671C6"/>
+          <circle cx="197" cy="74" r="8" fill="#27F4D2"/>
+        </g>
+        <circle cx="165" cy="78" r="13" fill="none" stroke="#F2EBDD" stroke-width="2.5"/>
+      </svg>
+      <p style="margin: 0; font-size: 22px; text-align: right"><span style="color: #8C9AB5">Following</span> <b style="font-weight: 700; border-bottom: 3px solid #E80020">EMI</b> <span style="color: #8C9AB5">287 km/h</span></p>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":844,"height":390}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const rows = [['AVA', '#E8702A', 'Leader'], ['BEN', '#E8702A', '+1.2'], ['EMI', '#E80020', '+0.8'], ['CRU', '#3671C6', '+0.7'], ['GIO', '#27F4D2', '+2.3']]
+      .map((r, i) => ({ p: i + 1, code: r[0], col: r[1], int: r[2], gapCol: i === 0 ? '#8C9AB5' : '#F2EBDD', bg: r[0] === 'EMI' ? '#15213A' : 'transparent' }));
+    return { rows };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<title>Lapline, live data locked</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0E1626}
+a{color:#F2EBDD}a:hover{color:#FFFFFF}
+button{font:inherit;color:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; display: flex; flex-direction: column; background: #0E1626; color: #F2EBDD; font-family: 'Barlow Semi Condensed', sans-serif; font-variant-numeric: tabular-nums; overflow: hidden">
+
+  <div aria-hidden="true" style="height: 4px; background: #283857; flex: none"></div>
+
+  <header style="height: 56px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 4px 0 16px; gap: 8px">
+    <div style="display: flex; align-items: baseline; gap: 8px">
+      <span style="font-size: 21px; font-weight: 600">Harbourfront</span>
+      <span style="font-size: 17px; color: #8C9AB5">Race, on now</span>
+    </div>
+    <button aria-label="Settings" style="width: 44px; height: 44px; display: grid; place-items: center; background: none; border: 0">
+      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="#F2EBDD" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+    </button>
+  </header>
+
+  <section aria-label="Track" style="position: relative; height: 250px; flex: none">
+    <svg width="390" height="250" viewBox="0 0 390 290" role="img" aria-label="Track outline" style="position: absolute; inset: 0; opacity: .3">
+      <path d="M355 136L365 116L348 101L316 93L283 86L255 79L228 74L197 74L165 78L139 84L118 93L98 102L78 109L62 115L54 123L50 136L40 151L24 168L14 190L28 215L67 231L118 230L162 218L194 209L219 203L240 194L256 182L272 171L294 163L326 154Z" fill="none" stroke="#F2EBDD" stroke-width="3.4" stroke-linejoin="round"/>
+    </svg>
+    <div style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 64px; height: 64px; border-radius: 50%; background: #15213A; border: 1px solid #283857; display: grid; place-items: center">
+      <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" fill="none" stroke="#F2EBDD" stroke-width="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="#F2EBDD" stroke-width="2"/></svg>
+    </div>
+  </section>
+
+  <section style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding: 4px 24px 0">
+    <h2 style="margin: 0; font-size: 26px; font-weight: 600; line-height: 1.2">The race is live, but live data isn't switched on</h2>
+    <p style="margin: 0; font-size: 18px; line-height: 1.45; color: #C9D1DE">OpenF1 only serves data during a session to sponsors. Without sponsor access, this race opens for free replay from <b style="color: #F2EBDD">1:30 am Monday</b>.</p>
+    <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 6px">
+      <button style="height: 52px; border-radius: 14px; border: 0; background: #F2EBDD; color: #0E1626; font-size: 18px; font-weight: 600">Replay today's qualifying instead</button>
+      <button style="height: 52px; border-radius: 14px; border: 1px solid #283857; background: #15213A; font-size: 18px">Choose another session</button>
+    </div>
+    <details style="margin-top: 4px; font-size: 16px; color: #8C9AB5">
+      <summary style="cursor: pointer; min-height: 44px; display: flex; align-items: center; color: #F2EBDD">How to turn on live data</summary>
+      <p style="margin: 4px 0 0; line-height: 1.45">Sponsor OpenF1 for €9.90 a month, then add the login to the server's settings on Railway as OPENF1_USERNAME and OPENF1_PASSWORD. Live data starts within a minute.</p>
+    </details>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

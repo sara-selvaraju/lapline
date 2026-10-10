@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<title>Lapline, telemetry expanded</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0E1626}
+a{color:#F2EBDD}a:hover{color:#FFFFFF}
+button{font:inherit;color:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; display: flex; flex-direction: column; background: #0E1626; color: #F2EBDD; font-family: 'Barlow Semi Condensed', sans-serif; font-variant-numeric: tabular-nums; overflow: hidden">
+
+  <div role="status" aria-label="Track green" style="height: 4px; background: #2BB673; flex: none"></div>
+
+  <header style="height: 56px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 4px 0 16px; gap: 8px">
+    <div style="display: flex; align-items: baseline; gap: 8px">
+      <span style="font-size: 21px; font-weight: 600">Harbourfront</span>
+      <span style="font-size: 17px; color: #8C9AB5">Lap <b style="color: #F2EBDD; font-weight: 600">23</b>/62</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 2px">
+      <button aria-label="Live, 10 seconds behind real time. Open sync." style="display: flex; align-items: center; gap: 7px; height: 44px; padding: 0 10px; background: none; border: 0">
+        <span style="width: 8px; height: 8px; border-radius: 50%; background: #E5383B"></span>
+        <span style="font-size: 16px; font-weight: 600">Live</span>
+        <span style="font-size: 15px; color: #8C9AB5">10 s behind</span>
+      </button>
+      <button aria-label="Settings" style="width: 44px; height: 44px; display: grid; place-items: center; background: none; border: 0">
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="#F2EBDD" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <section aria-label="Track" style="position: relative; height: 236px; flex: none">
+    <svg width="390" height="236" viewBox="0 0 390 236" role="img" aria-label="3D track view, EMI selected" style="position: absolute; inset: 0">
+      <path d="{{ground}}" fill="none" stroke="#283857" stroke-width="1.2"/>
+      <path d="{{posts}}" stroke="#F2EBDD" stroke-width="1" opacity="0.14"/>
+      <path d="{{track}}" fill="none" stroke="#F2EBDD" stroke-width="10" stroke-linejoin="round" opacity="0.1"/>
+      <path d="{{track}}" fill="none" stroke="#F2EBDD" stroke-width="3.2" stroke-linejoin="round"/>
+    </svg>
+    <svg width="390" height="236" viewBox="0 0 390 236" aria-hidden="true" style="position: absolute; inset: 0">
+      <path d="M282 129L287 128L292 126L298 125L304 124L310 122L316 120L323 118L329 116L335 114L340 111L345 108L349 105L353 102L355 100L356 98L356 96L355 95L353 93" fill="none" stroke="#8C9AB5" stroke-width="1.6" stroke-dasharray="3 3"/>
+      <text x="300" y="114" fill="#8C9AB5" font-size="12" font-family="Barlow Semi Condensed, sans-serif">Pit lane</text>
+      <path d="M361 100L367 103M352 87L355 80M316 78L317 71M276 71L278 64M244 64L245 57M210 61L210 54M172 64L171 57M140 70L138 64M115 79L113 73M91 88L89 81M69 94L66 88M58 101L52 97M53 114L47 111M40 130L35 125M21 148L15 145M22 170L16 174M58 188L57 195M117 189L118 196M168 177L170 184M204 168L205 175M231 162L233 168M251 150L255 156M270 138L273 145M299 131L301 137M337 119L340 125" stroke="#8C9AB5" stroke-width="1" opacity="0.45"/>
+      <path d="M80 95L76 81M144 180L147 194" stroke="#F2EBDD" stroke-width="2.2" stroke-linecap="round"/>
+      <text x="80" y="110" fill="#C9D1DE" font-size="12" font-weight="600" font-family="Barlow Semi Condensed, sans-serif">S2</text>
+      <text x="132" y="174" fill="#C9D1DE" font-size="12" font-weight="600" font-family="Barlow Semi Condensed, sans-serif">S3</text>
+      <path d="M295 78L297 64" stroke="#8C9AB5" stroke-width="1.6" stroke-linecap="round"/>
+      <text x="300" y="90" fill="#8C9AB5" font-size="12" font-family="Barlow Semi Condensed, sans-serif">Speed trap</text>
+      <path d="M350 106L360 118" stroke="#0E1626" stroke-width="4"/>
+      <path d="M350 106L360 118" stroke="#F2EBDD" stroke-width="4" stroke-dasharray="2 2"/>
+      <text x="363" y="131" fill="#C9D1DE" font-size="11" font-weight="600" font-family="Barlow Semi Condensed, sans-serif">S1</text>
+      <path d="M338 66l-8 3 8 4z" fill="#8C9AB5"/>
+    </svg>
+    <sc-for list="{{turns}}" as="tn" hint-placeholder-count="9">
+      <span style="position: absolute; left: {{tn.l}}px; top: {{tn.t}}px; width: 17px; height: 17px; box-sizing: border-box; border-radius: 50%; border: 1px solid #3A4D74; background: #15213A; color: #C9D1DE; font-size: 10px; font-weight: 700; display: grid; place-items: center">{{tn.n}}</span>
+    </sc-for>
+    <sc-for list="{{cars}}" as="c" hint-placeholder-count="20">
+      <span style="position: absolute; left: {{c.l}}px; top: {{c.t}}px; width: 10px; height: 10px; border-radius: 50%; background: {{c.col}}; box-shadow: 0 0 0 1.5px #0E1626"></span>
+    </sc-for>
+    <span aria-hidden="true" style="position: absolute; left: 146px; top: 55px; width: 16px; height: 16px; border-radius: 50%; border: 2px solid #F2EBDD; box-sizing: border-box"></span>
+    <span style="position: absolute; left: 138px; top: 76px; padding: 2px 7px; border-radius: 4px; background: #F2EBDD; color: #0E1626; font-size: 15px; font-weight: 700; border-bottom: 3px solid #E80020">EMI</span>
+    <span style="position: absolute; left: 96px; top: 57px; padding: 1px 5px; border-radius: 4px; background: rgba(14,22,38,.88); font-size: 13px; font-weight: 700; border-bottom: 2px solid #E8702A">BEN</span>
+    <span style="position: absolute; left: 160px; top: 34px; padding: 1px 5px; border-radius: 4px; background: rgba(14,22,38,.88); font-size: 13px; font-weight: 700; border-bottom: 2px solid #3671C6">CRU</span>
+
+    <div role="group" aria-label="Camera" style="position: absolute; top: 8px; right: 12px; display: flex; padding: 3px; gap: 2px; border-radius: 12px; background: rgba(21,33,58,.92); border: 1px solid #283857">
+      <button style="height: 38px; padding: 0 12px; border: 0; border-radius: 9px; background: none; color: #8C9AB5; font-size: 15px">Map</button>
+      <button aria-pressed="true" style="height: 38px; padding: 0 12px; border: 0; border-radius: 9px; background: #F2EBDD; color: #0E1626; font-size: 15px; font-weight: 600">Tilt</button>
+      <button style="height: 38px; padding: 0 12px; border: 0; border-radius: 9px; background: none; color: #8C9AB5; font-size: 15px">Chase</button>
+    </div>
+  </section>
+
+  <section aria-label="EMI telemetry" style="flex: 1; min-height: 0; background: #15213A; border-top: 1px solid #283857; border-radius: 16px 16px 0 0; padding: 12px 16px 12px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <span style="width: 4px; height: 34px; border-radius: 2px; background: #E80020"></span>
+      <div style="display: flex; flex-direction: column; flex: 1">
+        <span style="font-size: 24px; font-weight: 700; line-height: 1.1">P3 EMI</span>
+        <span style="font-size: 15px; color: #8C9AB5">Emi Sato, Ardent</span>
+      </div>
+      <button aria-label="Show previous driver" style="width: 44px; height: 44px; border-radius: 12px; border: 1px solid #283857; background: #0E1626; display: grid; place-items: center">
+        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6" stroke="#F2EBDD" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button aria-label="Show next driver" style="width: 44px; height: 44px; border-radius: 12px; border: 1px solid #283857; background: #0E1626; display: grid; place-items: center">
+        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="#F2EBDD" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button aria-label="Collapse telemetry" style="width: 44px; height: 44px; display: grid; place-items: center; background: none; border: 0">
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="#F2EBDD" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+
+    <div style="display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 18px; align-items: end">
+      <div style="display: flex; flex-direction: column">
+        <span style="font-size: 60px; font-weight: 700; line-height: 0.95">287</span>
+        <span style="font-size: 14px; color: #8C9AB5">km/h</span>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center">
+        <span style="font-size: 60px; font-weight: 500; line-height: 0.95">7</span>
+        <span style="font-size: 14px; color: #8C9AB5">gear</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px; padding-bottom: 4px">
+        <div style="display: grid; grid-template-columns: 62px minmax(0, 1fr) 36px; align-items: center; gap: 8px; font-size: 14px; color: #8C9AB5"><span>Throttle</span><div style="height: 8px; border-radius: 4px; background: #0E1626; overflow: hidden"><div style="width: 92%; height: 100%; background: #2BB673"></div></div><span style="text-align: right; color: #F2EBDD">92%</span></div>
+        <div style="display: grid; grid-template-columns: 62px minmax(0, 1fr) 36px; align-items: center; gap: 8px; font-size: 14px; color: #8C9AB5"><span>Brake</span><div style="height: 8px; border-radius: 4px; background: #0E1626"></div><span style="text-align: right; color: #F2EBDD">Off</span></div>
+        <div style="display: grid; grid-template-columns: 62px minmax(0, 1fr) 36px; align-items: center; gap: 8px; font-size: 14px; color: #8C9AB5"><span>RPM</span><div style="height: 8px; border-radius: 4px; background: #0E1626; overflow: hidden"><div style="width: 86%; height: 100%; background: #F2EBDD; opacity: .75"></div></div><span style="text-align: right; color: #F2EBDD">11.2k</span></div>
+      </div>
+    </div>
+
+    <figure style="margin: 0; display: flex; flex-direction: column; gap: 4px">
+      <figcaption style="display: flex; justify-content: space-between; font-size: 14px; color: #8C9AB5"><span>Speed, last 30 s</span><span><span style="color: #E5383B">■</span> braking</span></figcaption>
+      <svg width="358" height="92" viewBox="0 0 358 92" role="img" aria-label="Speed trace for the last 30 seconds, four braking zones">
+        <line x1="0" y1="14" x2="358" y2="14" stroke="#283857" stroke-dasharray="2 4"/>
+        <text x="356" y="10" fill="#8C9AB5" font-size="11" text-anchor="end" font-family="Barlow Semi Condensed, sans-serif">300</text>
+        <line x1="0" y1="54" x2="358" y2="54" stroke="#283857" stroke-dasharray="2 4"/>
+        <text x="356" y="50" fill="#8C9AB5" font-size="11" text-anchor="end" font-family="Barlow Semi Condensed, sans-serif">150</text>
+        <path d="M0 33L2 31L3 29L5 27L6 26L8 25L9 24L11 23L12 22L14 21L15 20L17 20L18 19L20 19L21 18L23 18L27 17L35 16L71 16L73 34L74 47L76 55L77 60L79 63L80 65L82 67L83 68L86 69L89 69L91 66L92 64L94 62L95 61L97 59L98 58L100 57L101 56L103 55L104 54L107 53L109 52L110 51L115 50L121 49L125 49L127 54L128 57L130 59L131 60L133 61L134 62L137 63L139 63L140 57L142 53L144 49L145 45L147 42L148 39L150 37L151 35L153 33L154 31L156 30L157 29L159 27L162 26L163 25L165 24L168 23L171 22L175 21L181 20L201 19L205 19L207 33L208 42L210 47L211 51L213 54L214 55L216 56L218 57L222 58L224 56L225 54L227 53L228 51L230 50L231 49L233 48L234 47L237 46L240 45L243 44L249 43L252 43L254 46L255 49L257 50L258 51L260 52L263 53L264 53L266 48L267 44L269 40L270 37L272 34L273 32L275 30L276 28L278 26L279 24L281 23L282 22L284 21L285 20L287 19L290 18L292 17L296 16L301 15L308 14L358 14" fill="none" stroke="#F2EBDD" stroke-width="2" stroke-linejoin="round"/>
+        <rect x="73" y="84" width="18" height="6" rx="2" fill="#E5383B"/>
+        <rect x="127" y="84" width="14" height="6" rx="2" fill="#E5383B"/>
+        <rect x="207" y="84" width="17" height="6" rx="2" fill="#E5383B"/>
+        <rect x="254" y="84" width="12" height="6" rx="2" fill="#E5383B"/>
+      </svg>
+    </figure>
+
+    <dl style="margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px">
+      <div style="display: flex; flex-direction: column"><dt style="font-size: 14px; color: #8C9AB5">To BEN ahead</dt><dd style="margin: 0; font-size: 21px; font-weight: 600">+0.812</dd></div>
+      <div style="display: flex; flex-direction: column"><dt style="font-size: 14px; color: #8C9AB5">CRU behind</dt><dd style="margin: 0; font-size: 21px; font-weight: 600">0.684</dd></div>
+      <div style="display: flex; flex-direction: column"><dt style="font-size: 14px; color: #8C9AB5">To leader</dt><dd style="margin: 0; font-size: 21px; font-weight: 600">+2.016</dd></div>
+      <div style="display: flex; flex-direction: column"><dt style="font-size: 14px; color: #8C9AB5">Last lap</dt><dd style="margin: 0; font-size: 21px; font-weight: 600">1:42.690</dd></div>
+      <div style="display: flex; flex-direction: column"><dt style="font-size: 14px; color: #8C9AB5">Best lap</dt><dd style="margin: 0; font-size: 21px; font-weight: 600">1:42.403</dd></div>
+      <div style="display: flex; flex-direction: column"><dt style="font-size: 14px; color: #8C9AB5">Tyre</dt><dd style="margin: 0; font-size: 21px; font-weight: 600; display: flex; align-items: center; gap: 6px"><span style="width: 20px; height: 20px; box-sizing: border-box; border-radius: 50%; border: 2.5px solid #FFD12E; color: #FFD12E; font-size: 11px; font-weight: 700; display: grid; place-items: center">M</span>15 laps</dd></div>
+    </dl>
+  </section>
+
+  <footer style="flex: none; height: 68px; box-sizing: border-box; padding: 0 8px 8px 16px; display: flex; align-items: center; gap: 8px; background: #15213A; border-top: 1px solid #283857">
+    <span style="flex: 1; font-size: 16px; color: #8C9AB5">Matching TV at <b style="color: #F2EBDD; font-weight: 600">10 s</b> behind</span>
+    <button aria-label="One second less delay" style="width: 44px; height: 44px; border-radius: 12px; border: 1px solid #283857; background: #0E1626; font-size: 20px">−</button>
+    <button aria-label="One second more delay" style="width: 44px; height: 44px; border-radius: 12px; border: 1px solid #283857; background: #0E1626; font-size: 20px">+</button>
+    <button style="height: 44px; padding: 0 14px; border-radius: 12px; border: 0; background: #F2EBDD; color: #0E1626; font-size: 16px; font-weight: 600">Sync</button>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const pos = '139,67 149,64 154,63 165,61 178,60 184,59 197,58 216,58 222,58 234,59 239,60 250,62 277,68 283,69 296,71 302,72 309,73 323,75 330,77 343,80'.split(' ').map((p) => p.split(',').map(Number));
+    const order = ['#E8702A','#E8702A','#E80020','#3671C6','#27F4D2','#3671C6','#E80020','#229971','#27F4D2','#FF87BC','#229971','#FF87BC','#64C4FF','#64C4FF','#B6BABD','#52E252','#B6BABD','#6692FF','#52E252','#6692FF'];
+    const turns = [[1,378,91],[2,274,84],[3,192,74],[4,108,92],[5,56,81],[6,36,108],[7,9,180],[8,246,174],[9,277,155]].map(([n, x, y]) => ({ n, l: x - 8.5, t: y - 8.5 }));
+    return {
+      turns,
+      cars: pos.map(([x, y], i) => ({ l: x - 5, t: y - 5, col: order[i] })),
+      track: 'M355 112L359 109L362 105L364 101L365 98L365 95L363 91L361 89L358 86L353 84L348 82L343 80L336 78L330 77L323 75L316 74L309 73L302 72L296 71L289 70L283 69L277 68L271 66L266 65L260 64L255 63L250 62L244 61L239 60L234 59L228 58L222 58L216 58L210 58L203 58L197 58L191 58L184 59L178 60L171 60L165 61L160 62L154 63L149 64L144 66L139 67L134 68L130 70L126 71L122 73L118 74L114 76L110 77L106 79L102 80L98 82L94 83L90 84L86 86L82 87L78 88L74 89L71 90L67 91L64 92L62 93L60 95L58 96L56 98L55 99L54 101L53 103L52 105L52 107L51 110L50 112L49 114L47 117L45 119L43 122L40 125L37 127L34 130L31 133L27 136L24 139L21 143L18 147L16 151L15 155L14 159L15 163L16 168L19 172L23 176L28 180L34 184L41 187L49 190L58 192L67 193L77 194L87 194L98 194L108 193L118 192L128 191L137 189L146 187L154 185L162 183L169 180L176 179L182 177L188 175L194 174L199 173L204 172L209 171L214 170L219 169L223 167L228 166L232 165L236 163L240 162L243 160L247 158L250 156L253 153L256 151L259 149L262 147L265 145L268 143L272 142L275 140L279 139L284 138L289 136L294 135L300 134L306 133L312 131L319 129L326 127L332 124L339 122L345 119L350 115Z',
+      ground: 'M355 121L359 118L362 115L364 112L365 108L365 105L363 102L361 99L358 96L353 93L348 91L343 89L336 87L330 85L323 83L316 82L309 80L302 79L296 78L289 77L283 75L277 74L271 73L266 72L260 71L255 70L250 68L244 67L239 66L234 64L228 63L222 62L216 61L210 61L203 60L197 60L191 60L184 60L178 60L171 61L165 62L160 63L154 65L149 66L144 68L139 69L134 71L130 73L126 74L122 76L118 78L114 79L110 80L106 82L102 83L98 84L94 86L90 87L86 88L82 90L78 91L74 93L71 94L67 96L64 98L62 100L60 102L58 104L56 106L55 108L54 110L53 112L52 114L52 116L51 119L50 121L49 123L47 125L45 128L43 130L40 133L37 135L34 138L31 141L27 145L24 148L21 152L18 156L16 160L15 164L14 169L15 173L16 177L19 181L23 184L28 188L34 191L41 193L49 195L58 197L67 198L77 198L87 198L98 198L108 197L118 196L128 194L137 192L146 190L154 188L162 186L169 184L176 182L182 180L188 179L194 177L199 175L204 174L209 172L214 171L219 169L223 168L228 167L232 165L236 164L240 163L243 161L247 159L250 158L253 156L256 155L259 153L262 152L265 150L268 149L272 147L275 146L279 145L284 144L289 142L294 141L300 140L306 138L312 137L319 135L326 133L332 131L339 129L345 126L350 124Z',
+      posts: 'M355 112V121M365 95V105M348 82V91M316 74V82M283 69V75M255 63V70M228 58V63M197 58V60M165 61V62M139 67V69M118 74V78M98 82V84M78 88V91M62 93V100M54 101V110M50 112V121M40 125V133M24 139V148M14 159V169M28 180V188M67 193V198M118 192V196M162 183V186M194 174V177M240 162V163M256 151V155M272 142V147M294 135V141M326 127V133',
+    };
+  }
+}
+</script>
+</body>
+</html>

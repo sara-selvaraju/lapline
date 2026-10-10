@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<title>Lapline, connection lost</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0E1626}
+a{color:#F2EBDD}a:hover{color:#FFFFFF}
+button{font:inherit;color:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; display: flex; flex-direction: column; background: #0E1626; color: #F2EBDD; font-family: 'Barlow Semi Condensed', sans-serif; font-variant-numeric: tabular-nums; overflow: hidden">
+
+  <div aria-hidden="true" style="height: 4px; background: #2BB673; opacity: .4; flex: none"></div>
+
+  <header style="height: 56px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 4px 0 16px; gap: 8px">
+    <div style="display: flex; align-items: baseline; gap: 8px">
+      <span style="font-size: 21px; font-weight: 600">Harbourfront</span>
+      <span style="font-size: 17px; color: #8C9AB5">Lap <b style="color: #F2EBDD; font-weight: 600">23</b>/62</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 2px">
+      <span style="display: flex; align-items: center; gap: 7px; height: 44px; padding: 0 10px">
+        <span style="width: 8px; height: 8px; border-radius: 50%; border: 2px solid #F5B700; box-sizing: border-box"></span>
+        <span style="font-size: 16px; font-weight: 600; color: #F5B700">Reconnecting</span>
+      </span>
+      <button aria-label="Settings" style="width: 44px; height: 44px; display: grid; place-items: center; background: none; border: 0">
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="#F2EBDD" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div role="alert" style="flex: none; margin: 0 12px 6px; padding: 10px 12px; border-radius: 12px; background: #15213A; border: 1px solid #F5B700; display: flex; align-items: center; gap: 12px">
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 2px">
+      <span style="font-size: 17px; font-weight: 600">No new data for 18 s</span>
+      <span style="font-size: 15px; color: #C9D1DE">Showing the last known positions. Trying again every 3 s.</span>
+    </div>
+    <button style="height: 44px; padding: 0 14px; border-radius: 12px; border: 0; background: #F5B700; color: #0E1626; font-size: 16px; font-weight: 600">Retry now</button>
+  </div>
+
+  <section aria-label="Track, last known positions" style="position: relative; height: 230px; flex: none; opacity: .45">
+    <svg width="390" height="230" viewBox="0 0 390 290" role="img" aria-label="Track with cars frozen at their last known positions" style="position: absolute; inset: 0">
+      <path d="M355 136L365 116L348 101L316 93L283 86L255 79L228 74L197 74L165 78L139 84L118 93L98 102L78 109L62 115L54 123L50 136L40 151L24 168L14 190L28 215L67 231L118 230L162 218L194 209L219 203L240 194L256 182L272 171L294 163L326 154Z" fill="none" stroke="#F2EBDD" stroke-width="3.4" stroke-linejoin="round"/>
+      <g fill="#8C9AB5">
+        <circle cx="139" cy="84" r="5"/><circle cx="149" cy="82" r="5"/><circle cx="154" cy="80" r="5"/><circle cx="165" cy="78" r="5"/><circle cx="178" cy="76" r="5"/>
+        <circle cx="184" cy="75" r="5"/><circle cx="197" cy="74" r="5"/><circle cx="216" cy="74" r="5"/><circle cx="222" cy="74" r="5"/><circle cx="234" cy="75" r="5"/>
+        <circle cx="239" cy="76" r="5"/><circle cx="250" cy="78" r="5"/><circle cx="277" cy="85" r="5"/><circle cx="283" cy="86" r="5"/><circle cx="296" cy="89" r="5"/>
+        <circle cx="302" cy="90" r="5"/><circle cx="309" cy="91" r="5"/><circle cx="323" cy="94" r="5"/><circle cx="330" cy="95" r="5"/><circle cx="343" cy="99" r="5"/>
+      </g>
+    </svg>
+  </section>
+
+  <section aria-label="Selected driver, last known" style="flex: none; height: 88px; box-sizing: border-box; padding: 10px 16px; background: #15213A; border-top: 1px solid #283857; border-bottom: 1px solid #283857; display: flex; align-items: center; gap: 12px">
+    <span style="width: 4px; align-self: stretch; border-radius: 2px; background: #E80020"></span>
+    <div style="display: flex; flex-direction: column; gap: 2px; width: 74px">
+      <span style="font-size: 15px; color: #8C9AB5">P3</span>
+      <span style="font-size: 24px; font-weight: 700; line-height: 1">EMI</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 2px">
+      <span style="font-size: 36px; font-weight: 700; line-height: 1; color: #8C9AB5">––</span>
+      <span style="font-size: 13px; color: #8C9AB5">km/h</span>
+    </div>
+    <span style="flex: 1; font-size: 15px; color: #8C9AB5; text-align: right">Telemetry paused until the stream is back</span>
+  </section>
+
+  <section aria-label="Timing, last known" style="flex: 1; min-height: 0; overflow: hidden">
+    <div style="height: 30px; display: flex; align-items: center; padding: 0 16px; font-size: 14px; color: #8C9AB5; border-bottom: 1px solid #283857">Order as of lap 23, 18 s ago</div>
+    <sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
+      <div style="height: 36px; display: grid; grid-template-columns: 26px 4px 1fr 78px; gap: 10px; align-items: center; padding: 0 16px; font-size: 17px; border-bottom: 1px solid rgba(40,56,87,.55); color: #8C9AB5">
+        <span style="text-align: right">{{r.p}}</span><span style="height: 20px; border-radius: 2px; background: {{r.col}}; opacity: .5"></span><span style="font-weight: 700">{{r.code}}</span><span style="text-align: right">{{r.int}}</span>
+      </div>
+    </sc-for>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const rows = [['AVA','#E8702A','Leader'],['BEN','#E8702A','+1.204'],['EMI','#E80020','+0.812'],['CRU','#3671C6','+0.684'],['GIO','#27F4D2','+2.305'],['DEL','#3671C6','+0.433'],['FIN','#E80020','+3.914'],['ISL','#229971','+1.008'],['HUX','#27F4D2','+0.902'],['KAI','#FF87BC','+2.611']].map((r, i) => ({ p: i + 1, code: r[0], col: r[1], int: r[2] }));
+    return { rows };
+  }
+}
+</script>
+</body>
+</html>
