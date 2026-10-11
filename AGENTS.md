@@ -16,9 +16,15 @@ A personal, non-commercial, phone-first second screen for F1 sessions: a 3D circ
 M0 done: the prototype is ported to the workspace layout in TypeScript with its
 behaviour unchanged, and deployed. Next is M1 in `docs/BUILD-PLAN.md`.
 
-The deployed service is `lapline` on Railway. `lapline.live` is not registered
-yet, so it runs at the generated Railway domain until that is bought and
-pointed at the service.
+Live at https://lapline.live, behind the password. `www.lapline.live` serves the
+same app. DNS is Cloudflare, registration GoDaddy, hosting Railway.
+
+Worth knowing before changing DNS: Cloudflare flattens the apex CNAME into an A
+record, which Railway's custom-domain check cannot verify, so `lapline.live` is
+**proxied** through Cloudflare and reaches Railway by Host header. It therefore
+needs to stay listed as a custom domain on the Railway service even though
+Railway shows it unverified. `www` is a true CNAME, DNS only, and goes straight
+to Railway. Server-sent events were measured at a steady 4 Hz through both.
 
 ## Stack
 
