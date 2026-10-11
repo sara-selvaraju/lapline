@@ -10,7 +10,7 @@
 import { z } from 'zod';
 
 /** Bump on any incompatible change to the messages below. */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 export const SSE_EVENTS = ['hello', 'tick', 'timing', 'status', 'circuit', 'ping'] as const;
 export type SseEvent = (typeof SSE_EVENTS)[number];
@@ -93,8 +93,16 @@ export const SessionListEntrySchema = z.object({
 });
 export type SessionListEntry = z.infer<typeof SessionListEntrySchema>;
 
+/**
+ * v2 replaced `authed: boolean` with this. A boolean could only say whether
+ * credentials were configured, so a rejected credential still reported as
+ * authenticated and the UI promised live data it could not deliver.
+ */
+export const AuthStateSchema = z.enum(['none', 'pending', 'ok', 'rejected']);
+export type AuthState = z.infer<typeof AuthStateSchema>;
+
 export const ApiStatsSchema = z.object({
-  authed: z.boolean(),
+  auth: AuthStateSchema,
   requests: z.number().int(),
   last: z.string().nullable(),
 });

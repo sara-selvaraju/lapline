@@ -17,7 +17,7 @@ const status = {
   level: 'ok',
   text: 'Live',
   mode: 'live',
-  api: { authed: true, requests: 12, last: '200 location' },
+  api: { auth: 'ok', requests: 12, last: '200 location' },
   freshness: 1_760_000_000_000,
 };
 
@@ -55,7 +55,7 @@ const timing = {
 
 describe('the protocol surface', () => {
   it('is version 1', () => {
-    expect(PROTOCOL_VERSION).toBe(1);
+    expect(PROTOCOL_VERSION).toBe(2);
   });
 
   it('names six events, and has a schema for each', () => {
@@ -123,6 +123,13 @@ describe('malformed messages are rejected', () => {
     expect(StatusSchema.safeParse({ ...status, api: { ...status.api, requests: 'twelve' } }).success).toBe(false);
   });
 
+  it('rejects the v1 boolean where v2 wants an auth state', () => {
+    const { auth, ...rest } = status.api;
+    void auth;
+    expect(StatusSchema.safeParse({ ...status, api: { ...rest, authed: true } }).success).toBe(false);
+    expect(StatusSchema.safeParse({ ...status, api: { ...status.api, auth: 'yes' } }).success).toBe(false);
+  });
+
   it('rejects null where null is not allowed', () => {
     expect(TimingSchema.safeParse({ ...timing, flag: null }).success).toBe(false);
     expect(TickSchema.safeParse({ ...tick, cars: null }).success).toBe(false);
@@ -165,6 +172,14 @@ describe('the car tuple', () => {
 
   it('rejects a non-integer driver number', () => {
     expect(CarTupleSchema.safeParse([4.5, ...car.slice(1)]).success).toBe(false);
+  });
+});
+
+describe('the auth state', () => {
+  it('distinguishes configured from working, which a boolean could not', () => {
+    for (const auth of ['none', 'pending', 'ok', 'rejected']) {
+      expect(StatusSchema.safeParse({ ...status, api: { ...status.api, auth } }).success).toBe(true);
+    }
   });
 });
 

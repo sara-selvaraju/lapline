@@ -25,6 +25,20 @@ export interface OpenF1Stats {
   last: string | null;
 }
 
+/**
+ * Whether authentication is actually working, as opposed to merely configured.
+ *
+ * 'none'     no credentials set, so the free tier
+ * 'pending'  credentials set, no token requested yet
+ * 'ok'       the last token request succeeded
+ * 'rejected' the last token request was refused
+ *
+ * The distinction matters: credentials with a stray space in them are
+ * configured but rejected, and reporting that as authenticated tells a viewer
+ * live data is available when it is not.
+ */
+export type AuthState = 'none' | 'pending' | 'ok' | 'rejected';
+
 interface TokenResponse {
   access_token?: string;
   expires_in?: string | number;
@@ -43,6 +57,8 @@ export class OpenF1 {
 
   private token: string | null = null;
   private tokenExp = 0;
+  private tokenRejected = false;
+  private tokenEverSucceeded = false;
   /** The queue. Each request chains off the last, so only one is ever in flight. */
   private chain: Promise<unknown> = Promise.resolve();
   private lastStart = 0;
@@ -59,6 +75,13 @@ export class OpenF1 {
     return Boolean(this.username && this.password);
   }
 
+  /** What the UI should say, rather than what the environment contains. */
+  get authState(): AuthState {
+    if (!this.hasCredentials) return 'none';
+    if (this.tokenRejected) return 'rejected';
+    return this.tokenEverSucceeded ? 'ok' : 'pending';
+  }
+
   /** OAuth2 password flow. Tokens last an hour; refresh a minute before expiry. */
   async getToken(force = false): Promise<string | null> {
     if (!this.hasCredentials) return null;
@@ -69,10 +92,18 @@ export class OpenF1 {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body,
     });
-    if (!res.ok) throw new Error(`OpenF1 token request failed: ${res.status} ${await res.text()}`);
+    if (!res.ok) {
+      // Remember this: the caller logs and carries on unauthenticated, so
+      // without recording it nothing downstream can tell a working credential
+      // from a refused one.
+      this.tokenRejected = true;
+      throw new Error(`OpenF1 token request failed: ${res.status} ${await res.text()}`);
+    }
     const data = (await res.json()) as TokenResponse;
     this.token = data.access_token ?? null;
     this.tokenExp = Date.now() + Number(data.expires_in || 3600) * 1000;
+    this.tokenRejected = false;
+    this.tokenEverSucceeded = true;
     return this.token;
   }
 

@@ -544,7 +544,7 @@ export class Feed {
       this.status,
       this.mode,
       {
-        authed: this.api.hasCredentials,
+        auth: this.api.authState,
         requests: this.api.stats.requests,
         last: this.api.stats.last,
       },
@@ -567,8 +567,13 @@ export class Feed {
       sessions: this.sessions,
       circuit: this.circuitPayload(),
       status: this.statusPayload(),
-      canLive: this.api.hasCredentials,
+      canLive: this.canLive(),
     });
+  }
+
+  /** Live is possible only when authentication is working, or not yet tried. */
+  canLive(): boolean {
+    return this.api.authState === 'ok' || this.api.authState === 'pending';
   }
 
   broadcastHello(): void {
