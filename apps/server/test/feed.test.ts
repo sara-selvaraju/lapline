@@ -295,3 +295,33 @@ describe('unknown sessions', () => {
     }
   });
 });
+
+describe('a session that has left its live window', () => {
+  it('stops fetching live and loads the replay instead', async () => {
+    const feed = sponsorFeed();
+    try {
+      await feed.loadSessionList();
+      await feed.selectSession(RACE);
+      expect(feed.mode).toBe('live');
+
+      // Someone is watching: with no listener the feed goes idle and fetches
+      // nothing, so the transition would never be reached.
+      feed.addListener(new Collector());
+
+      // Wind the clock past the end of the live window, as happens when a race
+      // finishes and the page is left open.
+      const past = (feed.sessEnd as number) + 31 * 60_000;
+      const realNow = Date.now;
+      Date.now = () => past;
+      try {
+        await feed.fetchStep();
+      } finally {
+        Date.now = realNow;
+      }
+
+      expect(feed.mode).toBe('replay');
+    } finally {
+      feed.stop();
+    }
+  }, 30_000);
+});

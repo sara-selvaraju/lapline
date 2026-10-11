@@ -3,6 +3,7 @@ import {
   isDue,
   liveFetchPlan,
   liveWindowFrom,
+  MAX_HI_LOOKBACK_MS,
   plannedRequestsPerMinute,
   replayWindow,
   replayWindowMs,
@@ -121,6 +122,25 @@ describe('live window starts', () => {
 
   it('gives no date filter for an endpoint fetched whole', () => {
     expect(liveWindowFrom('all', NOW - 5000, NOW, START)).toBeNull();
+  });
+
+  it('never reaches back further than the cap for a high-rate endpoint', () => {
+    // A stale mark, as happens after a failed fetch: without the cap this asks
+    // for hours of location data, OpenF1 answers 422, the mark stays stale and
+    // the next request is bigger still.
+    const hoursAgo = NOW - 5 * 3600_000;
+    expect(liveWindowFrom('hi', hoursAgo, NOW, START)).toBe(NOW - MAX_HI_LOOKBACK_MS);
+  });
+
+  it('still uses the recent mark when it is inside the cap', () => {
+    expect(liveWindowFrom('hi', NOW - 5000, NOW, START)).toBe(NOW - 15_000);
+  });
+
+  it('leaves the low-rate endpoints uncapped, since they are small', () => {
+    // These legitimately fetch the session so far on their first call.
+    expect(liveWindowFrom('lo', undefined, NOW, START)).toBe(START - 30 * 60_000);
+    const hoursAgo = NOW - 5 * 3600_000;
+    expect(liveWindowFrom('lo', hoursAgo, NOW, START)).toBe(hoursAgo - 30_000);
   });
 });
 

@@ -36,7 +36,7 @@ describe('resolveStatic', () => {
 describe('cacheControlFor', () => {
   it('pins hashed assets, which never change under the same name', () => {
     expect(cacheControlFor(path.join(ROOT, 'assets/index-abc123.js'))).toBe(
-      'public, max-age=31536000, immutable',
+      'private, max-age=31536000, immutable',
     );
   });
 

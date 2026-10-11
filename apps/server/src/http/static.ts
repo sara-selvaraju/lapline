@@ -38,9 +38,16 @@ export function resolveStatic(root: string, urlPath: string): string | null {
   return file;
 }
 
-/** Content-hashed assets never change under the same name. */
+/**
+ * Content-hashed assets never change under the same name, so they can be held
+ * for a year — but `private`, not `public`: behind the password these are
+ * authenticated responses, and `public` lets a shared cache such as
+ * Cloudflare's edge keep them and hand them to someone who never logged in.
+ * Only the client bundle, which is public on GitHub anyway, but the header was
+ * still wrong.
+ */
 export function cacheControlFor(file: string): string {
-  return /[./]assets[/\\]/.test(file) ? 'public, max-age=31536000, immutable' : 'no-cache';
+  return /[./]assets[/\\]/.test(file) ? 'private, max-age=31536000, immutable' : 'no-cache';
 }
 
 export function serveStatic(res: ServerResponse, root: string, urlPath: string): void {
