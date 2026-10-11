@@ -12,6 +12,7 @@
 
 import type { LapRow, LocationRow, Mode, SessionRow, Tick, Transform } from '@lapline/shared';
 import { LockedError, type OpenF1 } from '../openf1/client.js';
+import { LiveMqtt } from '../openf1/live-mqtt.js';
 import { createBuffers, num, prune, type Buffers } from './buffers.js';
 import { applyReplayControl, clock, newReplayState, replayNow, type ReplayState } from './clock.js';
 import { buildFrame } from './frames.js';
@@ -465,22 +466,25 @@ export class Feed {
 
   // ---------- MQTT ----------
 
-  /** Set in commit 9, when the MQTT client lands. */
-  protected mqtt: { stop(): void } | null = null;
+  private mqtt: LiveMqtt | null = null;
 
-  protected startMqtt(): void {
-    // MQTT arrives in commit 9; until then the live path uses REST polling,
-    // which is what LIVE_TRANSPORT=rest selects anyway.
+  /**
+   * Only when MQTT is the chosen transport and credentials exist. With
+   * LIVE_TRANSPORT=rest this stays null, so mqttHealthy is never true and the
+   * fetch scheduler runs the full REST plan.
+   */
+  private startMqtt(): void {
+    if (this.liveTransport !== 'mqtt' || !this.api.hasCredentials) return;
+    this.mqtt = new LiveMqtt(this.api, (topic, row) => {
+      this.mqttLastMsg = Date.now();
+      this.ingest(topic, [row]);
+    });
+    void this.mqtt.start().catch((e: unknown) => console.error('mqtt', message(e)));
   }
 
-  protected stopMqtt(): void {
+  private stopMqtt(): void {
     if (this.mqtt) this.mqtt.stop();
     this.mqtt = null;
-  }
-
-  protected noteMqttRow(topic: string, row: unknown): void {
-    this.mqttLastMsg = Date.now();
-    this.ingest(topic, [row]);
   }
 
   // ---------- frames ----------
