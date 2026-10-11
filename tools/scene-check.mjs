@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// M2's acceptance checks that need a real browser: tapping a bunch opens the
-// picker, selection stays in sync between the track and the tower, and the
-// frame rate with a full field.
+// The acceptance checks that need a real browser: tapping a bunch opens the
+// picker, selection stays in sync between the track and the tower, the frame
+// rate with a full field (M2), and the circuit detail layout — no turn badge
+// overlapping a car label or the camera group (M3).
 //
 //   node tools/scene-check.mjs [--url ...] [--seek ms]
 
@@ -107,6 +108,15 @@ say('selection changes with the tower', afterSecond.strip === afterSecond.rowCod
 
 // ---- tapping a bunch opens the picker ----
 console.log('\ncar picker');
+// Hold the field still. The sweep below takes a few seconds of session time,
+// so with the replay running the bunch it finds has driven off by the time it
+// reopens the spot. Everything from here on is about a static view.
+await fetch(`${URLBASE}/api/control`, {
+  method: 'POST',
+  headers: { ...headers, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ playing: false }),
+});
+await page.waitForTimeout(500);
 const box = await page.locator('.track-canvas').boundingBox();
 // Sweep the track for the densest overlap, rather than stopping at the first
 // one found: the acceptance check is about a bunch of four, and which spot is
@@ -131,16 +141,24 @@ for (let fy = 0.15; fy <= 0.85; fy += 0.04) {
   }
   if (opened >= 4) break;
 }
-// Reopen the densest spot so the follow-up assertions act on it.
+// Reopen the densest spot so the follow-up assertions act on it, and count
+// what is actually on screen now rather than trusting the sweep's tally.
+let reopened = 0;
 if (bestAt) {
   await page.mouse.click(box.x + box.width * bestAt[0], box.y + box.height * bestAt[1]);
   await page.waitForTimeout(150);
+  reopened = await page.evaluate(() => document.querySelectorAll('.picker-row').length);
 }
 
 say('a bunch opens the picker', opened !== null, opened ? `${opened} cars offered` : 'no bunch found');
 if (opened) {
   say('the picker offers four or more', opened >= 4, `${opened} rows`);
   const before = await page.evaluate(() => document.querySelector('.strip-code')?.textContent?.trim());
+  if (reopened < 2) {
+    say('choosing from it closes the picker', false, `only ${reopened} rows on reopening`);
+    say('and selects that car everywhere', false, 'not reached');
+    await page.evaluate(() => document.querySelector('.picker-scrim')?.click());
+  } else {
   await page.locator('.picker-row').nth(1).click();
   await page.waitForTimeout(400);
   const after = await page.evaluate(() => ({
@@ -150,6 +168,63 @@ if (opened) {
   }));
   say('choosing from it closes the picker', after.open === 0, `${after.open} rows left`);
   say('and selects that car everywhere', after.strip === after.rowCode, `strip ${after.strip}, tower ${after.rowCode}, was ${before}`);
+  }
+}
+
+// ---- circuit detail layout (M3) ----
+// The default view, which is what the acceptance check is about.
+await page.getByRole('button', { name: 'Tilt', exact: true }).click();
+await page.waitForTimeout(1200);
+
+console.log('\ncircuit detail');
+const layout = await page.evaluate(() => {
+  const scene = window.__lapline?.scene;
+  if (!scene) return null;
+  const { boxes, obstacles } = scene.layout();
+  const rect = (b) => ({
+    left: b.x - b.width / 2,
+    right: b.x + b.width / 2,
+    top: b.y - b.height / 2,
+    bottom: b.y + b.height / 2,
+  });
+  const hits = (a, b) => !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom);
+
+  const badges = boxes.filter((b) => b.kind === 'badge');
+  const labels = boxes.filter((b) => b.kind === 'label');
+  const overBadge = [];
+  const overGroup = [];
+  for (const badge of badges) {
+    const r = rect(badge);
+    for (const label of labels) if (hits(r, rect(label))) overBadge.push(`turn ${badge.key} on ${label.key}`);
+    for (const o of obstacles) if (hits(r, o)) overGroup.push(`turn ${badge.key}`);
+  }
+  return { badges: badges.length, labels: labels.length, obstacles: obstacles.length, overBadge, overGroup };
+});
+
+if (!layout) {
+  say('scene layout is readable', false, 'window.__lapline.scene missing');
+} else {
+  // Without a car label on screen there is nothing to check against, so the
+  // overlap check below would pass having compared nothing.
+  say(
+    'turn badges and car labels are drawn',
+    layout.badges > 0 && layout.labels > 0,
+    `${layout.badges} badges, ${layout.labels} car labels`,
+  );
+  say(
+    'no turn badge overlaps a car label',
+    layout.overBadge.length === 0,
+    layout.overBadge.length ? layout.overBadge.join(', ') : `checked ${layout.badges} x ${layout.labels}`,
+  );
+  say(
+    'no turn badge overlaps the camera group',
+    layout.obstacles > 0 && layout.overGroup.length === 0,
+    layout.obstacles === 0
+      ? 'no camera group found, so nothing was checked'
+      : layout.overGroup.length
+        ? layout.overGroup.join(', ')
+        : 'clear',
+  );
 }
 
 // ---- camera presets ----
