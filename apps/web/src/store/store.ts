@@ -37,6 +37,8 @@ export interface StoreState {
   camera: CameraPreset;
   follow: boolean;
   scrubbing: boolean;
+  /** Driver numbers under the last ambiguous tap, or null when closed. */
+  picker: number[] | null;
   history: HistorySample[];
   /** Bumps whenever the circuit's transform changes, so the scene can rebuild. */
   circuitEpoch: number;
@@ -54,6 +56,8 @@ export interface StoreState {
   setCamera: (p: CameraPreset) => void;
   setFollow: (on: boolean) => void;
   setScrubbing: (on: boolean) => void;
+  openPicker: (ns: number[]) => void;
+  closePicker: () => void;
   clearHistory: () => void;
 }
 
@@ -85,6 +89,7 @@ export const useStore = create<StoreState>((set, get) => ({
   camera: prefs.camera,
   follow: false,
   scrubbing: false,
+  picker: null,
   history: [],
   circuitEpoch: 0,
 
@@ -152,7 +157,7 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => {
       // The trace belongs to one driver; carrying it over would draw a line
       // that never happened.
-      const next = { sel: n, history: s.sel === n ? s.history : [] };
+      const next = { sel: n, history: s.sel === n ? s.history : [], picker: null };
       if (persistPref) persist({ ...s, ...next });
       return next;
     }),
@@ -184,6 +189,8 @@ export const useStore = create<StoreState>((set, get) => ({
 
   setFollow: (follow) => set({ follow }),
   setScrubbing: (scrubbing) => set({ scrubbing }),
+  openPicker: (picker) => set({ picker }),
+  closePicker: () => set({ picker: null }),
   clearHistory: () => set({ history: [] }),
 }));
 

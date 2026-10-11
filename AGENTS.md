@@ -13,12 +13,20 @@ A personal, non-commercial, phone-first second screen for F1 sessions: a 3D circ
 
 ## Status
 
-M1 done: protocol v2 with zod schemas and a version check, a Zustand store, the
-design tokens and self-hosted font, and the main screen built to
-`Main.dc.html`. Next is M2 in `docs/BUILD-PLAN.md`.
+M2 done, with one check that cannot be run here. The scene is a class with the
+track layers, cars, the label rule with screen-space collision avoidance,
+camera presets and the car picker. Next is M3 in `docs/BUILD-PLAN.md`.
 
-`npm run layout` measures the rendered screen against the artboard and fails on
-drift; run it for any change to the layout.
+**Unverified:** "60 fps on the target iPhone". There is no device here, so it
+is measured in headless Chrome instead — a steady 60 fps with a full field,
+which shows the scene is fast enough algorithmically but says nothing about
+Safari on A-series hardware. Run it on a phone before trusting it. This is the
+second check the project cannot close locally, after MQTT against OpenF1's real
+broker.
+
+`npm run layout` measures the rendered screen against the artboard and
+`npm run scene` runs the scene checks; both fail on drift. Run them for any
+change to the layout or the 3D view.
 
 Live at https://lapline.live, behind the password. `www.lapline.live` serves the
 same app. DNS is Cloudflare, registration GoDaddy, hosting Railway.

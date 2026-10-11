@@ -255,15 +255,25 @@ export class Scene {
     }
   }
 
-  /** The car under a tap, or null. The hit spheres are far larger than the dots. */
-  pickCar(ndc: THREE.Vector2): number | null {
+  /**
+   * Every car under a tap, nearest first. The hit spheres are far larger than
+   * the dots, because a thumb is not a mouse — which means a tap into a train
+   * of cars legitimately hits several, and the caller opens the picker rather
+   * than guessing which one was meant.
+   */
+  pickCars(ndc: THREE.Vector2): number[] {
     const ray = new THREE.Raycaster();
     ray.setFromCamera(ndc, this.camera);
     const hits = ray.intersectObjects(
       [...this.cars.values()].map((c) => c.hit),
       false,
     );
-    return hits.length ? (hits[0]!.object.userData.n as number) : null;
+    const seen = new Set<number>();
+    for (const h of hits) {
+      const n = h.object.userData.n as number;
+      if (!seen.has(n)) seen.add(n);
+    }
+    return [...seen];
   }
 
   /** Normalised device coordinates for a pointer over the canvas. */
