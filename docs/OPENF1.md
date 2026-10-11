@@ -64,9 +64,12 @@ Not used yet, but available: `weather`, `team_radio` (coverage dropped sharply i
 ## Circuit detail via `circuit_info_url`
 
 - Each meeting links to a JSON file hosted by MultiViewer, in the format FastF1 documents as circuit info: corners with numbers and positions, marshal lights, marshal sectors, and a rotation for orienting the map.
-- **Unverified:** this file couldn't be opened during design (automated access was refused). Inspect a real response, write a tolerant parser with a zod schema, and check MultiViewer's terms before depending on it.
-- Fetch it server-side once per meeting and cache it. If it fails, derive turns from curvature on the outline instead.
-- Assume corner coordinates share OpenF1's location frame, but confirm by overlaying them on a lap trace before trusting them.
+- **Verified on 11 October 2026**, against the Singapore meeting (`circuit_info_url` → `api.multiviewer.app/api/v1/circuits/61/2026`). It returns 200 with no special headers; the earlier note that automated access was refused is out of date.
+- The response carries `corners` (19 at Singapore), `marshalSectors` (16), `marshalLights` (16), a `rotation`, a 544-point `x`/`y` trace, `trackPositionTime` along that trace, and `pitLoss` for normal, SC and VSC.
+- **Corner coordinates do share OpenF1's location frame** — same origin, same scale. Checked by overlaying the 19 corners on a real Singapore lap trace: median distance to the racing line 24 units, worst 64, against a circuit spanning 14,391. Worst case is 0.45% of the circuit.
+- Fetch it server-side once per meeting and cache it, including failures, so a meeting without one is not retried on every session change. It is not OpenF1, so it must not go through the OpenF1 request queue.
+- If it fails, turns are derived from curvature on our own outline. That fallback finds about two thirds of a street circuit's corners — 12 at Singapore against the 19 the file lists — so it is a degraded mode, not an equivalent.
+- No sector boundaries are published by either source. They have to be derived from a reference lap's sector durations.
 
 ## Volumes and budgets
 
