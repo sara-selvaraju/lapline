@@ -5,9 +5,9 @@
 // and both stay right when the elevation setting changes.
 
 import * as THREE from 'three';
-import type { SectorBoundary, TrackMarker } from '@lapline/shared';
+import type { MarshalSectorFlag, SectorBoundary, TrackMarker } from '@lapline/shared';
 import { COLORS } from './colours.js';
-import { PX } from './geometry.js';
+import { PX, ribbonGeometry } from './geometry.js';
 
 /** docs/DESIGN.md: 17px badge, 14px out from the apex. */
 const BADGE_PX = 17;
@@ -64,6 +64,45 @@ function badgeTexture(label: string): THREE.CanvasTexture {
 
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function roundRect(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.arcTo(x + w, y, x + w, y + h, r);
+  g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r);
+  g.arcTo(x, y, x + w, y, r);
+  g.closePath();
+}
+
+/** A filled chip: yellow ground, night text, as docs/DESIGN.md draws it. */
+function chipTexture(label: string): THREE.CanvasTexture {
+  const scale = 8;
+  const px = 12;
+  const padX = 6 * scale;
+  const padY = 2 * scale;
+  const probe = document.createElement('canvas').getContext('2d')!;
+  probe.font = `700 ${px * scale}px "Barlow Semi Condensed", system-ui, sans-serif`;
+  const w = Math.ceil(probe.measureText(label).width) + padX * 2;
+  const h = Math.ceil(px * scale + padY * 2);
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const g = c.getContext('2d')!;
+  roundRect(g, 0, 0, w, h, 4 * scale);
+  g.fillStyle = '#F5B700';
+  g.fill();
+  g.font = `700 ${px * scale}px "Barlow Semi Condensed", system-ui, sans-serif`;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillStyle = '#0E1626';
+  g.fillText(label, w / 2, h / 2);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.userData.aspect = w / h;
+  tex.userData.heightPx = h / scale;
   return tex;
 }
 
@@ -185,6 +224,65 @@ export function buildMarshalTicks(points: readonly THREE.Vector3[], markers: rea
       linewidth: MARSHAL_TICK_PX,
     }),
   );
+}
+
+/** docs/DESIGN.md: the affected marshal sector overlaid 5px yellow with a chip. */
+const YELLOW_OVERLAY_PX = 5;
+
+export interface YellowOverlay {
+  line: THREE.Mesh;
+  chip: THREE.Sprite;
+}
+
+/**
+ * Paints the stretch of track a marshal sector covers.
+ *
+ * A marshal sector runs from its own marker to the next one round the lap, so
+ * the span is between consecutive markers and the last one wraps through the
+ * start line.
+ */
+export function buildYellowOverlays(
+  points: readonly THREE.Vector3[],
+  markers: readonly TrackMarker[],
+  flags: readonly MarshalSectorFlag[],
+): YellowOverlay[] {
+  if (points.length === 0 || markers.length === 0) return [];
+  const byNumber = new Map(markers.map((m, i) => [m.number, i]));
+  const out: YellowOverlay[] = [];
+
+  for (const flag of flags) {
+    const at = byNumber.get(flag.sector);
+    if (at === undefined) continue;
+    const from = markers[at]!.index;
+    const to = markers[(at + 1) % markers.length]!.index;
+
+    const span: THREE.Vector3[] = [];
+    for (let i = from; ; i = (i + 1) % points.length) {
+      // Lift it clear of the ribbon so the paint reads on top.
+      span.push(points[i]!.clone().setY(points[i]!.y + 0.08));
+      if (i === to || span.length > points.length) break;
+    }
+    if (span.length < 2) continue;
+
+    // A ribbon, not a line: WebGL ignores linewidth, so a LineBasicMaterial
+    // always draws one pixel however thick the design asks for.
+    const line = new THREE.Mesh(
+      ribbonGeometry(span, (YELLOW_OVERLAY_PX * PX) / 2, 0),
+      new THREE.MeshBasicMaterial({ color: 0xf5b700, side: THREE.DoubleSide, depthWrite: false }),
+    );
+    line.renderOrder = 7;
+
+    const label = flag.flag === 'DOUBLE YELLOW' ? 'Double yellow' : 'Yellow';
+    const tex = chipTexture(label);
+    const chip = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+    const hPx = tex.userData.heightPx as number;
+    chip.scale.set(hPx * PX * (tex.userData.aspect as number), hPx * PX, 1);
+    const mid = span[Math.floor(span.length / 2)]!;
+    chip.position.copy(mid).setY(mid.y + 2.2);
+    chip.renderOrder = 9;
+    out.push({ line, chip });
+  }
+  return out;
 }
 
 export { textTexture };

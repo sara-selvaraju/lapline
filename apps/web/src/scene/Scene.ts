@@ -11,11 +11,17 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { Circuit, Tick } from '@lapline/shared';
+import type { Circuit, MarshalSectorFlag, Tick, Timing } from '@lapline/shared';
 import { storeState } from '../store/store.js';
 import { applyStale, makeCar, setLabelSelected, type Car } from './cars.js';
 import { COLORS, FRAME_MS } from './colours.js';
-import { buildMarshalTicks, buildSectorTicks, buildTurnBadges, type BadgeSprite } from './detail.js';
+import {
+  buildMarshalTicks,
+  buildSectorTicks,
+  buildTurnBadges,
+  buildYellowOverlays,
+  type BadgeSprite,
+} from './detail.js';
 import { labelledDrivers, resolveCollisions, type LabelBox, type Obstacle } from './labels.js';
 import {
   GLOW_HALF_WIDTH,
@@ -54,6 +60,7 @@ export class Scene {
   readonly backgroundGroup = new THREE.Group();
   readonly trackGroup = new THREE.Group();
   readonly detailGroup = new THREE.Group();
+  readonly flagGroup = new THREE.Group();
   readonly carGroup = new THREE.Group();
 
   private readonly canvas: HTMLCanvasElement;
@@ -67,6 +74,11 @@ export class Scene {
   private disposables: Array<{ dispose(): void }> = [];
   private readonly cars = new Map<number, Car>();
   private badges: BadgeSprite[] = [];
+  private worldPoints: THREE.Vector3[] = [];
+  private circuit: Circuit | null = null;
+  /** What the flag layer was last drawn for, so it is only rebuilt on change. */
+  private paintedFlags = '';
+  private readonly noFlags: MarshalSectorFlag[] = [];
   private transform: Circuit['transform'] | null = null;
   private zx = 4;
   /** A jump over a quarter of the map is a seek, so snap rather than slide. */
@@ -84,7 +96,7 @@ export class Scene {
     const gridMat = grid.material as THREE.Material;
     gridMat.transparent = true;
     gridMat.opacity = 0.35;
-    this.scene.add(grid, this.backgroundGroup, this.trackGroup, this.detailGroup, this.carGroup);
+    this.scene.add(grid, this.backgroundGroup, this.trackGroup, this.detailGroup, this.flagGroup, this.carGroup);
 
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
@@ -106,7 +118,11 @@ export class Scene {
   setCircuit(circuit: Circuit | null, zx: number, layers = { turns: true, sectors: true, pitLane: true }): void {
     this.clearGroup(this.trackGroup);
     this.clearGroup(this.detailGroup);
+    this.clearGroup(this.flagGroup);
     this.badges = [];
+    this.worldPoints = [];
+    this.circuit = circuit;
+    this.paintedFlags = '';
     this.zx = zx;
     this.transform = circuit?.transform ?? null;
     const raw = circuit?.points ?? [];
@@ -182,6 +198,7 @@ export class Scene {
     chevron.rotation.z = -sf.rotation;
     this.add(this.trackGroup, chevron);
 
+    this.worldPoints = points;
     this.addDetail(circuit, points, layers);
     if (!this.viewFitted) this.resetView();
   }
@@ -333,8 +350,25 @@ export class Scene {
   private readonly projected = new THREE.Vector3();
   private readonly labelBoxes: LabelBox[] = [];
 
+  /**
+   * Paints marshal sectors showing a flag. Rebuilt only when the set changes,
+   * because it is geometry rather than a transform and a yellow typically
+   * stands for a minute or more.
+   */
+  private paintFlags(timing: Pick<Timing, 'marshalSectors'> | null): void {
+    const key = (timing?.marshalSectors ?? this.noFlags).map((f) => `${f.sector}:${f.flag}`).join(',');
+    if (key === this.paintedFlags) return;
+    this.paintedFlags = key;
+    this.clearGroup(this.flagGroup);
+    if (!this.circuit || !timing?.marshalSectors.length || this.worldPoints.length === 0) return;
+    for (const o of buildYellowOverlays(this.worldPoints, this.circuit.marshalSectors, timing.marshalSectors)) {
+      this.flagGroup.add(o.line, o.chip);
+    }
+  }
+
   private onFrame(now: number, dt: number): void {
     const { sel, follow, allLabels, timing } = storeState();
+    this.paintFlags(timing);
     const rows = timing?.rows ?? [];
     const labelled = labelledDrivers(rows, sel, allLabels);
 

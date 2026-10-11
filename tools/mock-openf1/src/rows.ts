@@ -150,16 +150,19 @@ export function rowsFor(ep: string, s: MockSession, from: number, to: number): R
 
   if (ep === 'race_control') {
     // Scripted so replay steps through yellow, safety car and chequered.
-    const ev: Array<[number, string, string | null, string, string]> = [
-      [0, 'Flag', 'GREEN', 'Track', 'GREEN LIGHT - PIT EXIT OPEN'],
-      [5 * 60_000, 'Flag', 'YELLOW', 'Sector', 'YELLOW IN TRACK SECTOR 7'],
-      [6 * 60_000, 'Flag', 'CLEAR', 'Sector', 'CLEAR IN TRACK SECTOR 7'],
-      [9 * 60_000, 'SafetyCar', null, 'Track', 'SAFETY CAR DEPLOYED'],
-      [11 * 60_000, 'SafetyCar', null, 'Track', 'SAFETY CAR IN THIS LAP'],
-      [12 * 60_000, 'Flag', 'GREEN', 'Track', 'TRACK CLEAR'],
-      [s.laps * T0 * 1000, 'Flag', 'CHEQUERED', 'Track', 'CHEQUERED FLAG'],
+    // Sector-scoped rows carry their marshal sector, as the real feed does:
+    // Singapore's race sent 18 of them. Without the number nothing downstream
+    // can tell which part of the track to paint.
+    const ev: Array<[number, string, string | null, string, string, number | null]> = [
+      [0, 'Flag', 'GREEN', 'Track', 'GREEN LIGHT - PIT EXIT OPEN', null],
+      [5 * 60_000, 'Flag', 'YELLOW', 'Sector', 'YELLOW IN TRACK SECTOR 7', 7],
+      [6 * 60_000, 'Flag', 'CLEAR', 'Sector', 'CLEAR IN TRACK SECTOR 7', 7],
+      [9 * 60_000, 'SafetyCar', null, 'Track', 'SAFETY CAR DEPLOYED', null],
+      [11 * 60_000, 'SafetyCar', null, 'Track', 'SAFETY CAR IN THIS LAP', null],
+      [12 * 60_000, 'Flag', 'GREEN', 'Track', 'TRACK CLEAR', null],
+      [s.laps * T0 * 1000, 'Flag', 'CHEQUERED', 'Track', 'CHEQUERED FLAG', null],
     ];
-    for (const [dt, category, flag, scope, message] of ev) {
+    for (const [dt, category, flag, scope, message, sector] of ev) {
       const t = s.start + dt;
       if (t <= lim) {
         out.push({
@@ -171,7 +174,7 @@ export function rowsFor(ep: string, s: MockSession, from: number, to: number): R
           message,
           driver_number: null,
           lap_number: null,
-          sector: null,
+          sector,
         });
       }
     }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createBuffers, type Buffers } from '../src/feed/buffers.js';
-import { buildCars, buildTick, buildTiming, currentLap, trackFlag, tyre } from '../src/feed/frames.js';
+import { buildCars, buildTick, buildTiming, currentLap, marshalSectorFlags, trackFlag, tyre } from '../src/feed/frames.js';
 
 const T = 1_000_000;
 
@@ -315,5 +315,67 @@ describe('the timing event', () => {
     expect(timing.totalLaps).toBeNull();
     expect(timing.marshalSectors).toEqual([]);
     expect(timing.battles).toEqual([]);
+  });
+});
+
+describe('marshal sector flags', () => {
+  const rc = (t: number, row: Record<string, unknown>): [number, Record<string, unknown>] => [t, row];
+  const withRc = (rows: Array<[number, Record<string, unknown>]>): Buffers => {
+    const b = createBuffers();
+    b.rc = rows as Buffers['rc'];
+    return b;
+  };
+
+  it('is empty when nothing has happened', () => {
+    expect(marshalSectorFlags(createBuffers(), T)).toEqual([]);
+  });
+
+  it('raises a yellow at the sector race control names', () => {
+    const b = withRc([rc(T, { category: 'Flag', flag: 'YELLOW', scope: 'Sector', sector: 7 })]);
+    expect(marshalSectorFlags(b, T + 1)).toEqual([{ sector: 7, flag: 'YELLOW' }]);
+  });
+
+  it('clears it again when the sector goes clear', () => {
+    const b = withRc([
+      rc(T, { category: 'Flag', flag: 'YELLOW', scope: 'Sector', sector: 7 }),
+      rc(T + 1000, { category: 'Flag', flag: 'CLEAR', scope: 'Sector', sector: 7 }),
+    ]);
+    expect(marshalSectorFlags(b, T + 500)).toEqual([{ sector: 7, flag: 'YELLOW' }]);
+    expect(marshalSectorFlags(b, T + 2000)).toEqual([]);
+  });
+
+  it('keeps double yellow distinct from yellow', () => {
+    // Singapore's race carried one. The design draws both the same, but
+    // flattening it here would lose the distinction for good.
+    const b = withRc([rc(T, { category: 'Flag', flag: 'DOUBLE YELLOW', scope: 'Sector', sector: 14 })]);
+    expect(marshalSectorFlags(b, T + 1)).toEqual([{ sector: 14, flag: 'DOUBLE YELLOW' }]);
+  });
+
+  it('holds several sectors at once, in order', () => {
+    const b = withRc([
+      rc(T, { category: 'Flag', flag: 'YELLOW', scope: 'Sector', sector: 6 }),
+      rc(T + 10, { category: 'Flag', flag: 'YELLOW', scope: 'Sector', sector: 3 }),
+    ]);
+    expect(marshalSectorFlags(b, T + 100).map((f) => f.sector)).toEqual([3, 6]);
+  });
+
+  it('ignores track-scoped and driver-scoped flags', () => {
+    // A blue flag is about one car; a red is about everyone. Neither belongs
+    // to a marshal sector, and Singapore's race sent 71 blues.
+    const b = withRc([
+      rc(T, { category: 'Flag', flag: 'BLUE', scope: 'Driver', sector: null, driver_number: 4 }),
+      rc(T + 1, { category: 'Flag', flag: 'RED', scope: 'Track', sector: null }),
+    ]);
+    expect(marshalSectorFlags(b, T + 100)).toEqual([]);
+  });
+
+  it('ignores a sector-scoped row with no sector number', () => {
+    const b = withRc([rc(T, { category: 'Flag', flag: 'YELLOW', scope: 'Sector', sector: null })]);
+    expect(marshalSectorFlags(b, T + 1)).toEqual([]);
+  });
+
+  it('ignores anything after the clock', () => {
+    const b = withRc([rc(T + 10_000, { category: 'Flag', flag: 'YELLOW', scope: 'Sector', sector: 7 })]);
+    expect(marshalSectorFlags(b, T)).toEqual([]);
   });
 });
