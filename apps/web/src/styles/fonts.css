@@ -1,0 +1,40 @@
+/* Barlow Semi Condensed, self-hosted.
+ *
+ * SIL Open Font License 1.1, so redistribution is fine. Self-hosted rather than
+ * loaded from Google's CDN: no third-party request on the critical path, and the
+ * home-screen app keeps its type when the network is poor.
+ *
+ * Latin subset only — the UI is Australian English and driver codes are ASCII.
+ */
+
+@font-face {
+  font-family: 'Barlow Semi Condensed';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/barlow-semi-condensed-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Barlow Semi Condensed';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/barlow-semi-condensed-500.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Barlow Semi Condensed';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/barlow-semi-condensed-600.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Barlow Semi Condensed';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/barlow-semi-condensed-700.woff2') format('woff2');
+}

@@ -1,0 +1,79 @@
+/* Design tokens, from the table in docs/DESIGN.md.
+ *
+ * These are the only colours and sizes the UI may use. Where the spec and an
+ * artboard disagree, the artboard wins — docs/DESIGN.md says so, and any
+ * conflict is noted beside the token.
+ */
+
+:root {
+  /* ---- colour ---- */
+  --night: #0e1626;        /* page ground, scene clear colour */
+  --panel: #15213a;        /* driver strip, sheets, bars, selected tower row */
+  --line: #283857;         /* borders, dividers, scene ground line */
+  --line-strong: #3a4d74;  /* turn badge borders */
+  --flood: #f2ebdd;        /* track ribbon, primary text, primary buttons */
+  --text-2: #c9d1de;       /* secondary values */
+  --haze: #8c9ab5;         /* labels, units, tertiary text */
+  --green: #2bb673;        /* track green, throttle */
+  --yellow: #f5b700;       /* yellow, SC and VSC, reconnecting */
+  --red: #e5383b;          /* red flag, brake, live dot */
+  --purple: #b794ff;       /* fastest lap of the session */
+  --pb: #4cd08e;           /* personal best lap */
+
+  --tyre-soft: #ff4d4f;
+  --tyre-medium: #ffd12e;
+  --tyre-hard: #f2ebdd;
+  --tyre-inter: #3cc35a;
+  --tyre-wet: #2e8bff;
+
+  --label-bg: rgb(14 22 38 / 0.88);  /* car labels on the track */
+  --backdrop: rgb(5 9 18 / 0.55);    /* behind sheets */
+
+  /* ---- type ---- */
+  --font: 'Barlow Semi Condensed', system-ui, -apple-system, sans-serif;
+  --fs-speed: 60px;     /* speed and gear, telemetry panel */
+  --fs-lap: 44px;       /* lap number, glance mode */
+  --fs-strip: 36px;     /* speed and gear, driver strip */
+  --fs-code: 24px;      /* driver code in the strip, sheet titles */
+  --fs-circuit: 21px;   /* circuit name in the header */
+  --fs-body: 18px;      /* body copy in sheets and state screens */
+  --fs-row: 17px;       /* tower rows, header lap count */
+  --fs-button: 16px;    /* buttons, flag band label */
+  --fs-secondary: 15px; /* secondary text, race control line */
+  --fs-field: 14px;     /* field labels, tower header */
+  --fs-unit: 13px;      /* units, car labels on the track */
+  --fs-note: 12px;      /* track annotations, small chips */
+  --fs-badge: 10px;     /* turn badges, tyre letters */
+
+  /* ---- shape and spacing ---- */
+  --gutter: 16px;          /* 12px in landscape */
+  --tap: 44px;             /* minimum touch target */
+  --r-chip: 4px;           /* car labels and chips */
+  --r-button: 12px;        /* buttons and the camera group (9 to 12) */
+  --r-card: 14px;          /* cards and list groups */
+  --r-sheet: 20px;         /* sheets (16 to 20) */
+
+  /* ---- portrait layout, from the table in docs/DESIGN.md ---- */
+  --h-flag: 4px;           /* 28px once it carries a label */
+  --h-flag-label: 28px;
+  --h-header: 56px;
+  --h-track: 290px;
+  --h-strip: 88px;
+  --h-tower-head: 30px;
+  --h-tower-row: 36px;
+  --h-controls: 68px;      /* live; about 90 in replay */
+
+  /* The flag band grows and changes colour over 200-300ms. Nothing else moves. */
+  --flag-transition: 240ms;
+
+  color-scheme: dark;
+}
+
+/* The palette is designed for night; a daytime theme is an open question in
+ * docs/DESIGN.md, so there is deliberately no light variant yet. */
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --flag-transition: 0ms;
+  }
+}

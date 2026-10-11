@@ -1,3 +1,6 @@
+@import './styles/fonts.css';
+@import './styles/tokens.css';
+
 :root {
   --night: #0E1626;
   --panel: #15213A;
@@ -14,7 +17,7 @@
   --inter: #3CC35A;
   --wet: #2E8BFF;
   --gutter: 12px;
-  font-family: 'Barlow Semi Condensed', system-ui, sans-serif;
+  font-family: var(--font);
   color: var(--flood);
   background: var(--night);
   font-variant-numeric: tabular-nums;
