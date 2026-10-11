@@ -30,7 +30,7 @@ username=…&password=…
 - Username: the account username. Password: the access token.
 - Topics mirror REST paths: `v1/location`, `v1/car_data`, `v1/position`, `v1/intervals`, `v1/race_control`, `v1/pit`, `v1/laps`, `v1/stints` and so on.
 - Messages are the REST row plus `_id` (increasing) and `_key` (document identity). Rows with the same `_key` are updates to one document; `v1/laps` relies on this as sectors complete. Upsert laps by driver and lap number.
-- Lapline's MQTT client has only been tested against a local broker, not OpenF1's. Verify it during the first live session.
+- **Verified against OpenF1's real broker on 11 October 2026**, during the Singapore race. The feed switched to live by itself when the window opened, reported `mqtt: true`, and streamed 22 cars at 4 Hz with a 2 s data age. The earlier note that it had only met a local broker no longer applies.
 
 ## REST conventions
 
@@ -76,7 +76,8 @@ Not used yet, but available: `weather`, `team_radio` (coverage dropped sharply i
 - One race of location plus car data is about a million rows for 22 cars over two hours.
 - Replay windows: all cars for 30 s of session time is about 2,400 rows per endpoint per request.
 - **Free-tier replay:** opening a session costs about 8 requests (drivers, laps, stints, position, intervals, race control, pit, one reference-lap trace), which is around 20 s at 2.1 s spacing.
-- **Live REST fallback:** about 42 requests a minute, measured against the mock.
+- **Live REST fallback:** 44.5 requests a minute, measured against the mock, confirmed from two independent counts.
+- **Live over MQTT:** 2.5 requests a minute, measured against the real Singapore race. With the broker carrying the stream the scheduler drops to a slow repair sweep, so it spends about 4% of the sponsor budget rather than 73%.
 
 ## 2026 changes worth knowing
 
