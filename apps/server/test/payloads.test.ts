@@ -37,16 +37,16 @@ describe('circuitPayload', () => {
   const transform = { cx: 0, cy: 0, cz: 0, scale: 1 };
 
   it('returns the outline once there is one', () => {
-    const out = circuitPayload({ points: [[1, 2, 3]], transform, source: 'Sprint' }, null);
-    expect(out).toEqual({ points: [[1, 2, 3]], transform, source: 'Sprint' });
+    const out = circuitPayload({ points: [[1, 2, 3]], transform, source: 'Sprint', turns: [], sectors: [], marshalSectors: [], pitLane: [], detailSource: 'none' as const }, null);
+    expect(out).toEqual({ points: [[1, 2, 3]], transform, source: 'Sprint', turns: [], sectors: [], marshalSectors: [], pitLane: [], detailSource: 'none' as const });
   });
 
   it('returns a provisional transform with no points', () => {
-    expect(circuitPayload(null, transform)).toEqual({ points: [], transform, source: 'provisional' });
+    expect(circuitPayload(null, transform)).toMatchObject({ points: [], transform, source: 'provisional', detailSource: 'none' });
   });
 
   it('prefers a real outline over a provisional transform', () => {
-    expect(circuitPayload({ points: [[1, 2, 3]], transform, source: 'Sprint' }, transform)!.source).toBe('Sprint');
+    expect(circuitPayload({ points: [[1, 2, 3]], transform, source: 'Sprint', turns: [], sectors: [], marshalSectors: [], pitLane: [], detailSource: 'none' as const }, transform)!.source).toBe('Sprint');
   });
 
   it('returns null when there is neither', () => {

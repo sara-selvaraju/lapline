@@ -134,11 +134,15 @@ export function ingest(
         if (n == null || row.lap_number == null) break;
         let m = buffers.laps.get(n);
         if (!m) buffers.laps.set(n, (m = new Map()));
+        const s1 = num(row.duration_sector_1);
+        const s2 = num(row.duration_sector_2);
+        const s3 = num(row.duration_sector_3);
         m.set(row.lap_number, {
           n: row.lap_number,
           start: row.date_start ? ts(row.date_start) : null,
           dur: num(row.lap_duration),
           pitOut: Boolean(row.is_pit_out_lap),
+          sectors: s1 != null && s2 != null && s3 != null ? { s1, s2, s3 } : null,
         });
         added++;
         break;

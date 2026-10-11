@@ -110,10 +110,10 @@ describe('the car tuple', () => {
 describe('currentLap', () => {
   const b = createBuffers();
   b.laps.set(4, new Map([
-    [1, { n: 1, start: T, dur: 95, pitOut: false }],
-    [2, { n: 2, start: T + 95_000, dur: 90, pitOut: false }],
-    [3, { n: 3, start: T + 185_000, dur: 88, pitOut: true }],
-    [4, { n: 4, start: T + 273_000, dur: null, pitOut: false }],
+    [1, { n: 1, start: T, dur: 95, pitOut: false, sectors: null }],
+    [2, { n: 2, start: T + 95_000, dur: 90, pitOut: false, sectors: null }],
+    [3, { n: 3, start: T + 185_000, dur: 88, pitOut: true, sectors: null }],
+    [4, { n: 4, start: T + 273_000, dur: null, pitOut: false, sectors: null }],
   ]));
 
   it('reports the lap in progress', () => {
@@ -236,7 +236,7 @@ describe('buildTiming', () => {
     b.pos.set(4, [[T, 2]]);
     b.ivl.set(4, [[T, 12.5, 1.2]]);
     b.ivl.set(81, [[T, null, null]]);
-    b.laps.set(81, new Map([[7, { n: 7, start: T - 90_000, dur: 90, pitOut: false }]]));
+    b.laps.set(81, new Map([[7, { n: 7, start: T - 90_000, dur: 90, pitOut: false, sectors: null }]]));
     return b;
   }
 

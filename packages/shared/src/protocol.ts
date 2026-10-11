@@ -10,7 +10,7 @@
 import { z } from 'zod';
 
 /** Bump on any incompatible change to the messages below. */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 export const SSE_EVENTS = ['hello', 'tick', 'timing', 'status', 'circuit', 'ping'] as const;
 export type SseEvent = (typeof SSE_EVENTS)[number];
@@ -61,15 +61,44 @@ export type Point3 = z.infer<typeof Point3Schema>;
 // ---------- circuit ----------
 
 /**
- * The track outline and how to place it. Turn numbers, sector boundaries,
- * marshal sectors and the pit lane arrive in M3 and will bump the version,
- * because their shapes are not yet known well enough to declare here.
+ * Detail is addressed by index into `points` rather than by coordinate.
+ *
+ * The outline is the one thing both sides already agree on, so an index gives
+ * the exact 3D position and the local direction for free, survives the
+ * elevation setting changing, and is a great deal smaller on the wire than
+ * repeating coordinates.
  */
+export const TrackMarkerSchema = z.object({
+  /** Corner or marshal-sector number, as published. */
+  number: z.number().int(),
+  /** Index into the circuit's `points`. */
+  index: z.number().int(),
+});
+export type TrackMarker = z.infer<typeof TrackMarkerSchema>;
+
+export const SectorBoundarySchema = z.object({
+  label: z.enum(['S1', 'S2', 'S3']),
+  index: z.number().int(),
+});
+export type SectorBoundary = z.infer<typeof SectorBoundarySchema>;
+
+/** Where turn numbers came from, since the two differ in quality. */
+export const CircuitDetailSourceSchema = z.enum(['circuit-file', 'curvature', 'none']);
+export type CircuitDetailSource = z.infer<typeof CircuitDetailSourceSchema>;
+
+/** The track outline, how to place it, and everything drawn on it. */
 export const CircuitSchema = z.object({
   points: z.array(Point3Schema),
   transform: TransformSchema,
   /** The session the outline came from, or 'provisional'. */
   source: z.string(),
+  turns: z.array(TrackMarkerSchema).default([]),
+  sectors: z.array(SectorBoundarySchema).default([]),
+  marshalSectors: z.array(TrackMarkerSchema).default([]),
+  /** Its own path, since the pit lane is not on the racing line. */
+  pitLane: z.array(Point3Schema).default([]),
+  /** Published detail or derived from the lap's shape; the latter is partial. */
+  detailSource: CircuitDetailSourceSchema.default('none'),
 });
 export type Circuit = z.infer<typeof CircuitSchema>;
 
@@ -203,10 +232,18 @@ export const RaceControlLineSchema = z.object({
 });
 export type RaceControlLine = z.infer<typeof RaceControlLineSchema>;
 
-/** A marshal sector showing a flag. Populated from M3; empty until then. */
+/**
+ * A flag shown at one marshal sector. Its own enum rather than TrackFlag:
+ * race control sends DOUBLE YELLOW at a sector, which is not a track-wide
+ * state, and folding it into YELLOW on arrival would lose the distinction
+ * before anyone could decide what to do with it.
+ */
+export const SectorFlagSchema = z.enum(['YELLOW', 'DOUBLE YELLOW', 'CLEAR']);
+export type SectorFlag = z.infer<typeof SectorFlagSchema>;
+
 export const MarshalSectorFlagSchema = z.object({
   sector: z.number().int(),
-  flag: TrackFlagSchema,
+  flag: SectorFlagSchema,
 });
 export type MarshalSectorFlag = z.infer<typeof MarshalSectorFlagSchema>;
 

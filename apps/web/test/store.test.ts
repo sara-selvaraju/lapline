@@ -88,7 +88,16 @@ describe('applyHello', () => {
 });
 
 describe('applyCircuit', () => {
-  const circuit = { points: [[1, 2, 3]] as [number, number, number][], transform: { cx: 0, cy: 0, cz: 0, scale: 1 }, source: 'Sprint' };
+  const circuit = {
+    points: [[1, 2, 3]] as [number, number, number][],
+    transform: { cx: 0, cy: 0, cz: 0, scale: 1 },
+    source: 'Sprint',
+    turns: [],
+    sectors: [],
+    marshalSectors: [],
+    pitLane: [] as [number, number, number][],
+    detailSource: 'none' as const,
+  };
 
   it('stores the outline and its transform', () => {
     useStore.getState().applyCircuit(circuit);

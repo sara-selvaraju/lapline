@@ -35,6 +35,8 @@ import {
 } from './schedule.js';
 import { filterSessionList, isLiveWindow, LIVE_POST_MS, pickAutoSession } from './sessions.js';
 import { pickReferenceLap, smoothZ, trackCandidates, transformFor, TRACK_RETRY_MS, type Point } from './track.js';
+import { fetchCircuitInfo } from '../circuit/multiviewer.js';
+import { resolveMarkers, sectorBoundaries, turnsFromOutline, type SectorDurations } from '../circuit/resolve.js';
 
 const ts = (d: string | undefined): number => Date.parse(d as string);
 const iso = (ms: number): string => new Date(ms).toISOString();
@@ -260,10 +262,10 @@ export class Feed {
     this.trackAttemptAt = Date.now();
     for (const c of trackCandidates(this.session!, this.sessions, this.mode)) {
       try {
-        const pts = await this.referenceLap(c);
+        const ref = await this.referenceLap(c);
         if (gen !== this.generation) return;
-        if (pts && pts.length > 50) {
-          this.setTrack(pts, c.session_name as string);
+        if (ref && ref.points.length > 50) {
+          this.setTrack(ref.points, c.session_name as string, ref.sectors);
           return;
         }
       } catch (e) {
@@ -274,7 +276,9 @@ export class Feed {
     }
   }
 
-  private async referenceLap(sess: SessionRow): Promise<Point[] | null> {
+  private async referenceLap(
+    sess: SessionRow,
+  ): Promise<{ points: Point[]; sectors: SectorDurations | null } | null> {
     let lapRows;
     if (sess.session_key === this.session!.session_key) {
       // Already buffered, so this costs no request.
@@ -282,13 +286,19 @@ export class Feed {
       for (const [n, m] of this.buffers.laps) for (const l of m.values()) lapRows.push({ ...l, driver: n });
     } else {
       lapRows = (await this.api.get<LapRow>('laps', [['session_key', '=', sess.session_key as number]])).map(
-        (r) => ({
-          driver: r.driver_number as number,
-          n: r.lap_number as number,
-          start: r.date_start ? ts(r.date_start) : null,
-          dur: num(r.lap_duration),
-          pitOut: Boolean(r.is_pit_out_lap),
-        }),
+        (r) => {
+          const s1 = num(r.duration_sector_1);
+          const s2 = num(r.duration_sector_2);
+          const s3 = num(r.duration_sector_3);
+          return {
+            driver: r.driver_number as number,
+            n: r.lap_number as number,
+            start: r.date_start ? ts(r.date_start) : null,
+            dur: num(r.lap_duration),
+            pitOut: Boolean(r.is_pit_out_lap),
+            sectors: s1 != null && s2 != null && s3 != null ? { s1, s2, s3 } : null,
+          };
+        },
       );
     }
     const lap = pickReferenceLap(lapRows);
@@ -301,14 +311,62 @@ export class Feed {
       ['date', '>=', iso(start - 500)],
       ['date', '<', iso(start + dur * 1000 + 500)],
     ]);
-    return rows
+    const points = rows
       .filter((r) => !(r.x === 0 && r.y === 0 && r.z === 0))
       .map((r) => [r.x as number, r.y as number, r.z as number] as Point);
+    return { points, sectors: (lap as { sectors?: SectorDurations | null }).sectors ?? null };
   }
 
-  private setTrack(raw: Point[], source: string): void {
+  private setTrack(raw: Point[], source: string, durations: SectorDurations | null): void {
     const points = smoothZ(raw);
-    this.track = { points, transform: transformFor(points), source };
+    this.track = {
+      points,
+      transform: transformFor(points),
+      source,
+      turns: [],
+      sectors: sectorBoundaries(points.length, durations),
+      marshalSectors: [],
+      pitLane: [],
+      detailSource: 'none',
+    };
+    this.broadcast('circuit', this.circuitPayload());
+    // The circuit file is a third party, so the outline goes out first and the
+    // detail follows if and when it arrives.
+    void this.addCircuitDetail(this.generation);
+  }
+
+  /**
+   * Corner and marshal-sector positions, from the meeting's circuit file where
+   * there is one and from the lap's own shape where there is not. Never blocks
+   * the outline, and never fails the session: a circuit with no detail is a
+   * circuit, and a missing third party is not our viewer's problem.
+   */
+  private async addCircuitDetail(gen: number): Promise<void> {
+    const track = this.track;
+    if (!track || !this.session) return;
+
+    let url: string | undefined;
+    try {
+      const rows = await this.api.get<{ circuit_info_url?: string }>('meetings', [
+        ['meeting_key', '=', this.session.meeting_key as number],
+      ]);
+      url = rows[0]?.circuit_info_url;
+    } catch (e) {
+      console.error('meetings', message(e));
+    }
+    if (gen !== this.generation || this.track !== track) return;
+
+    const info = await fetchCircuitInfo(url);
+    if (gen !== this.generation || this.track !== track) return;
+
+    if (info && info.corners.length > 0) {
+      track.turns = resolveMarkers(track.points, info.corners);
+      track.marshalSectors = resolveMarkers(track.points, info.marshalSectors);
+      track.detailSource = 'circuit-file';
+    } else {
+      track.turns = turnsFromOutline(track.points);
+      track.detailSource = track.turns.length > 0 ? 'curvature' : 'none';
+    }
     this.broadcast('circuit', this.circuitPayload());
   }
 
