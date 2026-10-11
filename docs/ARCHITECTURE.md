@@ -56,6 +56,7 @@ npm workspaces, TypeScript strict mode throughout, Node 22.
 | 3D library | `three` from npm, not a CDN | The prototype's CDN dependency failed in one environment; bundling removes it |
 | Access control | Password page that sets a signed, HttpOnly cookie | Basic auth prompts are unreliable in iOS home-screen web apps. Keep `/healthz` open |
 | Hosting | One Railway service, custom domain `lapline.live` | Simplest thing that works; no database needed |
+| DNS | Cloudflare, registration left at GoDaddy | GoDaddy cannot put a CNAME on the apex and offers no ALIAS or flattening, so `lapline.live` itself could not reach Railway. Cloudflare flattens it. The apex is proxied and routes to Railway by Host header; `www` is DNS only and goes direct |
 | Persistence | None server-side; per-phone preferences in `localStorage` | Replays come from OpenF1's free historical data, so nothing needs storing |
 
 Revisit a decision only with evidence, and record the change here.
