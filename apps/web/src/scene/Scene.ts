@@ -15,7 +15,8 @@ import type { Circuit, Tick } from '@lapline/shared';
 import { storeState } from '../store/store.js';
 import { applyStale, makeCar, setLabelSelected, type Car } from './cars.js';
 import { COLORS, FRAME_MS } from './colours.js';
-import { labelledDrivers, resolveCollisions, type LabelBox } from './labels.js';
+import { buildMarshalTicks, buildSectorTicks, buildTurnBadges, type BadgeSprite } from './detail.js';
+import { labelledDrivers, resolveCollisions, type LabelBox, type Obstacle } from './labels.js';
 import {
   GLOW_HALF_WIDTH,
   PX,
@@ -27,6 +28,14 @@ import {
 } from './geometry.js';
 
 export type CameraPreset = 'map' | 'tilt' | 'chase';
+
+/**
+ * Badges share the collision pass with car labels, which is keyed by driver
+ * number. Driver numbers are small positive integers, so badges take keys
+ * counting down from a large negative one — distinct, and recognisable on the
+ * way back out.
+ */
+const BADGE_KEY = -1000;
 
 /** How the camera sits for each preset, as a direction and a distance factor. */
 const PRESETS: Record<CameraPreset, { dir: THREE.Vector3; fit: number }> = {
@@ -44,6 +53,7 @@ export class Scene {
   /** Empty seam for a future background layer. */
   readonly backgroundGroup = new THREE.Group();
   readonly trackGroup = new THREE.Group();
+  readonly detailGroup = new THREE.Group();
   readonly carGroup = new THREE.Group();
 
   private readonly canvas: HTMLCanvasElement;
@@ -56,6 +66,7 @@ export class Scene {
   private preset: CameraPreset = 'tilt';
   private disposables: Array<{ dispose(): void }> = [];
   private readonly cars = new Map<number, Car>();
+  private badges: BadgeSprite[] = [];
   private transform: Circuit['transform'] | null = null;
   private zx = 4;
   /** A jump over a quarter of the map is a seek, so snap rather than slide. */
@@ -73,7 +84,7 @@ export class Scene {
     const gridMat = grid.material as THREE.Material;
     gridMat.transparent = true;
     gridMat.opacity = 0.35;
-    this.scene.add(grid, this.backgroundGroup, this.trackGroup, this.carGroup);
+    this.scene.add(grid, this.backgroundGroup, this.trackGroup, this.detailGroup, this.carGroup);
 
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
@@ -92,8 +103,10 @@ export class Scene {
   // ---------- structure ----------
 
   /** Rebuilds the track. `zx` is the elevation exaggeration, 1 to 12. */
-  setCircuit(circuit: Circuit | null, zx: number): void {
+  setCircuit(circuit: Circuit | null, zx: number, layers = { turns: true, sectors: true, pitLane: true }): void {
     this.clearGroup(this.trackGroup);
+    this.clearGroup(this.detailGroup);
+    this.badges = [];
     this.zx = zx;
     this.transform = circuit?.transform ?? null;
     const raw = circuit?.points ?? [];
@@ -169,7 +182,30 @@ export class Scene {
     chevron.rotation.z = -sf.rotation;
     this.add(this.trackGroup, chevron);
 
+    this.addDetail(circuit, points, layers);
     if (!this.viewFitted) this.resetView();
+  }
+
+  /** Turn badges, sector and marshal ticks. Each layer is a viewer preference. */
+  private addDetail(
+    circuit: Circuit,
+    points: readonly THREE.Vector3[],
+    layers: { turns: boolean; sectors: boolean; pitLane: boolean },
+  ): void {
+    if (layers.turns && circuit.turns.length) {
+      this.badges = buildTurnBadges(points, circuit.turns);
+      for (const b of this.badges) this.detailGroup.add(b.sprite);
+    }
+    if (layers.sectors) {
+      if (circuit.marshalSectors.length) {
+        this.detailGroup.add(buildMarshalTicks(points, circuit.marshalSectors));
+      }
+      if (circuit.sectors.length) {
+        const { lines, labels } = buildSectorTicks(points, circuit.sectors);
+        this.detailGroup.add(lines);
+        for (const l of labels) this.detailGroup.add(l);
+      }
+    }
   }
 
   /** New positions from a tick. The loop slides between this and the last. */
@@ -335,6 +371,28 @@ export class Scene {
     const leader = rows.find((row) => row.p === 1)?.n;
 
     this.labelBoxes.length = 0;
+
+    // Turn badges join the same pass. docs/DESIGN.md asks for them "nudged
+    // clear of car labels", and a car label is the more urgent thing to read,
+    // so badges sort last and move around whatever is already placed.
+    for (let i = 0; i < this.badges.length; i++) {
+      const b = this.badges[i]!;
+      this.projected.copy(b.base).project(this.camera);
+      if (this.projected.z > 1) {
+        b.sprite.visible = false;
+        continue;
+      }
+      b.sprite.visible = true;
+      this.labelBoxes.push({
+        n: BADGE_KEY - i,
+        x: ((this.projected.x + 1) / 2) * r.width,
+        y: ((1 - this.projected.y) / 2) * r.height,
+        width: b.sprite.scale.x / PX,
+        height: b.sprite.scale.y / PX,
+        priority: 3,
+      });
+    }
+
     for (const [n, car] of this.cars) {
       if (!car.label.visible) continue;
       this.projected.copy(car.group.position).add(this.labelOffset).project(this.camera);
@@ -354,14 +412,41 @@ export class Scene {
       });
     }
 
-    const offsets = resolveCollisions(this.labelBoxes);
+    const offsets = resolveCollisions(this.labelBoxes, 2, this.obstacles());
     for (const [n, dyPx] of offsets) {
+      if (n <= BADGE_KEY) {
+        const b = this.badges[BADGE_KEY - n];
+        if (!b) continue;
+        const scale = this.worldPerPixelAt(b.base, r.height);
+        b.sprite.position.copy(b.base).setY(b.base.y - dyPx * scale);
+        continue;
+      }
       const car = this.cars.get(n);
       if (!car) continue;
       // Screen pixels back into world units at this car's distance.
       const scale = this.worldPerPixelAt(car.group.position, r.height);
       car.label.position.set(0, this.labelBase - dyPx * scale, 0);
     }
+  }
+
+  /**
+   * Screen furniture labels and badges must keep off. docs/DESIGN.md asks for
+   * turn badges "nudged clear of car labels and controls", and the camera group
+   * is the control that sits over the track.
+   */
+  private obstacles(): Obstacle[] {
+    const group = this.canvas?.parentElement?.querySelector('.camera-group');
+    const canvasBox = this.canvas?.getBoundingClientRect();
+    if (!group || !canvasBox) return [];
+    const b = group.getBoundingClientRect();
+    return [
+      {
+        top: b.top - canvasBox.top,
+        bottom: b.bottom - canvasBox.top,
+        left: b.left - canvasBox.left,
+        right: b.right - canvasBox.left,
+      },
+    ];
   }
 
   private readonly labelOffset = new THREE.Vector3(0, 2.4, 0);

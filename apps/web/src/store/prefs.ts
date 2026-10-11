@@ -14,11 +14,24 @@ export interface Prefs {
   zx: number;
   allLabels: boolean;
   camera: CameraPreset;
+  /** docs/DESIGN.md: each detail layer is a preference, on by default. */
+  showTurns: boolean;
+  showSectors: boolean;
+  showPitLane: boolean;
 }
 
 const KEY = 'lapline';
 
-export const DEFAULT_PREFS: Prefs = { sel: null, gapMode: 'int', zx: 4, allLabels: false, camera: 'tilt' };
+export const DEFAULT_PREFS: Prefs = {
+  sel: null,
+  gapMode: 'int',
+  zx: 4,
+  allLabels: false,
+  camera: 'tilt',
+  showTurns: true,
+  showSectors: true,
+  showPitLane: true,
+};
 
 export function loadPrefs(): Prefs {
   try {
@@ -32,6 +45,9 @@ export function loadPrefs(): Prefs {
         raw.camera === 'map' || raw.camera === 'chase' || raw.camera === 'tilt'
           ? raw.camera
           : DEFAULT_PREFS.camera,
+      showTurns: typeof raw.showTurns === 'boolean' ? raw.showTurns : DEFAULT_PREFS.showTurns,
+      showSectors: typeof raw.showSectors === 'boolean' ? raw.showSectors : DEFAULT_PREFS.showSectors,
+      showPitLane: typeof raw.showPitLane === 'boolean' ? raw.showPitLane : DEFAULT_PREFS.showPitLane,
     };
   } catch {
     return { ...DEFAULT_PREFS };

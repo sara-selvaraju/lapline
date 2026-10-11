@@ -62,9 +62,21 @@ export interface LabelBox {
  * visible this is cheaper and steadier than anything cleverer, and a label that
  * jitters between frames is worse than one slightly out of place.
  */
-export function resolveCollisions(boxes: readonly LabelBox[], gap = 2): Map<number, number> {
+export interface Obstacle {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+
+export function resolveCollisions(
+  boxes: readonly LabelBox[],
+  gap = 2,
+  obstacles: readonly Obstacle[] = [],
+): Map<number, number> {
   const offsets = new Map<number, number>();
-  const placed: Array<{ top: number; bottom: number; left: number; right: number }> = [];
+  // Fixed furniture the labels must avoid, such as the camera group.
+  const placed: Obstacle[] = [...obstacles];
 
   for (const b of [...boxes].sort((a, c) => a.priority - c.priority || a.y - c.y)) {
     let dy = 0;
