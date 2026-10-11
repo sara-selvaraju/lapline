@@ -424,6 +424,20 @@ export class Feed {
   async fetchStep(): Promise<void> {
     if (!this.session || (this.mode !== 'replay' && this.mode !== 'live')) return;
     if (this.idle()) return;
+
+    // A session that has left its live window is finished, and live fetching
+    // will only ask OpenF1 for data that will never arrive. The periodic
+    // refresh cannot catch this: it only switches when auto-pick lands on a
+    // *different* session, and the one that just ended is still the newest.
+    if (this.mode === 'live' && !this.isLiveWindow(this.session)) {
+      this.setStatus('info', 'The session has finished. Loading the replay.');
+      await this.selectSession(this.session.session_key as number, {
+        manual: this.userPicked,
+        mode: 'replay',
+      });
+      return;
+    }
+
     const gen = this.generation;
     const key = this.session.session_key as number;
 

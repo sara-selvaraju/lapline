@@ -213,7 +213,7 @@ describe('static files', () => {
     const r = await fetch(`${BASE}/assets/index-abc123.js`, { headers: auth });
     expect(r.status).toBe(200);
     expect(r.headers.get('content-type')).toContain('text/javascript');
-    expect(r.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
+    expect(r.headers.get('cache-control')).toBe('private, max-age=31536000, immutable');
   });
 
   it('404s an unknown path rather than falling back to the app', async () => {
