@@ -4,7 +4,7 @@
 // Ported from reference/prototype/public/app.js.
 
 import * as THREE from 'three';
-import { state } from '../state.js';
+import { storeState } from '../store/store.js';
 import { COLORS } from './colours.js';
 
 export const trackGroup = new THREE.Group();
@@ -15,18 +15,18 @@ export const trackGroup = new THREE.Group();
  * street circuits are nearly flat and would otherwise read as a plane.
  */
 export function toWorld(x: number, y: number, z: number, out = new THREE.Vector3()): THREE.Vector3 {
-  const t = state.transform;
+  const t = storeState().transform;
   if (!t) return out.set(0, 0, 0);
   return out.set(
     (x - t.cx) * t.scale,
-    Math.max(0, (z - t.cz) * t.scale * state.zx),
+    Math.max(0, (z - t.cz) * t.scale * storeState().zx),
     -(y - t.cy) * t.scale,
   );
 }
 
 export function buildTrack(): void {
   trackGroup.clear();
-  const pts = state.circuit?.points || [];
+  const pts = storeState().circuit?.points || [];
   if (pts.length < 10) return;
 
   const P = pts.map((p) => toWorld(p[0], p[1], p[2]));

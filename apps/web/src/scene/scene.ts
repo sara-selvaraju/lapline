@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { $ } from '../dom.js';
-import { state } from '../state.js';
+import { storeState } from '../store/store.js';
 import { cars, carGroup } from './cars.js';
 import { COLORS, FRAME_MS } from './colours.js';
 import { trackGroup } from './track.js';
@@ -82,21 +82,22 @@ function animate(now: number): void {
   lastFrame = now;
 
   // The leaders always carry a label; everyone else only when selected or asked for.
-  const leaders = new Set((state.timing?.rows || []).slice(0, 3).map((r) => r.n));
+  const leaders = new Set((storeState().timing?.rows || []).slice(0, 3).map((r) => r.n));
   for (const [n, c] of cars) {
     if (!c.to) continue;
     const f = Math.min(1, (now - c.t0) / FRAME_MS);
     if (c.from) c.mesh.position.lerpVectors(c.from, c.to, f);
     else c.mesh.position.copy(c.to);
     c.mesh.material.opacity = c.stale ? 0.3 : 1;
-    const sel = n === state.sel;
+    const sel = n === storeState().sel;
     c.halo.visible = sel;
-    c.label.visible = sel || state.allLabels || leaders.has(n);
+    c.label.visible = sel || storeState().allLabels || leaders.has(n);
     c.label.material.opacity = c.stale ? 0.4 : 1;
   }
 
-  if (state.follow && state.sel != null && cars.get(state.sel)?.to) {
-    vA.copy(cars.get(state.sel)!.mesh.position);
+  const sel = storeState().sel;
+  if (storeState().follow && sel != null && cars.get(sel)?.to) {
+    vA.copy(cars.get(sel)!.mesh.position);
     const delta = vA.sub(controls.target).multiplyScalar(Math.min(1, dt / 200));
     controls.target.add(delta);
     camera.position.add(delta);

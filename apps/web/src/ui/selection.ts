@@ -1,17 +1,13 @@
-// Selecting a car. Clearing the history matters: the speed trace belongs to one
-// driver, so carrying it over would draw a line that never happened.
-//
-// Ported from reference/prototype/public/app.js.
+// Selecting a car. The store owns the rule that the speed trace resets, because
+// the trace belongs to one driver.
 
-import { savePrefs, state } from '../state.js';
+import { useStore } from '../store/store.js';
 import { renderTele } from './telemetry.js';
 import { invalidateTower, renderTower } from './tower.js';
 
 export function select(n: number, persist = true): void {
-  if (state.sel !== n) state.history = [];
-  state.sel = n;
+  useStore.getState().select(n, persist);
   invalidateTower();
   renderTower();
   renderTele();
-  if (persist) savePrefs();
 }

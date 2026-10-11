@@ -9,7 +9,7 @@ import { $ } from './dom.js';
 import { camera, canvas, ndcFor, resetView, startScene } from './scene/scene.js';
 import { cars, pickCarAt } from './scene/cars.js';
 import { buildTrack } from './scene/track.js';
-import { savePrefs, state } from './state.js';
+import { storeState, useStore } from './store/store.js';
 import { post } from './stream/control.js';
 import { connect, watchVisibility } from './stream/sse.js';
 import { renderControls, SPEEDS } from './ui/controls.js';
@@ -32,11 +32,12 @@ canvas.addEventListener('pointerup', (e) => {
 });
 
 $('followBtn').addEventListener('click', () => {
-  state.follow = !state.follow;
-  $('followBtn').setAttribute('aria-pressed', String(state.follow));
+  const next = !storeState().follow;
+  useStore.getState().setFollow(next);
+  $('followBtn').setAttribute('aria-pressed', String(next));
 });
 $('resetBtn').addEventListener('click', () => {
-  state.follow = false;
+  useStore.getState().setFollow(false);
   $('followBtn').setAttribute('aria-pressed', 'false');
   resetView();
 });
@@ -48,33 +49,33 @@ $('rows').addEventListener('click', (e) => {
   if (li) select(Number((li as HTMLElement).dataset.n));
 });
 $('gapToggle').addEventListener('click', () => {
-  state.gapMode = state.gapMode === 'int' ? 'gap' : 'int';
+  useStore.getState().setGapMode(storeState().gapMode === 'int' ? 'gap' : 'int');
   setGapToggleLabel();
   invalidateTower();
   renderTower();
-  savePrefs();
 });
 setGapToggleLabel();
 
 // ---------------- replay and live controls ----------------
 
-$('playBtn').addEventListener('click', () => void post({ playing: !state.replay?.playing }));
+$('playBtn').addEventListener('click', () => void post({ playing: !storeState().replay?.playing }));
 $('speedBtn').addEventListener('click', () => {
-  const i = SPEEDS.indexOf(state.replay?.speed ?? 1);
+  const i = SPEEDS.indexOf(storeState().replay?.speed ?? 1);
   void post({ speed: SPEEDS[(i + 1) % SPEEDS.length] });
 });
-$('scrub').addEventListener('input', () => (state.scrubbing = true));
+$('scrub').addEventListener('input', () => useStore.getState().setScrubbing(true));
 $('scrub').addEventListener('change', () => {
-  state.scrubbing = false;
-  if (!state.replay) return;
-  const { start, end } = state.replay;
+  useStore.getState().setScrubbing(false);
+  const replay = storeState().replay;
+  if (!replay) return;
+  const { start, end } = replay;
   void post({ at: start + (Number($<HTMLInputElement>('scrub').value) / 1000) * (end - start) });
-  state.history = [];
+  useStore.getState().clearHistory();
 });
-$('delayMinus').addEventListener('click', () => void post({ delayS: (state.live?.delayS ?? 10) - 5 }));
-$('delayPlus').addEventListener('click', () => void post({ delayS: (state.live?.delayS ?? 10) + 5 }));
-$('fromStartBtn').addEventListener('click', () => void post({ session: state.session?.key, mode: 'replay' }));
-$('toLiveBtn').addEventListener('click', () => void post({ session: state.session?.key, mode: 'live' }));
+$('delayMinus').addEventListener('click', () => void post({ delayS: (storeState().live?.delayS ?? 10) - 5 }));
+$('delayPlus').addEventListener('click', () => void post({ delayS: (storeState().live?.delayS ?? 10) + 5 }));
+$('fromStartBtn').addEventListener('click', () => void post({ session: storeState().session?.key, mode: 'replay' }));
+$('toLiveBtn').addEventListener('click', () => void post({ session: storeState().session?.key, mode: 'live' }));
 
 // ---------------- settings ----------------
 
@@ -87,21 +88,19 @@ $('autoBtn').addEventListener('click', () => {
   $<HTMLDialogElement>('menu').close();
 });
 
-$<HTMLInputElement>('zx').value = String(state.zx);
-$('zxVal').textContent = `${state.zx}×`;
+$<HTMLInputElement>('zx').value = String(storeState().zx);
+$('zxVal').textContent = `${storeState().zx}×`;
 $('zx').addEventListener('input', () => {
-  state.zx = Number($<HTMLInputElement>('zx').value);
-  $('zxVal').textContent = `${state.zx}×`;
+  useStore.getState().setZx(Number($<HTMLInputElement>('zx').value));
+  $('zxVal').textContent = `${storeState().zx}×`;
   buildTrack();
   // Heights change, so the slide a car is mid-way through no longer applies.
   for (const c of cars.values()) c.from = null;
-  savePrefs();
 });
 
-$<HTMLInputElement>('allLabels').checked = state.allLabels;
+$<HTMLInputElement>('allLabels').checked = storeState().allLabels;
 $('allLabels').addEventListener('change', () => {
-  state.allLabels = $<HTMLInputElement>('allLabels').checked;
-  savePrefs();
+  useStore.getState().setAllLabels($<HTMLInputElement>('allLabels').checked);
 });
 
 $('wake').addEventListener('change', () => {

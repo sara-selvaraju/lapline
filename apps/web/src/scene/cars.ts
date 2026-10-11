@@ -7,7 +7,7 @@
 // Ported from reference/prototype/public/app.js.
 
 import * as THREE from 'three';
-import { state } from '../state.js';
+import { storeState } from '../store/store.js';
 import { COLORS } from './colours.js';
 
 export interface Telemetry {
@@ -75,7 +75,7 @@ function labelSprite(text: string, colour: string): THREE.Sprite {
 export function ensureCar(n: number): Car {
   const existing = cars.get(n);
   if (existing) return existing;
-  const d = state.drivers.get(n) || { code: String(n), colour: '#8C9AB5' };
+  const d = storeState().drivers.get(n) || { code: String(n), colour: '#8C9AB5' };
   const mesh = new THREE.Mesh(carGeo, new THREE.MeshBasicMaterial({ color: new THREE.Color(d.colour), transparent: true }));
   const hit = new THREE.Mesh(hitGeo, new THREE.MeshBasicMaterial({ visible: false }));
   hit.userData.n = n;

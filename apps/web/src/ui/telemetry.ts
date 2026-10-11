@@ -4,13 +4,13 @@
 
 import { $ } from '../dom.js';
 import { cars } from '../scene/cars.js';
-import { state } from '../state.js';
+import { storeState } from '../store/store.js';
 import { fmtGap, fmtLap, tyreHtml } from './format.js';
 
 export function renderTele(): void {
-  const n = state.sel;
-  const d = n != null ? state.drivers.get(n) : undefined;
-  const r = n != null ? state.timingByN.get(n) : undefined;
+  const n = storeState().sel;
+  const d = n != null ? storeState().drivers.get(n) : undefined;
+  const r = n != null ? storeState().timingByN.get(n) : undefined;
   const tel = n != null ? cars.get(n)?.tel : undefined;
 
   $('tSwatch').style.background = d?.colour || 'var(--haze)';
@@ -24,7 +24,7 @@ export function renderTele(): void {
   $('bBrk').style.width = `${tel?.brk ? Math.min(100, tel.brk) : 0}%`;
   $('bRpm').style.width = `${Math.min(100, ((tel?.rpm ?? 0) / 13000) * 100)}%`;
   $('tRpm').textContent = tel?.rpm ? tel.rpm.toLocaleString('en-AU') : '';
-  $('tGap').textContent = r ? fmtGap(state.gapMode === 'int' ? r.int : r.gap, r.p) : '–';
+  $('tGap').textContent = r ? fmtGap(storeState().gapMode === 'int' ? r.int : r.gap, r.p) : '–';
   $('tLast').textContent = fmtLap(r?.last);
   $('tBest').textContent = fmtLap(r?.best);
   drawSpark();
@@ -43,7 +43,7 @@ export function drawSpark(): void {
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.clearRect(0, 0, w, h);
 
-  const H = state.history;
+  const H = storeState().history;
   if (H.length < 2) return;
   const t1 = H.at(-1)![0];
   const t0 = t1 - 30_000;
