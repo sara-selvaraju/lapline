@@ -16,6 +16,10 @@ const flag = (n, d) => {
 };
 const URLBASE = flag('url', 'http://localhost:3000').replace(/\/$/, '');
 const SHOT = flag('shot', null);
+/** Seek here first, in ms from the session start, to reach a scripted state. */
+const SEEK = flag('seek', null);
+/** The flag band grows to carry a label in any state but green. */
+const EXPECT_FLAG = flag('flag', null);
 const PASSWORD = process.env.APP_PASSWORD;
 
 /** From Main.dc.html. The track is excluded from the "few pixels" rule but its box is not. */
@@ -44,6 +48,17 @@ page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
 page.on('console', (m) => {
   if (m.type() === 'error') errors.push(`console: ${m.text()}`);
 });
+
+if (SEEK) {
+  const headers = PASSWORD ? { Authorization: `Basic ${Buffer.from(`any:${PASSWORD}`).toString('base64')}` } : {};
+  const state = await (await fetch(`${URLBASE}/api/state`, { headers })).json();
+  await fetch(`${URLBASE}/api/control`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ at: state.session.start + Number(SEEK), playing: true }),
+  });
+  await new Promise((r) => setTimeout(r, 9000));
+}
 
 await page.goto(URLBASE, { waitUntil: 'domcontentloaded' });
 try {
@@ -77,7 +92,11 @@ const m = await page.evaluate(() => {
       }).length
     : 0;
   const canvas = document.querySelector('.track-canvas');
+  const band = document.querySelector('.flag-band');
   return {
+    flagClass: band?.className ?? null,
+    flagLabel: band?.textContent?.trim() || null,
+    flagHeight: band ? Math.round(band.getBoundingClientRect().height) : null,
     heights: {
       flagBand: h('.flag-band'),
       header: h('.header'),
@@ -123,6 +142,18 @@ console.log(`  rows whole  ${m.rowsWhole}   partly visible ${m.rowsAny}   of ${m
 const rowsOk = m.rowsAny >= 8 && m.rowsAny <= 10;
 if (!rowsOk) failed = true;
 console.log(`  about nine  ${rowsOk ? 'ok' : 'DRIFT'}`);
+
+if (EXPECT_FLAG) {
+  console.log('\nflag band');
+  const wantHeight = EXPECT_FLAG === 'green' ? 4 : 28;
+  const classOk = (m.flagClass ?? '').includes(`flag-${EXPECT_FLAG}`);
+  const heightOk = Math.abs((m.flagHeight ?? -1) - wantHeight) <= TOLERANCE;
+  const labelOk = EXPECT_FLAG === 'green' ? !m.flagLabel : Boolean(m.flagLabel);
+  if (!classOk || !heightOk || !labelOk) failed = true;
+  console.log(`  class       ${m.flagClass}  ${classOk ? 'ok' : 'DRIFT'}`);
+  console.log(`  label       ${m.flagLabel ?? '(none)'}  ${labelOk ? 'ok' : 'DRIFT'}`);
+  console.log(`  height      ${m.flagHeight}  want ${wantHeight}  ${heightOk ? 'ok' : 'DRIFT'}`);
+}
 
 console.log('\nother');
 console.log(`  font        ${m.font}`);
