@@ -3,6 +3,7 @@
 // per-frame data never passes through React.
 
 import { useEffect, useRef } from 'react';
+import { CarPicker } from './CarPicker.js';
 import { getScene, setScene } from '../scene/instance.js';
 import { Scene, type CameraPreset } from '../scene/Scene.js';
 import { useStore } from '../store/store.js';
@@ -21,6 +22,7 @@ const PRESETS: Array<[CameraPreset, string]> = [
 export function TrackArea(): React.JSX.Element {
   const ref = useRef<HTMLCanvasElement>(null);
   const select = useStore((s) => s.select);
+  const openPicker = useStore((s) => s.openPicker);
   const rc = useStore((s) => s.timing?.rc?.[0]?.msg ?? null);
   const circuit = useStore((s) => s.circuit);
   const circuitEpoch = useStore((s) => s.circuitEpoch);
@@ -62,8 +64,10 @@ export function TrackArea(): React.JSX.Element {
           if (!d || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 8) return;
           const scene = getScene();
           if (!scene) return;
-          const n = scene.pickCar(scene.ndcFor(e));
-          if (n != null) select(n);
+          const hit = scene.pickCars(scene.ndcFor(e));
+          // One car is unambiguous; several means the viewer chooses.
+          if (hit.length === 1) select(hit[0]!);
+          else if (hit.length > 1) openPicker(hit);
         }}
       />
       <div className="camera-group" role="group" aria-label="Camera">
@@ -79,6 +83,7 @@ export function TrackArea(): React.JSX.Element {
         ))}
       </div>
       {rc && <p className="race-control">{sentence(rc)}</p>}
+      <CarPicker />
     </section>
   );
 }
