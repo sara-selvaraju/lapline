@@ -3,6 +3,9 @@
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';
+import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import type { InitPayload, Tick } from '@lapline/shared';
 
 const MOCK_PORT = 4301;
@@ -15,6 +18,12 @@ const auth = { Authorization: `Basic ${Buffer.from(`any:${PASSWORD}`).toString('
 let mock: ChildProcess;
 let srv: ChildProcess;
 let mockLog = '';
+/**
+ * The static layer gets its own fixture rather than apps/web/dist, so this test
+ * does not depend on `npm run build` having run first — the definition of done
+ * runs typecheck, then test, then build, and typecheck does not build the web app.
+ */
+let publicDir = '';
 
 async function waitFor(url: string, headers: Record<string, string> = {}): Promise<void> {
   for (let i = 0; i < 120; i++) {
@@ -30,6 +39,11 @@ async function waitFor(url: string, headers: Record<string, string> = {}): Promi
 }
 
 beforeAll(async () => {
+  publicDir = await mkdtemp(path.join(tmpdir(), 'lapline-public-'));
+  await writeFile(path.join(publicDir, 'index.html'), '<!doctype html><title>Lapline</title>');
+  await mkdir(path.join(publicDir, 'assets'));
+  await writeFile(path.join(publicDir, 'assets', 'index-abc123.js'), 'console.log(1);');
+
   mock = spawn(process.execPath, ['tools/mock-openf1/dist/src/index.js'], {
     env: { ...process.env, MOCK_PORT: String(MOCK_PORT) },
     cwd: ROOT,
@@ -49,7 +63,7 @@ beforeAll(async () => {
       LIVE_TRANSPORT: 'rest',
       OPENF1_USERNAME: '',
       OPENF1_PASSWORD: '',
-      PUBLIC_DIR: `${ROOT}apps/web/dist`,
+      PUBLIC_DIR: publicDir,
     },
     cwd: ROOT,
     stdio: 'ignore',
@@ -59,9 +73,10 @@ beforeAll(async () => {
   await new Promise((r) => setTimeout(r, 3500));
 }, 60_000);
 
-afterAll(() => {
+afterAll(async () => {
   srv?.kill();
   mock?.kill();
+  if (publicDir) await rm(publicDir, { recursive: true, force: true });
 });
 
 describe('/healthz', () => {
@@ -181,11 +196,20 @@ describe('/api/control', () => {
 });
 
 describe('static files', () => {
-  it('serves the built index.html with no-cache', async () => {
+  it('serves index.html for the root path, with no-cache', async () => {
     const r = await fetch(`${BASE}/`, { headers: auth });
     expect(r.status).toBe(200);
     expect(r.headers.get('content-type')).toContain('text/html');
+    // Never pinned: this is how a new deploy is found.
     expect(r.headers.get('cache-control')).toBe('no-cache');
+    expect(await r.text()).toContain('Lapline');
+  });
+
+  it('pins a content-hashed asset for a year', async () => {
+    const r = await fetch(`${BASE}/assets/index-abc123.js`, { headers: auth });
+    expect(r.status).toBe(200);
+    expect(r.headers.get('content-type')).toContain('text/javascript');
+    expect(r.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
   });
 
   it('404s an unknown path rather than falling back to the app', async () => {

@@ -132,6 +132,26 @@ The prototype sends timing inside every fourth tick; v1 splits it out. A positio
 - **ui/:** one component per design area: flag band, header, track overlays, driver strip, telemetry panel, timing tower, controls bar, sheets (sync, settings, car picker) and state screens. Names follow `docs/DESIGN.md`.
 - Wake lock while visible. Reconnect when the page returns to the foreground. Safe-area insets. PWA manifest.
 
+## Measured
+
+Numbers taken during M0, against `tools/mock-openf1` and against real OpenF1
+data. Re-measure on a device and during a live session in M9.
+
+| Measurement | Value | How |
+|---|---|---|
+| Live REST request rate | 44.5/min | Sponsor credentials, `LIVE_TRANSPORT=rest`, mock Race, 120 s window. Agrees with 44.0/min counted independently in the mock's own log |
+| Live REST plan, demanded | 48/min | Arithmetic over the plan; queue spacing and the 1 s scheduler tick stretch it to the measured figure |
+| Free-tier replay rate | 6/min at 1x, 12/min at 8x | Mock Sprint |
+| Opening a real session | 17 requests, about 40 s | Singapore qualifying on the free tier, 2.1 s spacing |
+| `intervals` for one race | 3,044,250 bytes, 4.1 s | Real session 11731. `laps` is 527,507 bytes, `race_control` 79,757 |
+| Frame rate out | 4.0 ticks/s, 1.0 timing/s | Measured through the Vite dev proxy and direct |
+| Built web bundle | 502 KB, 129 KB gzipped | Vite, three.js included |
+
+The `intervals` figure is the one to watch: a real race replay moves about
+3.7 MB over its eight session-open requests, which puts 25 to 30 seconds between
+opening a session and the tower filling. That is a `feed/` problem, not a UI one,
+and it sits against the first-useful-paint target below.
+
 ## Non-functional targets
 
 - 60 fps on a recent iPhone in the Tilt view with 22 cars and all circuit detail on; no worse than 30 fps on a three-year-old Android.
