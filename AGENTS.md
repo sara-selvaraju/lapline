@@ -13,16 +13,33 @@ A personal, non-commercial, phone-first second screen for F1 sessions: a 3D circ
 
 ## Status
 
-M2 done, with one check that cannot be run here. The scene is a class with the
-track layers, cars, the label rule with screen-space collision avoidance,
-camera presets and the car picker. Next is M3 in `docs/BUILD-PLAN.md`.
+M3 done, with one check that cannot be run here. The circuit now carries its
+detail: turns from the meeting's `circuit_info_url` with curvature as a
+fallback, sector boundaries, marshal ticks, marshal-sector yellows, and a pit
+lane derived from a car's position trace through a stop. All three M3
+acceptance checks pass — corners aligned against real Singapore data, the mock
+yellow painting its sector, and no turn badge overlapping a car label or the
+camera group, which `npm run scene` now asserts. Next is M4 in
+`docs/BUILD-PLAN.md`.
 
-**Unverified:** "60 fps on the target iPhone". There is no device here, so it
-is measured in headless Chrome instead — a steady 60 fps with a full field,
-which shows the scene is fast enough algorithmically but says nothing about
-Safari on A-series hardware. Run it on a phone before trusting it. This is the
-second check the project cannot close locally, after MQTT against OpenF1's real
-broker.
+**Unverified:** "60 fps on the target iPhone", carried over from M2. There is
+no device here, so it is measured in headless Chrome instead — a steady 60 fps
+with a full field, which shows the scene is fast enough algorithmically but
+says nothing about Safari on A-series hardware. Run it on a phone before
+trusting it. This is the second check the project cannot close locally, after
+MQTT against OpenF1's real broker.
+
+**Flaky, and not M3's doing:** `npm run scene`'s "the picker offers four or
+more" check depends on the field happening to bunch where it sweeps. It passes
+at some points of the Singapore race and finds no bunch at all at others, and
+none in the mock. It asserts a property of the data, not of the app; M4 or
+later should rewrite it to assert that the picker offers every car actually
+under the tap.
+
+The pit lane is empty against the mock, which is correct: the mock's cars never
+leave the racing line, so there is no lane to find, and the derivation fails
+closed rather than drawing one in the wrong place. It is verified against real
+Singapore data instead.
 
 `npm run layout` measures the rendered screen against the artboard and
 `npm run scene` runs the scene checks; both fail on drift. Run them for any
