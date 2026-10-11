@@ -35,6 +35,9 @@ export interface StoreState {
   zx: number;
   allLabels: boolean;
   camera: CameraPreset;
+  showTurns: boolean;
+  showSectors: boolean;
+  showPitLane: boolean;
   follow: boolean;
   scrubbing: boolean;
   /** Driver numbers under the last ambiguous tap, or null when closed. */
@@ -54,6 +57,7 @@ export interface StoreState {
   setZx: (zx: number) => void;
   setAllLabels: (on: boolean) => void;
   setCamera: (p: CameraPreset) => void;
+  setLayer: (layer: 'showTurns' | 'showSectors' | 'showPitLane', on: boolean) => void;
   setFollow: (on: boolean) => void;
   setScrubbing: (on: boolean) => void;
   openPicker: (ns: number[]) => void;
@@ -64,7 +68,16 @@ export interface StoreState {
 const prefs = loadPrefs();
 
 const persist = (s: StoreState): void => {
-  savePrefs({ sel: s.sel, gapMode: s.gapMode, zx: s.zx, allLabels: s.allLabels, camera: s.camera } satisfies Prefs);
+  savePrefs({
+    sel: s.sel,
+    gapMode: s.gapMode,
+    zx: s.zx,
+    allLabels: s.allLabels,
+    camera: s.camera,
+    showTurns: s.showTurns,
+    showSectors: s.showSectors,
+    showPitLane: s.showPitLane,
+  } satisfies Prefs);
 };
 
 export const useStore = create<StoreState>((set, get) => ({
@@ -87,6 +100,9 @@ export const useStore = create<StoreState>((set, get) => ({
   zx: prefs.zx,
   allLabels: prefs.allLabels,
   camera: prefs.camera,
+  showTurns: prefs.showTurns,
+  showSectors: prefs.showSectors,
+  showPitLane: prefs.showPitLane,
   follow: false,
   scrubbing: false,
   picker: null,
@@ -185,6 +201,14 @@ export const useStore = create<StoreState>((set, get) => ({
       persist({ ...s, camera });
       // Choosing a preset is an explicit framing, so it cancels follow.
       return { camera, follow: false };
+    }),
+
+  setLayer: (layer, on) =>
+    set((s) => {
+      const next = { [layer]: on } as Pick<StoreState, typeof layer>;
+      persist({ ...s, ...next });
+      // The scene rebuilds its detail from the epoch, as it does for elevation.
+      return { ...next, circuitEpoch: s.circuitEpoch + 1 };
     }),
 
   setFollow: (follow) => set({ follow }),

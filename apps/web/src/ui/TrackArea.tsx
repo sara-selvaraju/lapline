@@ -27,6 +27,9 @@ export function TrackArea(): React.JSX.Element {
   const circuit = useStore((s) => s.circuit);
   const circuitEpoch = useStore((s) => s.circuitEpoch);
   const zx = useStore((s) => s.zx);
+  const showTurns = useStore((s) => s.showTurns);
+  const showSectors = useStore((s) => s.showSectors);
+  const showPitLane = useStore((s) => s.showPitLane);
   const camera = useStore((s) => s.camera);
   const setCamera = useStore((s) => s.setCamera);
 
@@ -42,8 +45,8 @@ export function TrackArea(): React.JSX.Element {
 
   // Rebuild the track when the outline, its transform or the elevation changes.
   useEffect(() => {
-    getScene()?.setCircuit(circuit, zx);
-  }, [circuit, circuitEpoch, zx]);
+    getScene()?.setCircuit(circuit, zx, { turns: showTurns, sectors: showSectors, pitLane: showPitLane });
+  }, [circuit, circuitEpoch, zx, showTurns, showSectors, showPitLane]);
 
   useEffect(() => {
     getScene()?.setCamera(camera);

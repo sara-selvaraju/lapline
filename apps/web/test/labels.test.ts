@@ -119,3 +119,37 @@ describe('resolveCollisions', () => {
     expect(resolveCollisions(many).size).toBe(40);
   });
 });
+
+describe('fixed obstacles', () => {
+  const box = (n: number, x: number, y: number): LabelBox => ({ n, x, y, width: 40, height: 16, priority: 2 });
+
+  it('moves a label out from under the camera group', () => {
+    const camera = { top: 8, bottom: 52, left: 240, right: 378 };
+    const out = resolveCollisions([box(1, 300, 30)], 2, [camera]);
+    const moved = 30 + out.get(1)!;
+    expect(moved + 8).toBeLessThanOrEqual(camera.top);
+  });
+
+  it('leaves a label clear of the obstacle alone', () => {
+    const camera = { top: 8, bottom: 52, left: 240, right: 378 };
+    expect(resolveCollisions([box(1, 100, 200)], 2, [camera]).get(1)).toBe(0);
+  });
+
+  it('leaves a label below the obstacle where it is', () => {
+    // The resolver only pushes upwards, and a label clear underneath is clear.
+    const camera = { top: 8, bottom: 52, left: 240, right: 378 };
+    expect(resolveCollisions([box(1, 300, 70)], 2, [camera]).get(1)).toBe(0);
+  });
+
+  it('keeps labels off each other and off the furniture at once', () => {
+    const camera = { top: 8, bottom: 52, left: 240, right: 378 };
+    const ys = { 1: 30, 2: 34 } as Record<number, number>;
+    const out = resolveCollisions([box(1, 300, ys[1]!), box(2, 300, ys[2]!)], 2, [camera]);
+    const spans = [1, 2]
+      .map((n) => ({ top: ys[n]! - 8 + out.get(n)!, bottom: ys[n]! + 8 + out.get(n)! }))
+      .sort((a, b) => a.top - b.top);
+    // Both clear the camera group, and neither sits on the other.
+    for (const s of spans) expect(s.bottom).toBeLessThanOrEqual(camera.top + 0.001);
+    expect(spans[1]!.top).toBeGreaterThanOrEqual(spans[0]!.bottom - 0.001);
+  });
+});
