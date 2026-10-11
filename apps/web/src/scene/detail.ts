@@ -133,6 +133,8 @@ export interface BadgeSprite {
   sprite: THREE.Sprite;
   /** Where it sits before collision avoidance nudges it. */
   base: THREE.Vector3;
+  /** The turn it marks, so a failing layout check can name it. */
+  number: number;
 }
 
 /** Turn badges, each pushed out from its apex and clear of the track. */
@@ -149,7 +151,7 @@ export function buildTurnBadges(points: readonly THREE.Vector3[], turns: readonl
     sprite.scale.set(BADGE_PX * PX, BADGE_PX * PX, 1);
     sprite.position.copy(base);
     sprite.renderOrder = 8;
-    out.push({ sprite, base });
+    out.push({ sprite, base, number: t.number });
   }
   return out;
 }
@@ -283,6 +285,135 @@ export function buildYellowOverlays(
     out.push({ line, chip });
   }
   return out;
+}
+
+/** docs/DESIGN.md: dashed 1.6px haze, 3 on and 3 off, labelled "Pit lane". */
+const PIT_LANE_PX = 1.6;
+const PIT_DASH_PX = 3;
+const PIT_GAP_PX = 3;
+
+/** Cumulative distance along an open path, so dashes can be spaced by length. */
+function arcLengths(points: readonly THREE.Vector3[]): number[] {
+  const out = [0];
+  for (let i = 1; i < points.length; i++) out.push(out[i - 1]! + points[i]!.distanceTo(points[i - 1]!));
+  return out;
+}
+
+/** The point at a given distance along an open path. */
+function pointAt(points: readonly THREE.Vector3[], lengths: readonly number[], s: number): THREE.Vector3 {
+  const total = lengths[lengths.length - 1]!;
+  if (s <= 0) return points[0]!.clone();
+  if (s >= total) return points[points.length - 1]!.clone();
+  let i = 1;
+  while (i < lengths.length - 1 && lengths[i]! < s) i++;
+  const a = points[i - 1]!;
+  const b = points[i]!;
+  const segment = lengths[i]! - lengths[i - 1]!;
+  const t = segment > 0 ? (s - lengths[i - 1]!) / segment : 0;
+  return a.clone().lerp(b, t);
+}
+
+/**
+ * A dashed ribbon along an open path, as one geometry.
+ *
+ * Open, unlike `ribbonGeometry`, which treats its points as a closed lap: a
+ * pit lane runs from entry to exit and must not be joined up. Each dash is a
+ * quad, which is why they are kept short — three pixels of straight line
+ * follows a curve closely enough.
+ */
+export function dashedRibbonGeometry(
+  points: readonly THREE.Vector3[],
+  halfWidth: number,
+  dash: number,
+  gap: number,
+  lift: number,
+): THREE.BufferGeometry {
+  const g = new THREE.BufferGeometry();
+  if (points.length < 2 || dash <= 0 || gap < 0) return g;
+  const lengths = arcLengths(points);
+  const total = lengths[lengths.length - 1]!;
+  if (!(total > 0)) return g;
+
+  const verts: number[] = [];
+  const dir = new THREE.Vector3();
+  for (let s = 0; s < total; s += dash + gap) {
+    const a = pointAt(points, lengths, s);
+    const b = pointAt(points, lengths, Math.min(s + dash, total));
+    dir.subVectors(b, a).setY(0);
+    if (dir.lengthSq() === 0) continue;
+    dir.normalize();
+    const nx = -dir.z * halfWidth;
+    const nz = dir.x * halfWidth;
+    const ay = a.y + lift;
+    const by = b.y + lift;
+    // Two triangles: a-left, b-left, a-right and a-right, b-left, b-right.
+    verts.push(
+      a.x + nx, ay, a.z + nz,
+      b.x + nx, by, b.z + nz,
+      a.x - nx, ay, a.z - nz,
+      a.x - nx, ay, a.z - nz,
+      b.x + nx, by, b.z + nz,
+      b.x - nx, by, b.z - nz,
+    );
+  }
+  g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  return g;
+}
+
+export interface PitLaneLayer {
+  line: THREE.Mesh;
+  label: THREE.Sprite;
+}
+
+/** How far off the lane the label sits, in pixels. */
+const PIT_LABEL_OFFSET_PX = 9;
+
+/**
+ * The pit lane and its label, or nothing if the server could not derive a path.
+ *
+ * The label sits beside the lane's midpoint rather than on it, on whichever
+ * side is further from the racing line: a pit lane runs alongside the main
+ * straight, so the free space is away from the track, and which side that is
+ * depends on the circuit.
+ */
+export function buildPitLane(
+  points: readonly THREE.Vector3[],
+  track: readonly THREE.Vector3[] = [],
+): PitLaneLayer | null {
+  if (points.length < 2) return null;
+  const line = new THREE.Mesh(
+    dashedRibbonGeometry(points, (PIT_LANE_PX * PX) / 2, PIT_DASH_PX * PX, PIT_GAP_PX * PX, 0.04),
+    new THREE.MeshBasicMaterial({
+      color: COLORS.haze,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.85,
+      depthWrite: false,
+    }),
+  );
+  line.renderOrder = 6;
+
+  const tex = textTexture('Pit lane', 11, '#8c9ab5');
+  const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+  const hPx = tex.userData.heightPx as number;
+  label.scale.set(hPx * PX * (tex.userData.aspect as number), hPx * PX, 1);
+  const at = Math.floor(points.length / 2);
+  const mid = points[at]!;
+  const ahead = points[Math.min(at + 1, points.length - 1)]!;
+  const behind = points[Math.max(at - 1, 0)]!;
+  const dir = new THREE.Vector3().subVectors(ahead, behind).setY(0);
+  const normal =
+    dir.lengthSq() > 0
+      ? new THREE.Vector3(-dir.z, 0, dir.x).normalize()
+      : new THREE.Vector3(1, 0, 0);
+  const reach = PIT_LABEL_OFFSET_PX * PX + (hPx * PX) / 2;
+  const nearestTo = (p: THREE.Vector3): number =>
+    track.length === 0 ? 0 : Math.min(...track.map((q) => p.distanceToSquared(q)));
+  const a = mid.clone().addScaledVector(normal, reach);
+  const b = mid.clone().addScaledVector(normal, -reach);
+  label.position.copy(nearestTo(a) >= nearestTo(b) ? a : b).setY(mid.y + 1.2);
+  label.renderOrder = 8;
+  return { line, label };
 }
 
 export { textTexture };

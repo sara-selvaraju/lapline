@@ -36,6 +36,9 @@ export function TrackArea(): React.JSX.Element {
   useEffect(() => {
     if (!ref.current) return undefined;
     const scene = new Scene(ref.current);
+    // The handle the browser-based acceptance checks in tools/ read the
+    // finished layout through. Nothing in the app uses it.
+    (window as unknown as { __lapline?: { scene: Scene } }).__lapline = { scene };
     setScene(scene);
     return () => {
       setScene(null);

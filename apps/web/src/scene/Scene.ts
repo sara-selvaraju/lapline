@@ -11,12 +11,13 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { Circuit, MarshalSectorFlag, Tick, Timing } from '@lapline/shared';
+import type { Circuit, MarshalSectorFlag, Point3, Tick, Timing, Transform } from '@lapline/shared';
 import { storeState } from '../store/store.js';
 import { applyStale, makeCar, setLabelSelected, type Car } from './cars.js';
 import { COLORS, FRAME_MS } from './colours.js';
 import {
   buildMarshalTicks,
+  buildPitLane,
   buildSectorTicks,
   buildTurnBadges,
   buildYellowOverlays,
@@ -128,11 +129,7 @@ export class Scene {
     const raw = circuit?.points ?? [];
     if (raw.length < 10 || !circuit) return;
 
-    const t = circuit.transform;
-    const points = raw.map(
-      ([x, y, z]) =>
-        new THREE.Vector3((x - t.cx) * t.scale, Math.max(0, (z - t.cz) * t.scale * zx), -(y - t.cy) * t.scale),
-    );
+    const points = raw.map((p) => this.toWorld(p, circuit.transform, zx));
 
     // Glow first: a wide, faint ribbon under the track, like floodlight spill.
     this.add(
@@ -203,6 +200,20 @@ export class Scene {
     if (!this.viewFitted) this.resetView();
   }
 
+  /**
+   * A circuit coordinate in world space: centred, floored, scaled, with the
+   * elevation exaggeration applied. OpenF1's y is our z, and negated, because
+   * three.js looks down -z.
+   */
+  private toWorld(p: Point3, t: Transform, zx: number): THREE.Vector3 {
+    const [x, y, z] = p;
+    return new THREE.Vector3(
+      (x - t.cx) * t.scale,
+      Math.max(0, (z - t.cz) * t.scale * zx),
+      -(y - t.cy) * t.scale,
+    );
+  }
+
   /** Turn badges, sector and marshal ticks. Each layer is a viewer preference. */
   private addDetail(
     circuit: Circuit,
@@ -222,6 +233,13 @@ export class Scene {
         this.detailGroup.add(lines);
         for (const l of labels) this.detailGroup.add(l);
       }
+    }
+    if (layers.pitLane && circuit.pitLane.length) {
+      const lane = buildPitLane(
+        circuit.pitLane.map((p) => this.toWorld(p, circuit.transform, this.zx)),
+        points,
+      );
+      if (lane) this.detailGroup.add(lane.line, lane.label);
     }
   }
 
@@ -446,21 +464,129 @@ export class Scene {
       });
     }
 
-    const offsets = resolveCollisions(this.labelBoxes, 2, this.obstacles());
+    const obstacles = this.obstacles();
+    const offsets = resolveCollisions(this.labelBoxes, 2, obstacles);
     for (const [n, dyPx] of offsets) {
       if (n <= BADGE_KEY) {
         const b = this.badges[BADGE_KEY - n];
         if (!b) continue;
-        const scale = this.worldPerPixelAt(b.base, r.height);
-        b.sprite.position.copy(b.base).setY(b.base.y - dyPx * scale);
+        b.sprite.position
+          .copy(b.base)
+          .setY(b.base.y + this.worldLiftForScreenOffset(b.base, dyPx, r.height));
         continue;
       }
       const car = this.cars.get(n);
       if (!car) continue;
-      // Screen pixels back into world units at this car's distance.
-      const scale = this.worldPerPixelAt(car.group.position, r.height);
-      car.label.position.set(0, this.labelBase - dyPx * scale, 0);
+      // Measured the same way as the badges, so the label lands where the
+      // collision pass put it and the badges that moved around it stay clear.
+      const base = car.group.position.clone().setY(car.group.position.y + this.labelBase);
+      car.label.position.set(0, this.labelBase + this.worldLiftForScreenOffset(base, dyPx, r.height), 0);
     }
+
+    this.hideUnplaceableBadges(obstacles, r.width, r.height);
+  }
+
+  /**
+   * Drops any turn badge the nudge could not get clear.
+   *
+   * docs/DESIGN.md asks for badges "nudged clear of car labels and controls",
+   * but a badge beside a corner at the edge of the view sometimes has nowhere
+   * to go: the resolver only moves things up the screen, and above this one is
+   * the camera group. Hiding it is the better answer. A car label and a camera
+   * control both matter more than a turn number, and a badge shoved halfway
+   * across the view no longer marks the corner it names. Visibility is decided
+   * afresh every frame, so it comes back as soon as the view moves.
+   */
+  private hideUnplaceableBadges(obstacles: readonly Obstacle[], widthPx: number, heightPx: number): void {
+    const at = new THREE.Vector3();
+    const rectOf = (sprite: THREE.Sprite): Obstacle | null => {
+      sprite.getWorldPosition(at).project(this.camera);
+      if (at.z > 1) return null;
+      const x = ((at.x + 1) / 2) * widthPx;
+      const y = ((1 - at.y) / 2) * heightPx;
+      const w = sprite.scale.x / PX;
+      const h = sprite.scale.y / PX;
+      return { left: x - w / 2, right: x + w / 2, top: y - h / 2, bottom: y + h / 2 };
+    };
+    const hits = (a: Obstacle, b: Obstacle): boolean =>
+      a.right > b.left && a.left < b.right && a.bottom > b.top && a.top < b.bottom;
+
+    const labels: Obstacle[] = [];
+    for (const [, car] of this.cars) {
+      if (!car.label.visible) continue;
+      const box = rectOf(car.label);
+      if (box) labels.push(box);
+    }
+    for (const b of this.badges) {
+      if (!b.sprite.visible) continue;
+      const box = rectOf(b.sprite);
+      if (!box) continue;
+      if (labels.some((l) => hits(box, l)) || obstacles.some((o) => hits(box, o))) b.sprite.visible = false;
+    }
+  }
+
+  /**
+   * The world-space lift that moves a point a given number of pixels up the
+   * screen.
+   *
+   * The collision pass works in screen pixels, but sprites are positioned in
+   * world units, and under a tilted camera a world-space lift is neither
+   * purely vertical on screen nor worth the same number of pixels at every
+   * depth. A single estimate therefore falls short, which is how a badge ends
+   * up still sitting under the car label it was meant to clear. Measuring
+   * what the estimate actually achieved and correcting makes the nudge land.
+   */
+  private worldLiftForScreenOffset(base: THREE.Vector3, dyPx: number, heightPx: number): number {
+    if (dyPx === 0) return 0;
+    const at = new THREE.Vector3();
+    const screenY = (x: number, y: number, z: number): number =>
+      ((1 - at.set(x, y, z).project(this.camera).y) / 2) * heightPx;
+
+    const from = screenY(base.x, base.y, base.z);
+    const want = from + dyPx;
+    let lift = -dyPx * this.worldPerPixelAt(base, heightPx);
+    for (let i = 0; i < 3; i++) {
+      const got = screenY(base.x, base.y + lift, base.z);
+      if (Math.abs(want - got) < 0.5) break;
+      const achieved = got - from;
+      if (Math.abs(achieved) < 1e-6) break;
+      lift *= dyPx / achieved;
+    }
+    return lift;
+  }
+
+  /**
+   * Where the badges and car labels actually ended up, in canvas pixels.
+   *
+   * Read back from the sprites themselves rather than recomputed, so what the
+   * acceptance checks in tools/ measure is what the viewer sees. Includes the
+   * screen furniture labels keep off, so a check can judge the whole layout.
+   */
+  layout(): {
+    boxes: Array<{ kind: 'badge' | 'label'; key: number; x: number; y: number; width: number; height: number }>;
+    obstacles: Obstacle[];
+  } {
+    const r = this.canvas?.getBoundingClientRect();
+    const boxes: Array<{ kind: 'badge' | 'label'; key: number; x: number; y: number; width: number; height: number }> =
+      [];
+    if (!r) return { boxes, obstacles: [] };
+    const at = new THREE.Vector3();
+    const push = (kind: 'badge' | 'label', key: number, sprite: THREE.Sprite): void => {
+      if (!sprite.visible) return;
+      sprite.getWorldPosition(at).project(this.camera);
+      if (at.z > 1) return;
+      boxes.push({
+        kind,
+        key,
+        x: ((at.x + 1) / 2) * r.width,
+        y: ((1 - at.y) / 2) * r.height,
+        width: sprite.scale.x / PX,
+        height: sprite.scale.y / PX,
+      });
+    };
+    for (let i = 0; i < this.badges.length; i++) push('badge', this.badges[i]!.number, this.badges[i]!.sprite);
+    for (const [n, car] of this.cars) push('label', n, car.label);
+    return { boxes, obstacles: this.obstacles() };
   }
 
   /**
