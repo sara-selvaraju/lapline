@@ -1,43 +1,49 @@
-// Cars, their labels and tap-to-select picking.
+// Car visuals, to docs/DESIGN.md.
 //
-// Each car keeps the position it is sliding from and to, so motion is smooth
-// between 4 Hz frames. The hit sphere is far larger than the car, because a
-// thumb on a phone is not precise.
-//
-// Ported from reference/prototype/public/app.js.
+// A 10px dot in the team colour with a 1.5px night outline, a 16px flood ring
+// when selected, and stale cars at 45% opacity and greyed. Sizes are given in
+// pixels by the design and converted once here: the dots are world-sized, so
+// the far side of the circuit reads as further away, which is the point of
+// showing it in 3D at all.
 
 import * as THREE from 'three';
-import { storeState } from '../store/store.js';
 import { COLORS } from './colours.js';
+import { PX } from './geometry.js';
 
-export interface Telemetry {
-  sp: number | null;
-  gear: number | null;
-  rpm: number | null;
-  thr: number | null;
-  brk: number | null;
-  drs: number | null;
-}
+/** docs/DESIGN.md: 10px dot, 1.5px night outline, 16px ring when selected. */
+const DOT_RADIUS = (10 * PX) / 2;
+const OUTLINE_RADIUS = DOT_RADIUS + 1.5 * PX;
+const RING_RADIUS = (16 * PX) / 2;
+/** Far larger than the dot: a thumb on a phone is not a mouse. */
+const HIT_RADIUS = 3;
+
+/** Stale is below 45% opacity and greyed, not just faded. */
+export const STALE_OPACITY = 0.45;
+
+const dotGeo = new THREE.SphereGeometry(DOT_RADIUS, 20, 14);
+const outlineGeo = new THREE.SphereGeometry(OUTLINE_RADIUS, 16, 12);
+// 1.5px of tube, so the ring reads at the default zoom rather than vanishing.
+const ringGeo = new THREE.TorusGeometry(RING_RADIUS, (1.5 * PX) / 2, 8, 32);
+const hitGeo = new THREE.SphereGeometry(HIT_RADIUS, 8, 6);
 
 export interface Car {
-  mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
+  n: number;
+  code: string;
+  group: THREE.Group;
+  dot: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
+  ring: THREE.Mesh;
   hit: THREE.Mesh;
-  halo: THREE.Mesh;
   label: THREE.Sprite;
+  /** Team colour, kept so stale greying can be undone. */
+  colour: THREE.Color;
+  colourHex: string;
+  /** Whether the label is currently drawn in the selected, inverted style. */
+  labelSelected: boolean;
   from: THREE.Vector3 | null;
   to: THREE.Vector3 | null;
   t0: number;
   stale: boolean;
-  tel?: Telemetry;
 }
-
-export const carGroup = new THREE.Group();
-export const cars = new Map<number, Car>();
-
-const carGeo = new THREE.SphereGeometry(0.85, 20, 14);
-/** Generous, because a thumb is not a mouse. */
-const hitGeo = new THREE.SphereGeometry(3, 8, 6);
-const haloGeo = new THREE.TorusGeometry(1.7, 0.18, 8, 32);
 
 function roundRect(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
   g.beginPath();
@@ -49,62 +55,113 @@ function roundRect(g: CanvasRenderingContext2D, x: number, y: number, w: number,
   g.closePath();
 }
 
-function labelSprite(text: string, colour: string): THREE.Sprite {
+/**
+ * A car label. Selected labels invert — flood ground, night text, 15px with a
+ * 3px team underline — and the rest are 13px on label-bg with a 2px underline.
+ */
+export function labelTexture(text: string, colour: string, selected: boolean): THREE.CanvasTexture {
+  const scale = 4;
+  const fontPx = selected ? 15 : 13;
+  const underline = selected ? 3 : 2;
+  const padX = 5;
+  const padY = 2;
+
+  const probe = document.createElement('canvas').getContext('2d')!;
+  probe.font = `700 ${fontPx * scale}px "Barlow Semi Condensed", system-ui, sans-serif`;
+  const textW = probe.measureText(text).width;
+
+  const w = Math.ceil(textW + padX * 2 * scale);
+  const h = Math.ceil((fontPx + padY * 2 + underline) * scale);
   const c = document.createElement('canvas');
-  c.width = 128;
-  c.height = 64;
+  c.width = w;
+  c.height = h;
   const g = c.getContext('2d')!;
-  g.font = '700 38px "Barlow Semi Condensed", system-ui, sans-serif';
+
+  g.fillStyle = selected ? '#F2EBDD' : 'rgba(14,22,38,0.88)';
+  roundRect(g, 0, 0, w, h - underline * scale, 4 * scale);
+  g.fill();
+
+  g.fillStyle = colour;
+  g.fillRect(0, h - underline * scale, w, underline * scale);
+
+  g.font = `700 ${fontPx * scale}px "Barlow Semi Condensed", system-ui, sans-serif`;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
-  g.fillStyle = 'rgba(14,22,38,0.85)';
-  roundRect(g, 14, 10, 100, 44, 10);
-  g.fill();
-  g.fillStyle = colour;
-  g.fillRect(14, 50, 100, 4);
-  g.fillStyle = '#F2EBDD';
-  g.fillText(text, 64, 32);
+  g.fillStyle = selected ? '#0E1626' : '#F2EBDD';
+  g.fillText(text, w / 2, (h - underline * scale) / 2);
+
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
-  s.scale.set(5, 2.5, 1);
-  s.renderOrder = 10;
-  return s;
+  tex.userData.aspect = w / h;
+  tex.userData.heightPx = h / scale;
+  return tex;
 }
 
-export function ensureCar(n: number): Car {
-  const existing = cars.get(n);
-  if (existing) return existing;
-  const d = storeState().drivers.get(n) || { code: String(n), colour: '#8C9AB5' };
-  const mesh = new THREE.Mesh(carGeo, new THREE.MeshBasicMaterial({ color: new THREE.Color(d.colour), transparent: true }));
+export function makeCar(n: number, code: string, colour: string): Car {
+  const group = new THREE.Group();
+  const team = new THREE.Color(colour);
+
+  // An inverted hull: only the far side of a slightly larger sphere is drawn,
+  // so it reads as a rim behind the dot. A front-facing sphere would simply
+  // cover the dot and punch dark holes in the ribbon underneath.
+  const outline = new THREE.Mesh(
+    outlineGeo,
+    new THREE.MeshBasicMaterial({ color: COLORS.night, side: THREE.BackSide }),
+  );
+  const dot = new THREE.Mesh(dotGeo, new THREE.MeshBasicMaterial({ color: team.clone(), transparent: true }));
+  const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: COLORS.flood }));
+  ring.rotation.x = Math.PI / 2;
+  ring.visible = false;
+
   const hit = new THREE.Mesh(hitGeo, new THREE.MeshBasicMaterial({ visible: false }));
   hit.userData.n = n;
-  mesh.add(hit);
-  const halo = new THREE.Mesh(haloGeo, new THREE.MeshBasicMaterial({ color: COLORS.flood }));
-  halo.rotation.x = Math.PI / 2;
-  halo.visible = false;
-  mesh.add(halo);
-  const label = labelSprite(d.code, d.colour);
-  label.position.set(0, 3, 0);
-  mesh.add(label);
-  carGroup.add(mesh);
-  const car: Car = { mesh, hit, halo, label, from: null, to: null, t0: 0, stale: false };
-  cars.set(n, car);
-  return car;
+
+  const tex = labelTexture(code, colour, false);
+  const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+  const hPx = tex.userData.heightPx as number;
+  label.scale.set(hPx * PX * (tex.userData.aspect as number), hPx * PX, 1);
+  label.position.set(0, 2.4, 0);
+  label.renderOrder = 10;
+
+  group.add(outline, dot, ring, hit, label);
+  return {
+    n,
+    code,
+    group,
+    dot,
+    ring,
+    hit,
+    label,
+    colour: team,
+    colourHex: colour,
+    labelSelected: false,
+    from: null,
+    to: null,
+    t0: 0,
+    stale: false,
+  };
 }
 
-export function clearCars(): void {
-  for (const c of cars.values()) carGroup.remove(c.mesh);
-  cars.clear();
+/** Swaps a label between the normal and inverted styles, redrawing its texture. */
+export function setLabelSelected(car: Car, selected: boolean): void {
+  if (car.labelSelected === selected) return;
+  car.labelSelected = selected;
+  const mat = car.label.material as THREE.SpriteMaterial;
+  mat.map?.dispose();
+  const tex = labelTexture(car.code, car.colourHex, selected);
+  mat.map = tex;
+  mat.needsUpdate = true;
+  const hPx = tex.userData.heightPx as number;
+  car.label.scale.set(hPx * PX * (tex.userData.aspect as number), hPx * PX, 1);
 }
 
-/** The car under a tap, in normalised device coordinates, or null. */
-export function pickCarAt(ndc: THREE.Vector2, camera: THREE.Camera): number | null {
-  const ray = new THREE.Raycaster();
-  ray.setFromCamera(ndc, camera);
-  const hits = ray.intersectObjects(
-    [...cars.values()].map((c) => c.hit),
-    false,
-  );
-  return hits.length ? (hits[0]!.object.userData.n as number) : null;
+const GREY = new THREE.Color(COLORS.haze);
+
+/** Stale cars drop to 45% and lose their team colour, so they read as old. */
+export function applyStale(car: Car, stale: boolean): void {
+  if (car.stale === stale) return;
+  car.stale = stale;
+  car.dot.material.opacity = stale ? STALE_OPACITY : 1;
+  car.dot.material.color.copy(stale ? GREY : car.colour);
+  (car.label.material as THREE.SpriteMaterial).opacity = stale ? STALE_OPACITY : 1;
 }

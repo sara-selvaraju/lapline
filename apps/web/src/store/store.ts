@@ -8,7 +8,7 @@
 
 import { create } from 'zustand';
 import type { Circuit, Driver, Hello, LiveMeta, ReplayMeta, Status, Tick, Timing, TowerRow, Transform } from '@lapline/shared';
-import { DEFAULT_PREFS, loadPrefs, savePrefs, type GapMode, type Prefs } from './prefs.js';
+import { DEFAULT_PREFS, loadPrefs, savePrefs, type CameraPreset, type GapMode, type Prefs } from './prefs.js';
 
 /** One sample of the selected car, for the 30-second speed trace. */
 export type HistorySample = [t: number, speed: number | null, throttle: number | null, brake: number | null];
@@ -34,6 +34,7 @@ export interface StoreState {
   gapMode: GapMode;
   zx: number;
   allLabels: boolean;
+  camera: CameraPreset;
   follow: boolean;
   scrubbing: boolean;
   history: HistorySample[];
@@ -50,6 +51,7 @@ export interface StoreState {
   setGapMode: (m: GapMode) => void;
   setZx: (zx: number) => void;
   setAllLabels: (on: boolean) => void;
+  setCamera: (p: CameraPreset) => void;
   setFollow: (on: boolean) => void;
   setScrubbing: (on: boolean) => void;
   clearHistory: () => void;
@@ -58,7 +60,7 @@ export interface StoreState {
 const prefs = loadPrefs();
 
 const persist = (s: StoreState): void => {
-  savePrefs({ sel: s.sel, gapMode: s.gapMode, zx: s.zx, allLabels: s.allLabels } satisfies Prefs);
+  savePrefs({ sel: s.sel, gapMode: s.gapMode, zx: s.zx, allLabels: s.allLabels, camera: s.camera } satisfies Prefs);
 };
 
 export const useStore = create<StoreState>((set, get) => ({
@@ -80,6 +82,7 @@ export const useStore = create<StoreState>((set, get) => ({
   gapMode: prefs.gapMode,
   zx: prefs.zx,
   allLabels: prefs.allLabels,
+  camera: prefs.camera,
   follow: false,
   scrubbing: false,
   history: [],
@@ -170,6 +173,13 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => {
       persist({ ...s, allLabels });
       return { allLabels };
+    }),
+
+  setCamera: (camera) =>
+    set((s) => {
+      persist({ ...s, camera });
+      // Choosing a preset is an explicit framing, so it cancels follow.
+      return { camera, follow: false };
     }),
 
   setFollow: (follow) => set({ follow }),

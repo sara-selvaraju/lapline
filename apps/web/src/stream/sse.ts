@@ -18,12 +18,8 @@ import {
   type Tick,
   type Timing,
 } from '@lapline/shared';
-import { cars, clearCars, ensureCar } from '../scene/cars.js';
-import { buildTrack, toWorld, trackGroup } from '../scene/track.js';
+import { getScene } from '../scene/instance.js';
 import { useStore } from '../store/store.js';
-
-/** A jump of more than a quarter of the map means a seek, so snap instead of sliding. */
-const SNAP_DISTANCE = 25;
 
 let es: EventSource | undefined;
 /** Only reload once, so a persistently wrong version cannot loop the page. */
@@ -96,21 +92,15 @@ export function onHello(d: Hello): void {
     !before.session || !d.session || before.session.key !== d.session.key || before.drivers.size !== d.drivers.length;
 
   useStore.getState().applyHello(d);
-  // The scene's car meshes carry driver colours and codes, so a new field means
+  // The car meshes carry driver colours and codes, so a new field means
   // throwing them away rather than recolouring in place.
-  if (fieldChanged) {
-    clearCars();
-    trackGroup.clear();
-  }
+  if (fieldChanged) getScene()?.clearCars();
   if (d.circuit) onCircuit(d.circuit);
 }
 
 export function onCircuit(c: Circuit): void {
-  const before = useStore.getState().circuitEpoch;
+  // The component rebuilds the track from the store, so this only has to store it.
   useStore.getState().applyCircuit(c);
-  buildTrack();
-  // Positions computed under the old transform are meaningless now.
-  if (useStore.getState().circuitEpoch !== before) for (const car of cars.values()) car.from = null;
 }
 
 export function onStatus(s: Status): void {
@@ -119,21 +109,8 @@ export function onStatus(s: Status): void {
 
 export function onTick(f: Tick): void {
   useStore.getState().applyTick(f);
-  const { transform } = useStore.getState();
-  if (!transform) return;
-
-  const now = performance.now();
-  for (const row of f.cars) {
-    const [n, x, y, z, , , , , , , stale] = row;
-    const c = ensureCar(n);
-    const to = toWorld(x, y, z);
-    to.y += 0.9;
-    c.from = c.to ? c.mesh.position.clone() : null;
-    if (c.from && c.from.distanceTo(to) > SNAP_DISTANCE) c.from = null;
-    c.to = to;
-    c.t0 = now;
-    c.stale = Boolean(stale);
-  }
+  // Straight to the scene: positions must not wait on a React render.
+  getScene()?.setFrame(f);
 }
 
 export function onTiming(t: Timing): void {

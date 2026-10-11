@@ -5,6 +5,7 @@
 // blank screen.
 
 export type GapMode = 'int' | 'gap';
+export type CameraPreset = 'map' | 'tilt' | 'chase';
 
 export interface Prefs {
   sel: number | null;
@@ -12,11 +13,12 @@ export interface Prefs {
   /** Elevation exaggeration: street circuits are nearly flat. */
   zx: number;
   allLabels: boolean;
+  camera: CameraPreset;
 }
 
 const KEY = 'lapline';
 
-export const DEFAULT_PREFS: Prefs = { sel: null, gapMode: 'int', zx: 4, allLabels: false };
+export const DEFAULT_PREFS: Prefs = { sel: null, gapMode: 'int', zx: 4, allLabels: false, camera: 'tilt' };
 
 export function loadPrefs(): Prefs {
   try {
@@ -26,6 +28,10 @@ export function loadPrefs(): Prefs {
       gapMode: raw.gapMode === 'gap' ? 'gap' : DEFAULT_PREFS.gapMode,
       zx: typeof raw.zx === 'number' ? raw.zx : DEFAULT_PREFS.zx,
       allLabels: typeof raw.allLabels === 'boolean' ? raw.allLabels : DEFAULT_PREFS.allLabels,
+      camera:
+        raw.camera === 'map' || raw.camera === 'chase' || raw.camera === 'tilt'
+          ? raw.camera
+          : DEFAULT_PREFS.camera,
     };
   } catch {
     return { ...DEFAULT_PREFS };
