@@ -20,10 +20,12 @@
     "test": "vitest run",
     "typecheck": "tsc -b tsconfig.json && tsc --noEmit -p apps/web",
     "mock": "npm run start -w @lapline/mock-openf1",
-    "parity": "node tools/parity-check.mjs"
+    "parity": "node tools/parity-check.mjs",
+    "screenshot": "node tools/screenshot.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "playwright": "^1.64.0",
     "typescript": "5.9.3",
     "vitest": "^5.0.3"
   }
