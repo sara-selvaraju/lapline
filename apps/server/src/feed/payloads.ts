@@ -1,20 +1,20 @@
-// The payloads sent to browsers.
+// The protocol v1 messages the feed broadcasts.
 //
-// Ported from reference/prototype/lib/feed.js. Nothing secret goes in here:
-// AGENTS.md forbids echoing env values in /api/state or errors, so the API block
-// says only whether credentials exist, never what they are.
+// Nothing secret goes in here: AGENTS.md forbids echoing env values in
+// /api/state or errors, so the API block says only whether credentials exist.
 
-import type {
-  ApiStats,
-  Driver,
-  InitPayload,
-  Mode,
-  SessionListEntry,
-  SessionRow,
-  StatusLevel,
-  StatusPayload,
-  TrackPayload,
-  Transform,
+import {
+  PROTOCOL_VERSION,
+  type ApiStats,
+  type Circuit,
+  type Driver,
+  type Hello,
+  type Mode,
+  type SessionListEntry,
+  type SessionRow,
+  type Status,
+  type StatusLevel,
+  type Transform,
 } from '@lapline/shared';
 import { isLiveWindow } from './sessions.js';
 import type { Point } from './track.js';
@@ -31,15 +31,17 @@ export interface TrackState {
   source: string;
 }
 
-export function statusPayload(status: FeedStatus, mode: Mode, api: ApiStats): StatusPayload {
-  return { ...status, mode, api };
+export function statusPayload(
+  status: FeedStatus,
+  mode: Mode,
+  api: ApiStats,
+  freshness: number | null,
+): Status {
+  return { ...status, mode, api, freshness };
 }
 
 /** The outline, or just a transform while one is still being worked out. */
-export function trackPayload(
-  track: TrackState | null,
-  provisional: Transform | null,
-): TrackPayload | null {
+export function circuitPayload(track: TrackState | null, provisional: Transform | null): Circuit | null {
   if (track) return { points: track.points, transform: track.transform, source: track.source };
   if (provisional) return { points: [], transform: provisional, source: 'provisional' };
   return null;
@@ -50,7 +52,7 @@ export function sessionLabel(s: SessionRow): string {
   return `${s.circuit_short_name || s.location} ${(s.session_name || '').toLowerCase()}`;
 }
 
-export interface InitInput {
+export interface HelloInput {
   session: SessionRow | null;
   sessStart: number | undefined;
   sessEnd: number | undefined;
@@ -58,13 +60,13 @@ export interface InitInput {
   userPicked: boolean;
   drivers: Iterable<Driver>;
   sessions: readonly SessionRow[];
-  track: TrackPayload | null;
-  status: StatusPayload;
+  circuit: Circuit | null;
+  status: Status;
   canLive: boolean;
   now?: number;
 }
 
-export function initPayload(i: InitInput): InitPayload {
+export function helloPayload(i: HelloInput): Hello {
   const s = i.session;
   const now = i.now ?? Date.now();
   const sessions: SessionListEntry[] = i.sessions.map((x) => ({
@@ -74,6 +76,7 @@ export function initPayload(i: InitInput): InitPayload {
     live: isLiveWindow(x, now),
   }));
   return {
+    protocolVersion: PROTOCOL_VERSION,
     session: s
       ? {
           key: s.session_key as number,
@@ -88,7 +91,7 @@ export function initPayload(i: InitInput): InitPayload {
     userPicked: i.userPicked,
     drivers: [...i.drivers],
     sessions,
-    track: i.track,
+    circuit: i.circuit,
     status: i.status,
     canLive: i.canLive,
   };

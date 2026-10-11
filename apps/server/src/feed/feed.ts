@@ -10,17 +10,17 @@
 //
 // Ported from reference/prototype/lib/feed.js.
 
-import type { LapRow, LocationRow, Mode, SessionRow, Tick, Transform } from '@lapline/shared';
+import type { Circuit, LapRow, LocationRow, Mode, SessionRow, Tick, Timing, Transform } from '@lapline/shared';
 import { LockedError, type OpenF1 } from '../openf1/client.js';
 import { LiveMqtt } from '../openf1/live-mqtt.js';
 import { createBuffers, num, prune, type Buffers } from './buffers.js';
 import { applyReplayControl, clock, newReplayState, replayNow, type ReplayState } from './clock.js';
-import { buildFrame } from './frames.js';
+import { buildTick, buildTiming } from './frames.js';
 import { ingest } from './ingest.js';
 import {
-  initPayload,
+  circuitPayload,
+  helloPayload,
   statusPayload,
-  trackPayload,
   type FeedStatus,
   type TrackState,
 } from './payloads.js';
@@ -201,12 +201,12 @@ export class Feed {
       this.mode = 'locked';
       const free = new Date(this.sessEnd + LIVE_POST_MS);
       this.setStatus('warn', 'Live data needs OpenF1 sponsor credentials', { freeAt: free.toISOString() });
-      this.broadcastInit();
+      this.broadcastHello();
       return;
     }
 
     this.setStatus('info', 'Loading session data');
-    this.broadcastInit();
+    this.broadcastHello();
     try {
       await this.loadStatic(gen);
       if (gen !== this.generation) return;
@@ -221,7 +221,7 @@ export class Feed {
         this.setStatus('error', message(e));
       }
     }
-    this.broadcastInit();
+    this.broadcastHello();
   }
 
   /** Data loaded once at session start, and refreshed periodically when live. */
@@ -230,7 +230,7 @@ export class Feed {
     this.ingest('drivers', await this.api.get('drivers', [['session_key', '=', key]]));
     if (gen !== this.generation) return;
     // Drivers alone are worth sending: the tower can render before timing lands.
-    this.broadcastInit();
+    this.broadcastHello();
 
     for (const ep of STATIC_ENDPOINTS) {
       const started = Date.now();
@@ -309,11 +309,11 @@ export class Feed {
   private setTrack(raw: Point[], source: string): void {
     const points = smoothZ(raw);
     this.track = { points, transform: transformFor(points), source };
-    this.broadcast('track', this.trackPayload());
+    this.broadcast('circuit', this.circuitPayload());
   }
 
-  trackPayload() {
-    return trackPayload(this.track, this.provisional);
+  circuitPayload(): Circuit | null {
+    return circuitPayload(this.track, this.provisional);
   }
 
   /** A rough transform from whatever positions we have, so the view can orient. */
@@ -323,7 +323,7 @@ export class Feed {
     for (const arr of this.buffers.loc.values()) for (const r of arr) pts.push([r[1], r[2], r[3]]);
     if (pts.length > 200) {
       this.provisional = transformFor(pts);
-      this.broadcast('track', this.trackPayload());
+      this.broadcast('circuit', this.circuitPayload());
     }
   }
 
@@ -373,7 +373,7 @@ export class Feed {
         if (e instanceof LockedError) {
           this.mode = 'locked';
           this.setStatus('warn', e.message);
-          this.broadcastInit();
+          this.broadcastHello();
         } else {
           console.error('fetch', message(e));
           this.setStatus('error', `Fetch problem: ${message(e)}`);
@@ -383,15 +383,20 @@ export class Feed {
     };
     void tickFetch();
 
-    // 4 Hz positions and telemetry, with timing riding every fourth frame.
-    let n = 0;
+    // Protocol v1 splits these: 4 Hz positions and telemetry, 1 Hz timing.
     this.timers.push(
       setInterval(() => {
         if (!this.listeners.size) return;
-        const f = this.frame(n % 4 === 0);
+        const f = this.tick();
         if (f) this.broadcast('tick', f);
-        n++;
       }, 250),
+    );
+    this.timers.push(
+      setInterval(() => {
+        if (!this.listeners.size) return;
+        const f = this.timing();
+        if (f) this.broadcast('timing', f);
+      }, 1000),
     );
     this.timers.push(setInterval(() => this.broadcast('ping', { t: Date.now() }), 15_000));
   }
@@ -489,33 +494,42 @@ export class Feed {
 
   // ---------- frames ----------
 
-  frame(withTiming: boolean): Tick | null {
-    if (!this.session || (this.mode !== 'replay' && this.mode !== 'live')) return null;
-    const t = this.mode === 'replay' ? this.replayNow() : this.clock();
-    return buildFrame(
-      this.buffers,
-      {
-        mode: this.mode,
-        t,
-        replay:
-          this.mode === 'replay'
-            ? {
-                playing: this.replay.playing,
-                speed: this.replay.speed,
-                start: this.sessStart as number,
-                end: this.sessEnd as number,
-              }
-            : undefined,
-        live:
-          this.mode === 'live'
-            ? {
-                delayS: this.liveDelayMs / 1000,
-                mqtt: Boolean(this.mqtt) && Date.now() - this.mqttLastMsg < MQTT_QUIET_MS,
-              }
-            : undefined,
-      },
-      withTiming,
-    );
+  /** Session time the frames are sampled at. */
+  private frameTime(): number {
+    return this.mode === 'replay' ? this.replayNow() : this.clock();
+  }
+
+  private streaming(): boolean {
+    return Boolean(this.session) && (this.mode === 'replay' || this.mode === 'live');
+  }
+
+  tick(): Tick | null {
+    if (!this.streaming()) return null;
+    return buildTick(this.buffers, {
+      mode: this.mode,
+      t: this.frameTime(),
+      replay:
+        this.mode === 'replay'
+          ? {
+              playing: this.replay.playing,
+              speed: this.replay.speed,
+              start: this.sessStart as number,
+              end: this.sessEnd as number,
+            }
+          : undefined,
+      live:
+        this.mode === 'live'
+          ? {
+              delayS: this.liveDelayMs / 1000,
+              mqtt: Boolean(this.mqtt) && Date.now() - this.mqttLastMsg < MQTT_QUIET_MS,
+            }
+          : undefined,
+    });
+  }
+
+  timing(): Timing | null {
+    if (!this.streaming()) return null;
+    return buildTiming(this.buffers, this.frameTime());
   }
 
   // ---------- clients ----------
@@ -526,19 +540,24 @@ export class Feed {
   }
 
   statusPayload() {
-    return statusPayload(this.status, this.mode, {
-      authed: this.api.hasCredentials,
-      requests: this.api.stats.requests,
-      last: this.api.stats.last,
-    });
+    return statusPayload(
+      this.status,
+      this.mode,
+      {
+        authed: this.api.hasCredentials,
+        requests: this.api.stats.requests,
+        last: this.api.stats.last,
+      },
+      this.buffers.newest,
+    );
   }
 
   broadcastStatus(): void {
     this.broadcast('status', this.statusPayload());
   }
 
-  initPayload() {
-    return initPayload({
+  helloPayload() {
+    return helloPayload({
       session: this.session,
       sessStart: this.sessStart,
       sessEnd: this.sessEnd,
@@ -546,14 +565,14 @@ export class Feed {
       userPicked: this.userPicked,
       drivers: this.buffers.drivers.values(),
       sessions: this.sessions,
-      track: this.trackPayload(),
+      circuit: this.circuitPayload(),
       status: this.statusPayload(),
       canLive: this.api.hasCredentials,
     });
   }
 
-  broadcastInit(): void {
-    this.broadcast('init', this.initPayload());
+  broadcastHello(): void {
+    this.broadcast('hello', this.helloPayload());
   }
 
   broadcast(event: string, data: unknown): void {
@@ -564,7 +583,7 @@ export class Feed {
   addListener(res: FeedListener): void {
     this.listeners.add(res);
     this.lastClients = Date.now();
-    res.write(`event: init\ndata: ${JSON.stringify(this.initPayload())}\n\n`);
+    res.write(`event: hello\ndata: ${JSON.stringify(this.helloPayload())}\n\n`);
   }
 
   removeListener(res: FeedListener): void {

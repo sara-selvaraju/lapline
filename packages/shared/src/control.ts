@@ -1,21 +1,24 @@
-// POST /api/control, as reference/prototype/server.js accepts it.
+// POST /api/control. Validated server-side, because it is the one place a
+// browser sends us anything.
 
-export interface ControlRequest {
+import { z } from 'zod';
+
+export const ControlRequestSchema = z.object({
   /** Select a session by key. Checked first, so it wins over the fields below. */
-  session?: number;
+  session: z.number().int().optional(),
   /** Force a mode on that session; 'replay' is "replay from start". */
-  mode?: 'replay' | 'live';
+  mode: z.enum(['replay', 'live']).optional(),
   /** 'auto' clears the manual pick and follows whichever session is live. */
-  follow?: 'auto';
-  /** Replay only. */
-  playing?: boolean;
-  /** Replay only. Clamped server-side to 0.25–32. */
-  speed?: number;
-  /** Replay only. Session time in epoch ms; a jump over 5 s refetches. */
-  at?: number;
-  /** Live only. Clamped server-side to 3–180 s. */
-  delayS?: number;
-}
+  follow: z.literal('auto').optional(),
+  playing: z.boolean().optional(),
+  /** Clamped server-side to 0.25-32. */
+  speed: z.number().optional(),
+  /** Session time in epoch ms; a jump over 5 s refetches. */
+  at: z.number().optional(),
+  /** Clamped server-side to 3-180 s. */
+  delayS: z.number().optional(),
+});
+export type ControlRequest = z.infer<typeof ControlRequestSchema>;
 
 export interface ControlResponse {
   ok: true;

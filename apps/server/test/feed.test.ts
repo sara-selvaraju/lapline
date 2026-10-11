@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';
-import type { Tick } from '@lapline/shared';
+import type { Tick, Timing } from '@lapline/shared';
 import { OpenF1 } from '../src/openf1/client.js';
 import { Feed, type FeedListener } from '../src/feed/feed.js';
 
@@ -61,7 +61,7 @@ describe('the free tier and the live window', () => {
       expect(feed.mode).toBe('locked');
       expect(feed.status.level).toBe('warn');
       expect(feed.status.freeAt).toMatch(/^\d{4}-\d\d-\d\dT/);
-      expect(feed.initPayload().canLive).toBe(false);
+      expect(feed.helloPayload().canLive).toBe(false);
     } finally {
       feed.stop();
     }
@@ -97,7 +97,7 @@ describe('the free tier and the live window', () => {
     try {
       await feed.loadSessionList();
       await feed.selectSession(SPRINT);
-      expect(JSON.stringify(feed.initPayload())).not.toMatch(/any|password|secret/i);
+      expect(JSON.stringify(feed.helloPayload())).not.toMatch(/any|password|secret/i);
     } finally {
       feed.stop();
     }
@@ -112,12 +112,12 @@ describe('replaying the finished mock Sprint', () => {
       await feed.selectSession(SPRINT);
       expect(feed.mode).toBe('replay');
       expect(feed.status.level).toBe('ok');
-      const init = feed.initPayload();
-      expect(init.drivers).toHaveLength(20);
-      expect(init.session!.name).toBe('Sprint');
+      const hello = feed.helloPayload();
+      expect(hello.drivers).toHaveLength(20);
+      expect(hello.session!.name).toBe('Sprint');
       // The outline comes from the fastest clean lap's position trace.
-      expect(init.track!.points.length).toBeGreaterThan(50);
-      expect(init.track!.transform.scale).toBeGreaterThan(0);
+      expect(hello.circuit!.points.length).toBeGreaterThan(50);
+      expect(hello.circuit!.transform.scale).toBeGreaterThan(0);
     } finally {
       feed.stop();
     }
@@ -135,13 +135,13 @@ describe('replaying the finished mock Sprint', () => {
       await feed.fetchStep();
       await feed.fetchStep();
 
-      const frame = feed.frame(true) as Tick;
+      const frame = feed.tick() as Tick;
       expect(frame.mode).toBe('replay');
       expect(frame.cars.length).toBe(20);
       expect(frame.replay).toMatchObject({ playing: false, speed: 1 });
-      expect(frame.timing!.rows).toHaveLength(20);
-      expect(frame.timing!.rows[0]!.p).toBe(1);
-      expect(frame.timing!.flag).toBe('GREEN');
+      expect((feed.timing() as Timing).rows).toHaveLength(20);
+      expect((feed.timing() as Timing).rows[0]!.p).toBe(1);
+      expect((feed.timing() as Timing).flag).toBe('GREEN');
       // Every car has a position and a speed, and none is stale.
       for (const car of frame.cars) {
         expect(Number.isFinite(car[1])).toBe(true);
@@ -161,7 +161,7 @@ describe('replaying the finished mock Sprint', () => {
       const start = feed.sessStart as number;
       const flagAt = (offset: number): string => {
         feed.setReplay({ at: start + offset, playing: false });
-        return (feed.frame(true) as Tick).timing!.flag;
+        return (feed.timing() as Timing).flag;
       };
       // The mock scripts a sector yellow at 5 min, safety car at 9, ending at 11.
       expect(flagAt(60_000)).toBe('GREEN');
@@ -181,14 +181,14 @@ describe('replaying the finished mock Sprint', () => {
       await feed.selectSession(SPRINT);
       feed.setReplay({ at: (feed.sessStart as number) + 300_000, playing: false });
       await feed.fetchStep();
-      expect((feed.frame(false) as Tick).cars).toHaveLength(20);
+      expect((feed.tick() as Tick).cars).toHaveLength(20);
 
       // A jump of more than 5 s invalidates the window.
       feed.setReplay({ at: (feed.sessStart as number) + 600_000 });
-      expect((feed.frame(false) as Tick).cars).toHaveLength(0);
+      expect((feed.tick() as Tick).cars).toHaveLength(0);
 
       await feed.fetchStep();
-      const after = feed.frame(false) as Tick;
+      const after = feed.tick() as Tick;
       expect(after.cars).toHaveLength(20);
       for (const car of after.cars) expect(car[10]).toBe(0);
     } finally {
@@ -219,12 +219,12 @@ describe('the live mock Race with credentials, over REST', () => {
       await feed.fetchStep();
       await feed.fetchStep();
 
-      const frame = feed.frame(true) as Tick;
+      const frame = feed.tick() as Tick;
       expect(frame.mode).toBe('live');
       expect(frame.live).toEqual({ delayS: 10, mqtt: false });
       expect(Math.abs(frame.t - (Date.now() - 10_000))).toBeLessThan(2000);
       expect(frame.cars.length).toBeGreaterThan(0);
-      expect(frame.timing!.rows.length).toBe(20);
+      expect((feed.timing() as Timing).rows.length).toBe(20);
     } finally {
       feed.stop();
     }
@@ -236,7 +236,7 @@ describe('the live mock Race with credentials, over REST', () => {
       await feed.loadSessionList();
       await feed.selectSession(RACE);
       // The live Race has no completed laps worth tracing yet, so the Sprint's lap is used.
-      expect(feed.initPayload().track!.source).toBe('Sprint');
+      expect(feed.helloPayload().circuit!.source).toBe('Sprint');
     } finally {
       feed.stop();
     }
@@ -258,15 +258,15 @@ describe('viewers and idling', () => {
     }
   });
 
-  it('sends an init event to a listener the moment it connects', async () => {
+  it('sends a hello event to a listener the moment it connects', async () => {
     const feed = freeFeed();
     try {
       await feed.loadSessionList();
       await feed.selectSession(SPRINT);
       const listener = new Collector();
       feed.addListener(listener);
-      expect(listener.of('init')).toHaveLength(1);
-      expect((listener.last('init') as { mode: string }).mode).toBe('replay');
+      expect(listener.of('hello')).toHaveLength(1);
+      expect((listener.last('hello') as { mode: string }).mode).toBe('replay');
     } finally {
       feed.stop();
     }

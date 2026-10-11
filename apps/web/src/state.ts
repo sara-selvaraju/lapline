@@ -6,7 +6,7 @@
 //
 // Ported from reference/prototype/public/app.js.
 
-import type { Driver, InitPayload, LiveMeta, ReplayMeta, StatusPayload, TimingBlock, Tick, TrackPayload } from '@lapline/shared';
+import type { Circuit, Driver, Hello, LiveMeta, ReplayMeta, Status, Tick, Timing, TowerRow, Transform } from '@lapline/shared';
 
 export type GapMode = 'int' | 'gap';
 
@@ -21,25 +21,25 @@ export interface Prefs {
 }
 
 export interface State {
-  session: InitPayload['session'];
+  session: Hello['session'];
   mode: string;
   drivers: Map<number, Driver>;
-  sessions: InitPayload['sessions'];
-  track: TrackPayload | null;
-  transform: TrackPayload['transform'] | null;
+  sessions: Hello['sessions'];
+  circuit: Circuit | null;
+  transform: Transform | null;
   sel: number | null;
   gapMode: GapMode;
   /** Elevation exaggeration: street circuits are nearly flat. */
   zx: number;
   allLabels: boolean;
   follow: boolean;
-  timing: TimingBlock | null;
-  timingByN: Map<number, TimingBlock['rows'][number]>;
+  timing: Timing | null;
+  timingByN: Map<number, TowerRow>;
   lastTick: Tick | null;
   history: HistorySample[];
   replay: ReplayMeta | null;
   live: LiveMeta | null;
-  status: StatusPayload | null;
+  status: Status | null;
   canLive: boolean;
   scrubbing: boolean;
 }
@@ -61,7 +61,7 @@ export const state: State = {
   mode: 'idle',
   drivers: new Map(),
   sessions: [],
-  track: null,
+  circuit: null,
   transform: null,
   sel: prefs.sel ?? null,
   gapMode: prefs.gapMode || 'int',

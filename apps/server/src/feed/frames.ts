@@ -14,7 +14,7 @@ import type {
   RaceControlLine,
   ReplayMeta,
   Tick,
-  TimingBlock,
+  Timing,
   TowerRow,
   TrackFlag,
 } from '@lapline/shared';
@@ -147,8 +147,12 @@ export function buildCars(buffers: Buffers, t: number): CarTuple[] {
   return cars;
 }
 
-/** Tower rows, the leader's lap, the flag and the last four race control lines. */
-export function buildTiming(buffers: Buffers, t: number): TimingBlock {
+/**
+ * Tower rows, the leader's lap, the flag and the last four race control lines.
+ * Sent at 1 Hz as its own event; marshal sectors arrive in M3 and battles in M4,
+ * so both are declared in the protocol and empty until then.
+ */
+export function buildTiming(buffers: Buffers, t: number): Timing {
   const rows: TowerRow[] = [];
   let leaderLap: number | null = null;
   for (const d of buffers.drivers.values()) {
@@ -181,10 +185,20 @@ export function buildTiming(buffers: Buffers, t: number): TimingBlock {
   const rc: RaceControlLine[] = [];
   const k = lastAtOrBefore(buffers.rc, t);
   for (let j = k; j >= 0 && rc.length < 4; j--) {
-    rc.push({ t: buffers.rc[j]![0], msg: buffers.rc[j]![1].message });
+    rc.push({ t: buffers.rc[j]![0], msg: buffers.rc[j]![1].message ?? '' });
   }
 
-  return { rows, lap: leaderLap, flag: trackFlag(buffers, t), rc };
+  return {
+    t,
+    rows,
+    lap: leaderLap,
+    // OpenF1 publishes no total-lap figure, so there is nothing honest to send.
+    totalLaps: null,
+    flag: trackFlag(buffers, t),
+    marshalSectors: [],
+    rc,
+    battles: [],
+  };
 }
 
 export interface FrameMeta {
@@ -194,11 +208,10 @@ export interface FrameMeta {
   live?: LiveMeta | undefined;
 }
 
-/** A tick. Timing rides along on every fourth one, so it arrives at 1 Hz. */
-export function buildFrame(buffers: Buffers, meta: FrameMeta, withTiming: boolean): Tick {
+/** 4 Hz. Timing is a separate event now, so this carries no tower rows. */
+export function buildTick(buffers: Buffers, meta: FrameMeta): Tick {
   const out: Tick = { t: meta.t, mode: meta.mode, cars: buildCars(buffers, meta.t) };
   if (meta.replay) out.replay = meta.replay;
   if (meta.live) out.live = meta.live;
-  if (withTiming) out.timing = buildTiming(buffers, meta.t);
   return out;
 }

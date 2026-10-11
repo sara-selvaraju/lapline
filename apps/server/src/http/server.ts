@@ -47,7 +47,7 @@ export function createServer({ feed, appPassword, publicDir }: ServerOptions): S
         }
       }
 
-      if (url.pathname === '/api/state') return json(res, 200, feed.initPayload());
+      if (url.pathname === '/api/state') return json(res, 200, feed.helloPayload());
 
       return serveStatic(res, publicDir, url.pathname);
     })();
