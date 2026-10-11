@@ -6,7 +6,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import type { InitPayload, Tick } from '@lapline/shared';
+import type { Hello, Tick, Timing } from '@lapline/shared';
 
 const MOCK_PORT = 4301;
 const SRV_PORT = 3301;
@@ -115,7 +115,7 @@ describe('the password gate', () => {
 
 describe('/api/state', () => {
   it('describes the replay session that was pinned', async () => {
-    const s = (await (await fetch(`${BASE}/api/state`, { headers: auth })).json()) as InitPayload;
+    const s = (await (await fetch(`${BASE}/api/state`, { headers: auth })).json()) as Hello;
     expect(s.mode).toBe('replay');
     expect(s.session!.key).toBe(1001);
     expect(s.session!.name).toBe('Sprint');
@@ -131,7 +131,7 @@ describe('/api/state', () => {
 });
 
 describe('/events', () => {
-  it('streams init then ticks, with timing on every fourth one', async () => {
+  it('streams hello, then ticks at 4 Hz and timing at 1 Hz', async () => {
     const res = await fetch(`${BASE}/events`, { headers: auth });
     expect(res.headers.get('content-type')).toContain('text/event-stream');
     expect(res.headers.get('x-accel-buffering')).toBe('no');
@@ -154,13 +154,17 @@ describe('/events', () => {
     }
     await reader.cancel();
 
-    expect(events[0]!.event).toBe('init');
+    expect(events[0]!.event).toBe('hello');
     const ticks = events.filter((e) => e.event === 'tick').map((e) => e.data as Tick);
+    const timings = events.filter((e) => e.event === 'timing').map((e) => e.data as Timing);
     expect(ticks.length).toBeGreaterThanOrEqual(8);
-    // Timing rides one tick in four.
-    const withTiming = ticks.filter((t) => t.timing).length;
-    expect(withTiming).toBeGreaterThanOrEqual(Math.floor(ticks.length / 4));
-    expect(withTiming).toBeLessThanOrEqual(Math.ceil(ticks.length / 4) + 1);
+    // Protocol v1: separate events, 4 Hz and 1 Hz, so about four ticks per timing.
+    expect(timings.length).toBeGreaterThanOrEqual(1);
+    expect(ticks.length / timings.length).toBeGreaterThan(2);
+    expect(ticks.length / timings.length).toBeLessThan(6);
+    // A tick carries no tower rows any more.
+    expect(ticks[0]).not.toHaveProperty('timing');
+    expect(timings[0]!.rows.length).toBe(20);
     // The clock advances at 1x.
     const span = ticks.at(-1)!.t - ticks[0]!.t;
     expect(span).toBeGreaterThan(0);
@@ -171,7 +175,7 @@ describe('/events', () => {
 describe('/api/control', () => {
   it('changes replay speed, and the clock then advances faster', async () => {
     const at = async (): Promise<number> => {
-      const s = (await (await fetch(`${BASE}/api/state`, { headers: auth })).json()) as InitPayload;
+      const s = (await (await fetch(`${BASE}/api/state`, { headers: auth })).json()) as Hello;
       return s.status.api.requests;
     };
     void (await at());

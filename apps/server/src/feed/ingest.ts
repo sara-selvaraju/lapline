@@ -41,6 +41,9 @@ export function ingest(
   rows: readonly unknown[],
 ): number {
   let added = 0;
+  const note = (t: number): void => {
+    if (Number.isFinite(t) && (buffers.newest == null || t > buffers.newest)) buffers.newest = t;
+  };
   for (const raw of rows) {
     const r = raw as UpstreamRow;
     if (r.session_key !== undefined && r.session_key !== sessionKey) continue;
@@ -53,6 +56,7 @@ export function ingest(
         const k = `${n}|${row.date}`;
         if (buffers.seen.location.has(k)) break;
         buffers.seen.location.add(k);
+        note(ts(row.date));
         insertSorted(bucket(buffers.loc, n), [ts(row.date), row.x as number, row.y as number, row.z as number]);
         added++;
         break;
@@ -63,6 +67,7 @@ export function ingest(
         const k = `${n}|${row.date}`;
         if (buffers.seen.car_data.has(k)) break;
         buffers.seen.car_data.add(k);
+        note(ts(row.date));
         insertSorted(bucket(buffers.car, n), [
           ts(row.date),
           row.speed,
@@ -80,6 +85,7 @@ export function ingest(
         const k = `${n}|${row.date}`;
         if (buffers.seen.position.has(k)) break;
         buffers.seen.position.add(k);
+        note(ts(row.date));
         insertSorted(bucket(buffers.pos, n), [ts(row.date), row.position]);
         added++;
         break;
@@ -89,6 +95,7 @@ export function ingest(
         const k = `${n}|${row.date}`;
         if (buffers.seen.intervals.has(k)) break;
         buffers.seen.intervals.add(k);
+        note(ts(row.date));
         insertSorted(bucket(buffers.ivl, n), [
           ts(row.date),
           row.gap_to_leader ?? null,
@@ -102,6 +109,7 @@ export function ingest(
         const k = `${row.date}|${row.message}`;
         if (buffers.seen.race_control.has(k)) break;
         buffers.seen.race_control.add(k);
+        note(ts(row.date));
         insertSorted(buffers.rc, [ts(row.date), row]);
         added++;
         break;
@@ -111,6 +119,7 @@ export function ingest(
         const k = `${n}|${row.date}`;
         if (buffers.seen.pit.has(k)) break;
         buffers.seen.pit.add(k);
+        note(ts(row.date));
         // pit_duration is deprecated; 22 s is a plausible lane time when neither is given.
         insertSorted(bucket(buffers.pits, n), [
           ts(row.date),

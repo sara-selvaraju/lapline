@@ -35,7 +35,7 @@ export function renderHeader(): void {
   const base = flag.replace(' ENDING', '');
   const band = $('flagband');
   band.className = `flag-${base}`;
-  band.textContent = FLAG_LABEL[flag] || '';
+  band.textContent = FLAG_LABEL[flag as TrackFlag] || '';
 
   const b = $('modebadge');
   b.className = `badge ${state.mode === 'live' ? 'live' : ''}`;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createBuffers, type Buffers } from '../src/feed/buffers.js';
-import { buildCars, buildFrame, buildTiming, currentLap, trackFlag, tyre } from '../src/feed/frames.js';
+import { buildCars, buildTick, buildTiming, currentLap, trackFlag, tyre } from '../src/feed/frames.js';
 
 const T = 1_000_000;
 
@@ -266,40 +266,54 @@ describe('buildTiming', () => {
   it('passes a lapped driver string through untouched', () => {
     const b = populated();
     b.ivl.set(99, [[T, '+1 LAP', null]]);
-    const row = buildTiming(b, T).rows.find((r) => r.n === 99)!;
+    const row = buildTiming(b, T).rows.find((r: { n: number }) => r.n === 99)!;
     expect(row.gap).toBe('+1 LAP');
   });
 
   it('flags a car as in the pit lane for the lane duration', () => {
     const b = populated();
     b.pits.set(4, [[T - 5000, 22]]);
-    expect(buildTiming(b, T).rows.find((r) => r.n === 4)!.pit).toBe(true);
-    expect(buildTiming(b, T + 30_000).rows.find((r) => r.n === 4)!.pit).toBe(false);
+    expect(buildTiming(b, T).rows.find((r: { n: number }) => r.n === 4)!.pit).toBe(true);
+    expect(buildTiming(b, T + 30_000).rows.find((r: { n: number }) => r.n === 4)!.pit).toBe(false);
   });
 
   it('returns the last four race control lines, newest first', () => {
     const b = populated();
     for (let i = 1; i <= 6; i++) b.rc.push([T - i * 1000, { message: `M${i}` }]);
     b.rc.sort((x, y) => x[0] - y[0]);
-    expect(buildTiming(b, T).rc.map((r) => r.msg)).toEqual(['M1', 'M2', 'M3', 'M4']);
+    expect(buildTiming(b, T).rc.map((r: { msg: string }) => r.msg)).toEqual(['M1', 'M2', 'M3', 'M4']);
   });
 });
 
-describe('buildFrame', () => {
-  it('includes replay meta only when replaying, and timing only on request', () => {
+describe('buildTick', () => {
+  it('includes replay meta only when replaying, and never timing', () => {
     const b = withLoc([[T, 1, 2, 3]]);
     const replay = { playing: true, speed: 1, start: T, end: T + 1000 };
-    const plain = buildFrame(b, { mode: 'replay', t: T, replay }, false);
-    expect(plain.replay).toEqual(replay);
-    expect(plain.timing).toBeUndefined();
-    expect(plain.live).toBeUndefined();
-    expect(buildFrame(b, { mode: 'replay', t: T, replay }, true).timing).toBeDefined();
+    const tick = buildTick(b, { mode: 'replay', t: T, replay });
+    expect(tick.replay).toEqual(replay);
+    expect(tick.live).toBeUndefined();
+    // Protocol v1 carries timing in its own event, so a tick never holds rows.
+    expect('timing' in tick).toBe(false);
   });
 
   it('includes live meta when live', () => {
     const b = withLoc([[T, 1, 2, 3]]);
-    const f = buildFrame(b, { mode: 'live', t: T, live: { delayS: 10, mqtt: false } }, false);
+    const f = buildTick(b, { mode: 'live', t: T, live: { delayS: 10, mqtt: false } });
     expect(f.live).toEqual({ delayS: 10, mqtt: false });
     expect(f.mode).toBe('live');
+  });
+});
+
+describe('the timing event', () => {
+  it('carries its own timestamp, so the client can line it up with ticks', () => {
+    expect(buildTiming(createBuffers(), T).t).toBe(T);
+  });
+
+  it('declares totalLaps, marshal sectors and battles, empty until later milestones', () => {
+    const timing = buildTiming(createBuffers(), T);
+    // OpenF1 publishes no total-lap figure; M3 fills marshal sectors, M4 battles.
+    expect(timing.totalLaps).toBeNull();
+    expect(timing.marshalSectors).toEqual([]);
+    expect(timing.battles).toEqual([]);
   });
 });

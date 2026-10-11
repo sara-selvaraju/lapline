@@ -8,7 +8,7 @@ import { esc } from './format.js';
 
 export function renderSessionSelect(): void {
   $('sessSelect').innerHTML = state.sessions
-    .map((s) => {
+    .map((s: { key: number; label: string; start: string; live: boolean }) => {
       const when = new Date(s.start).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
       return `<option value="${s.key}" ${state.session?.key === s.key ? 'selected' : ''}>${esc(
         s.label,

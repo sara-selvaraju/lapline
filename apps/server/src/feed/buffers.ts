@@ -68,6 +68,8 @@ export interface Buffers {
   pits: Map<number, PitBufRow[]>;
   rc: RcBufRow[];
   seen: SeenSets;
+  /** Newest upstream row timestamp seen, for the freshness signal. Null before any. */
+  newest: number | null;
 }
 
 export function createBuffers(): Buffers {
@@ -81,6 +83,7 @@ export function createBuffers(): Buffers {
     stints: new Map(),
     pits: new Map(),
     rc: [],
+    newest: null,
     seen: {
       location: new Set(),
       car_data: new Set(),

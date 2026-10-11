@@ -7,7 +7,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';
-import type { Tick } from '@lapline/shared';
+import type { Tick, Timing } from '@lapline/shared';
 import { OpenF1 } from '../src/openf1/client.js';
 import { DEFAULT_BROKER_URL, LiveMqtt } from '../src/openf1/live-mqtt.js';
 import { Feed } from '../src/feed/feed.js';
@@ -46,7 +46,7 @@ describe('transport selection', () => {
       await feed.loadSessionList();
       await feed.selectSession(RACE);
       await feed.fetchStep();
-      const frame = feed.frame(false) as Tick;
+      const frame = feed.tick() as Tick;
       expect(frame.live!.mqtt).toBe(false);
       expect(frame.cars.length).toBeGreaterThan(0);
     } finally {
@@ -78,10 +78,10 @@ describe('transport selection', () => {
       // MQTT never goes healthy, so the scheduler runs the full REST plan.
       await feed.fetchStep();
       await feed.fetchStep();
-      const frame = feed.frame(true) as Tick;
+      const frame = feed.tick() as Tick;
       expect(frame.live!.mqtt).toBe(false);
       expect(frame.cars.length).toBeGreaterThan(0);
-      expect(frame.timing!.rows).toHaveLength(20);
+      expect((feed.timing() as Timing).rows).toHaveLength(20);
     } finally {
       feed.stop();
       if (prev === undefined) delete process.env.OPENF1_MQTT_URL;

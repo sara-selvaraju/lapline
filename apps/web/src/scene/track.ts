@@ -26,7 +26,7 @@ export function toWorld(x: number, y: number, z: number, out = new THREE.Vector3
 
 export function buildTrack(): void {
   trackGroup.clear();
-  const pts = state.track?.points || [];
+  const pts = state.circuit?.points || [];
   if (pts.length < 10) return;
 
   const P = pts.map((p) => toWorld(p[0], p[1], p[2]));

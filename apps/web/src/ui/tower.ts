@@ -18,7 +18,7 @@ export function invalidateTower(): void {
 
 export function renderTower(): void {
   const rows = state.timing?.rows || [];
-  const bestOverall = Math.min(...rows.map((r) => r.best ?? Infinity));
+  const bestOverall = Math.min(...rows.map((r: { best: number | null }) => r.best ?? Infinity));
 
   const html = rows
     .map((r) => {

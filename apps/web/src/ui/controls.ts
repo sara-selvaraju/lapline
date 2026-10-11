@@ -17,7 +17,7 @@ export function renderControls(): void {
   $('liveCtl').hidden = !isLive;
   $('controls').hidden = !isReplay && !isLive;
   // "Go live" only makes sense when this session is live and we could read it.
-  const sessLive = state.sessions.find((s) => s.key === state.session?.key)?.live;
+  const sessLive = state.sessions.find((s: { key: number; live: boolean }) => s.key === state.session?.key)?.live;
   $('toLiveBtn').hidden = !(isReplay && sessLive && state.canLive);
   renderClock();
 }
