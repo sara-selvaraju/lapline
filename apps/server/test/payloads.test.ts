@@ -12,7 +12,7 @@ const session: SessionRow = {
   date_end: new Date(NOW + 3_600_000).toISOString(),
 };
 
-const api = { authed: false, requests: 8, last: '200 laps' };
+const api = { auth: 'none' as const, requests: 8, last: '200 laps' };
 
 describe('statusPayload', () => {
   it('carries the level, text, mode and API counters', () => {
@@ -27,9 +27,9 @@ describe('statusPayload', () => {
   });
 
   it('says only whether credentials exist, never what they are', () => {
-    const out = statusPayload({ level: 'ok', text: 'Live' }, 'live', { authed: true, requests: 1, last: null }, null);
+    const out = statusPayload({ level: 'ok', text: 'Live' }, 'live', { auth: 'ok' as const, requests: 1, last: null }, null);
     expect(JSON.stringify(out)).not.toMatch(/password|username|secret/i);
-    expect(out.api.authed).toBe(true);
+    expect(out.api.auth).toBe('ok');
   });
 });
 

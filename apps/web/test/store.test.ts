@@ -17,7 +17,7 @@ const hello = (over: Partial<Hello> = {}): Hello => ({
   ],
   sessions: [],
   circuit: null,
-  status: { level: 'ok', text: 'Live', mode: 'live', api: { authed: true, requests: 1, last: null }, freshness: T },
+  status: { level: 'ok', text: 'Live', mode: 'live', api: { auth: 'ok', requests: 1, last: null }, freshness: T },
   canLive: true,
   ...over,
 });
