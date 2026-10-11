@@ -21,9 +21,12 @@ function prefix(name, line) {
 }
 
 function run(name, command, args, env = {}) {
+  // detached gives each child its own process group, so killing the group takes
+  // its grandchildren too. Without this, Ctrl-C leaves Vite and tsc holding ports.
   const child = spawn(command, args, {
     env: { ...process.env, ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
+    detached: true,
   });
   children.push(child);
   for (const stream of [child.stdout, child.stderr]) {
@@ -46,27 +49,43 @@ function run(name, command, args, env = {}) {
   return child;
 }
 
+/** Signals the child's whole process group, so wrappers take their children with them. */
+function killGroup(child, signal) {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  try {
+    process.kill(-child.pid, signal);
+  } catch {
+    try {
+      child.kill(signal);
+    } catch {
+      /* already gone */
+    }
+  }
+}
+
 function shutdown(code = 0) {
   if (shuttingDown) return;
   shuttingDown = true;
-  for (const c of children) c.kill('SIGTERM');
+  for (const c of children) killGroup(c, 'SIGTERM');
   setTimeout(() => {
-    for (const c of children) if (c.exitCode === null) c.kill('SIGKILL');
+    for (const c of children) killGroup(c, 'SIGKILL');
     process.exit(code);
-  }, 300);
+  }, 500);
 }
 
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => shutdown(0));
 
 // Build once up front, so nothing starts against stale or missing output.
 console.log(prefix('tsc', 'building shared, server and mock...'));
-const first = spawnSync('npx', ['tsc', '-b', 'tsconfig.json'], { stdio: 'inherit' });
+const TSC = 'node_modules/.bin/tsc';
+const VITE = 'node_modules/.bin/vite';
+const first = spawnSync(TSC, ['-b', 'tsconfig.json'], { stdio: 'inherit' });
 if (first.status !== 0) {
   console.error(prefix('tsc', 'initial build failed; fix the errors and rerun'));
   process.exit(first.status ?? 1);
 }
 
-run('tsc', 'npx', ['tsc', '-b', 'tsconfig.json', '--watch', '--preserveWatchOutput']);
+run('tsc', TSC, ['-b', 'tsconfig.json', '--watch', '--preserveWatchOutput']);
 run('mock', process.execPath, ['--watch', 'tools/mock-openf1/dist/src/index.js'], {
   MOCK_PORT,
 });
@@ -74,6 +93,6 @@ run('server', process.execPath, ['--watch', 'apps/server/dist/src/index.js'], {
   PORT: SERVER_PORT,
   OPENF1_BASE: process.env.OPENF1_BASE ?? `http://localhost:${MOCK_PORT}`,
 });
-run('web', 'npm', ['run', 'dev', '-w', '@lapline/web']);
+run('web', VITE, ['--config', 'apps/web/vite.config.ts', 'apps/web']);
 
 console.log(prefix('tsc', `mock :${MOCK_PORT}  server :${SERVER_PORT}  web :5173`));
