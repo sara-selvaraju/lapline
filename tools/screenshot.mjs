@@ -54,7 +54,7 @@ for (const [label, viewport] of SIZES) {
   await page.goto(URLBASE, { waitUntil: 'domcontentloaded' });
   try {
     // The tower fills from timing frames, so this waits for real data.
-    await page.waitForFunction(() => document.querySelectorAll('#rows .row').length >= 15, {
+    await page.waitForFunction(() => document.querySelectorAll('.tower-row').length >= 15, {
       timeout: 30_000,
     });
   } catch {
@@ -64,24 +64,20 @@ for (const [label, viewport] of SIZES) {
   await page.waitForTimeout(2500);
 
   const facts = await page.evaluate(() => {
-    const text = (id) => document.getElementById(id)?.textContent?.trim() ?? null;
-    const canvas = document.getElementById('view');
+    const text = (sel) => document.querySelector(sel)?.textContent?.trim() ?? null;
+    const canvas = document.querySelector('.track-canvas');
     return {
-      session: text('sessname'),
-      mode: text('modebadge'),
-      lap: text('lap'),
-      flagBand: document.getElementById('flagband')?.className ?? null,
-      raceControl: text('rc'),
-      towerRows: document.querySelectorAll('#rows .row').length,
-      firstRow: document.querySelector('#rows .row')?.textContent?.replace(/\s+/g, ' ').trim() ?? null,
-      selected: text('tCode'),
-      speed: text('tSpeed'),
-      gear: text('tGear'),
-      rpm: text('tRpm'),
-      lastLap: text('tLast'),
-      bestLap: text('tBest'),
-      clock: text('clock'),
-      overlayShown: document.getElementById('overlay')?.hidden === false,
+      session: text('.circuit'),
+      mode: text('.pill-label'),
+      lap: text('.lap'),
+      flagBand: document.querySelector('.flag-band')?.className ?? null,
+      raceControl: text('.race-control'),
+      towerRows: document.querySelectorAll('.tower-row').length,
+      firstRow: document.querySelector('.tower-row')?.textContent?.replace(/\s+/g, ' ').trim() ?? null,
+      selected: text('.strip-code'),
+      speed: text('.strip-speed-value'),
+      gear: text('.strip-gear-value'),
+      overlayShown: Boolean(document.querySelector('.overlay')),
       canvas: canvas instanceof HTMLCanvasElement ? `${canvas.width}x${canvas.height}` : 'missing',
     };
   });
