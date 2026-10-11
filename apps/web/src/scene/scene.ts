@@ -8,29 +8,21 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { $ } from '../dom.js';
 import { storeState } from '../store/store.js';
 import { cars, carGroup } from './cars.js';
 import { COLORS, FRAME_MS } from './colours.js';
 import { trackGroup } from './track.js';
 
-const canvas = $<HTMLCanvasElement>('view');
-
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setClearColor(COLORS.night);
+let canvas: HTMLCanvasElement | null = null;
+let renderer: THREE.WebGLRenderer | null = null;
+let controls: OrbitControls | null = null;
+let frameHandle = 0;
+let resizeObserver: ResizeObserver | null = null;
 
 export const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(COLORS.night, 230, 440);
 
 export const camera = new THREE.PerspectiveCamera(45, 1, 0.5, 1000);
-const controls = new OrbitControls(camera, canvas);
-controls.enableDamping = true;
-controls.dampingFactor = 0.12;
-controls.maxPolarAngle = Math.PI * 0.47;
-controls.minDistance = 6;
-controls.maxDistance = 320;
-controls.screenSpacePanning = false;
 
 const grid = new THREE.PolarGridHelper(70, 12, 6, 64, COLORS.line, COLORS.line);
 (grid.material as THREE.Material).transparent = true;
@@ -41,6 +33,7 @@ scene.add(carGroup);
 
 /** Fit the 100-unit-wide track into whichever of the two view angles is narrower. */
 export function resetView(): void {
+  if (!controls) return;
   const vfov = THREE.MathUtils.degToRad(camera.fov);
   const hfov = 2 * Math.atan(Math.tan(vfov / 2) * camera.aspect);
   const dist = (54 / Math.tan(Math.min(vfov, hfov) / 2)) * 1.05;
@@ -52,6 +45,7 @@ export function resetView(): void {
 
 let viewFitted = false;
 function resize(): void {
+  if (!canvas || !renderer) return;
   const r = canvas.parentElement!.getBoundingClientRect();
   renderer.setSize(r.width, r.height, false);
   camera.aspect = r.width / Math.max(r.height, 1);
@@ -64,6 +58,7 @@ function resize(): void {
 
 /** Normalised device coordinates for a pointer event over the canvas. */
 export function ndcFor(e: { clientX: number; clientY: number }): THREE.Vector2 {
+  if (!canvas) return new THREE.Vector2();
   const r = canvas.getBoundingClientRect();
   return new THREE.Vector2(
     ((e.clientX - r.left) / r.width) * 2 - 1,
@@ -71,13 +66,12 @@ export function ndcFor(e: { clientX: number; clientY: number }): THREE.Vector2 {
   );
 }
 
-export { canvas };
-
 const vA = new THREE.Vector3();
 let lastFrame = performance.now();
 
 function animate(now: number): void {
-  requestAnimationFrame(animate);
+  frameHandle = requestAnimationFrame(animate);
+  if (!renderer || !controls) return;
   const dt = now - lastFrame;
   lastFrame = now;
 
@@ -107,8 +101,39 @@ function animate(now: number): void {
   renderer.render(scene, camera);
 }
 
-export function startScene(): void {
-  new ResizeObserver(resize).observe(canvas.parentElement!);
+/**
+ * Mounts the scene onto a canvas React has rendered. Imperative on purpose:
+ * positions update at display rate and must never pass through React state.
+ */
+export function startScene(el: HTMLCanvasElement): void {
+  if (canvas === el) return;
+  stopScene();
+  canvas = el;
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(COLORS.night);
+  controls = new OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.12;
+  controls.maxPolarAngle = Math.PI * 0.47;
+  controls.minDistance = 6;
+  controls.maxDistance = 320;
+  controls.screenSpacePanning = false;
+  viewFitted = false;
+  resizeObserver = new ResizeObserver(resize);
+  resizeObserver.observe(canvas.parentElement!);
   resize();
-  requestAnimationFrame(animate);
+  frameHandle = requestAnimationFrame(animate);
+}
+
+export function stopScene(): void {
+  if (frameHandle) cancelAnimationFrame(frameHandle);
+  frameHandle = 0;
+  resizeObserver?.disconnect();
+  resizeObserver = null;
+  controls?.dispose();
+  controls = null;
+  renderer?.dispose();
+  renderer = null;
+  canvas = null;
 }
