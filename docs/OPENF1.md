@@ -71,6 +71,15 @@ Not used yet, but available: `weather`, `team_radio` (coverage dropped sharply i
 - If it fails, turns are derived from curvature on our own outline. That fallback finds about two thirds of a street circuit's corners — 12 at Singapore against the 19 the file lists — so it is a degraded mode, not an equivalent.
 - No sector boundaries are published by either source. They have to be derived from a reference lap's sector durations.
 
+## The pit lane, from position traces
+
+- Neither OpenF1 nor the circuit file publishes a pit-lane path. It is derived from a car's own trace through a stop: `pit` gives the time and `lane_duration`, `location` gives the positions, and the samples that do not lie on the racing line are the lane.
+- **Measure the offset to the outline's segments, not its points.** The outline is sampled at about 3.7 Hz, so its points sit tens of units apart on a straight and far more at speed; nearest-*point* distance therefore measures the sampling gap as much as any lateral offset. On a clean Singapore lap it reaches 396 units with the car on the racing line throughout, which overlaps the pit lap entirely and makes the two indistinguishable. Nearest-*segment* distance is the real perpendicular offset.
+- **Verified on 12 October 2026** against the Singapore race (session 11388). Measured to segments, a clean racing lap never exceeds 42 units off the outline, while the lap with the stop sits at a median of 117 and a maximum of 186. A threshold of 0.4% of the circuit's longer axis (57 units at Singapore) separates them with no false positives.
+- The result is a single contiguous run of samples: 115 points over 33 s, 6,813 units long, 47% of the circuit's longer axis, with no reversals.
+- The threshold is scale-relative for the same reason the corner threshold is: coordinates are in whatever units the circuit uses, so an absolute figure is a figure about one circuit.
+- It costs one extra `location` request per session, and only once a stop has happened, so a session with no stops yet costs nothing.
+
 ## Volumes and budgets
 
 - One race of location plus car data is about a million rows for 22 cars over two hours.

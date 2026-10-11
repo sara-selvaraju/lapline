@@ -35,6 +35,7 @@ import {
 } from './schedule.js';
 import { filterSessionList, isLiveWindow, LIVE_POST_MS, pickAutoSession } from './sessions.js';
 import { pickReferenceLap, smoothZ, trackCandidates, transformFor, TRACK_RETRY_MS, type Point } from './track.js';
+import { pickPitStops, pitLaneFromTrace, stopWindow, type PitStop } from '../circuit/pitlane.js';
 import { fetchCircuitInfo } from '../circuit/multiviewer.js';
 import { resolveMarkers, sectorBoundaries, turnsFromOutline, type SectorDurations } from '../circuit/resolve.js';
 
@@ -53,6 +54,10 @@ export interface FeedOptions {
 
 /** Stop fetching once nobody has been connected this long. */
 const IDLE_MS = 60_000;
+/** How long to wait before another pit-lane attempt. */
+const PIT_LANE_RETRY_MS = 60_000;
+/** A circuit whose traces do not give a clean lane will not start to. */
+const MAX_PIT_LANE_ATTEMPTS = 4;
 
 export class Feed {
   readonly api: OpenF1;
@@ -78,6 +83,8 @@ export class Feed {
   private track: TrackState | null = null;
   private provisional: Transform | null = null;
   private trackAttemptAt = 0;
+  private pitLaneAttemptAt = 0;
+  private pitLaneAttempts = 0;
   private mqttLastMsg = 0;
   private timers: NodeJS.Timeout[] = [];
   private stopped = false;
@@ -97,6 +104,8 @@ export class Feed {
     this.track = null;
     this.provisional = null;
     this.trackAttemptAt = 0;
+    this.pitLaneAttemptAt = 0;
+    this.pitLaneAttempts = 0;
     this.mqttLastMsg = 0;
   }
 
@@ -370,6 +379,53 @@ export class Feed {
     this.broadcast('circuit', this.circuitPayload());
   }
 
+  /**
+   * The pit lane, traced from a car that has served a stop.
+   *
+   * This cannot run with the outline, because at the start of a race nobody
+   * has pitted yet. It is retried while the layer is empty, but only once
+   * there is a stop worth tracing, so a session with no stops yet costs
+   * nothing. A few attempts is the limit: a circuit where the trace does not
+   * give a clean lane will not start giving one.
+   */
+  private async ensurePitLane(gen: number): Promise<void> {
+    const track = this.track;
+    if (!track || track.pitLane.length > 0) return;
+    if (this.pitLaneAttempts >= MAX_PIT_LANE_ATTEMPTS) return;
+    if (Date.now() - this.pitLaneAttemptAt < PIT_LANE_RETRY_MS) return;
+
+    const stops: PitStop[] = [];
+    for (const [driver, rows] of this.buffers.pits) {
+      for (const [at, durationS] of rows) stops.push({ driver, at, laneDurationS: durationS });
+    }
+    const candidates = pickPitStops(stops);
+    if (candidates.length === 0) return;
+
+    this.pitLaneAttemptAt = Date.now();
+    this.pitLaneAttempts++;
+    const stop = candidates[0]!;
+    const { from, to } = stopWindow(stop);
+    try {
+      const rows = await this.api.get<LocationRow>('location', [
+        ['session_key', '=', this.session!.session_key as number],
+        ['driver_number', '=', stop.driver],
+        ['date', '>=', iso(from)],
+        ['date', '<', iso(to)],
+      ]);
+      if (gen !== this.generation || this.track !== track) return;
+      const trace = rows
+        .filter((r) => !(r.x === 0 && r.y === 0 && r.z === 0))
+        .sort((a, b) => ts(a.date as string) - ts(b.date as string))
+        .map((r) => [r.x as number, r.y as number, r.z as number] as Point);
+      const lane = pitLaneFromTrace(track.points, trace);
+      if (lane.length === 0) return;
+      track.pitLane = lane;
+      this.broadcast('circuit', this.circuitPayload());
+    } catch (e) {
+      if (!(e instanceof LockedError)) console.error('pit lane', message(e));
+    }
+  }
+
   circuitPayload(): Circuit | null {
     return circuitPayload(this.track, this.provisional);
   }
@@ -517,6 +573,7 @@ export class Feed {
       prune(this.buffers, clockMs);
       this.maybeProvisionalTransform();
       await this.ensureTrack(gen);
+      await this.ensurePitLane(gen);
       return;
     }
 
@@ -539,6 +596,7 @@ export class Feed {
     prune(this.buffers, this.clock());
     this.maybeProvisionalTransform();
     await this.ensureTrack(gen);
+    await this.ensurePitLane(gen);
   }
 
   // ---------- MQTT ----------
