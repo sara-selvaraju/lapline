@@ -112,19 +112,34 @@ Builds everything the track drawing needs, once per session, and caches it per m
 - Auth: a password page sets a signed cookie, or the site is open when `APP_PASSWORD` is unset.
 - Static: the built web app, with long cache headers for hashed assets.
 
-## Protocol v1 (SSE)
+## Protocol v2 (SSE)
 
-All types live in `packages/shared/src/protocol.ts`. Clients must check `protocolVersion` and reload on mismatch.
+All types live in `packages/shared/src/protocol.ts`, as zod schemas. Both sides
+validate: the client checks every inbound message and drops malformed frames
+rather than letting them reach the store, and the tests validate what the server
+sends, since validating at 4 Hz in the hot path is work for no benefit when the
+schema is what produced the data.
+
+Clients check `protocolVersion` on `hello` and reload on mismatch, once — a
+server stuck on the wrong version must not loop the page.
+
+**Version history.** v1 split `timing` out of `tick` and renamed `init` to
+`hello` and `track` to `circuit`. v2 replaced `ApiStats.authed` with
+`ApiStats.auth`, because a boolean could only say whether credentials were
+configured, so a rejected credential reported as authenticated and the UI
+promised live data it could not deliver.
 
 | Event | Rate | Carries |
 |---|---|---|
-| `hello` | on connect and on session change | protocol version, session, mode, drivers, session list, circuit (outline, transform, turns, sectors, marshal sectors, pit lane), status |
+| `hello` | on connect and on session change | protocol version, session, mode, drivers, session list, circuit (outline and transform; turns, sectors, marshal sectors and the pit lane arrive in M3 and will bump the version), status, whether live is possible |
 | `tick` | 4 per second | session time; per car a compact tuple of number, x, y, z, speed, gear, RPM, throttle, brake and stale; replay or live meta |
 | `timing` | 1 per second | tower rows; leader lap and total laps; track flag; marshal-sector flags; last four race control messages; battles |
-| `status` | on change | level, text, mode, freshness (time of the newest upstream row), OpenF1 tier, request count |
+| `status` | on change | level, text, mode, freshness (time of the newest upstream row), auth state, request count |
 | `circuit` | when the outline improves | same circuit block as in `hello` |
 
-The prototype sends timing inside every fourth tick; v1 splits it out. A positions tick is about 1 KB and a timing frame about 2 KB, so a two-hour race costs about 45 MB of mobile data.
+`timing` also carries `battles` and `marshalSectors`, declared from v1 and empty until M4 and M3 fill them, and `totalLaps`, which stays null because OpenF1 publishes no total-lap figure.
+
+The prototype sent timing inside every fourth tick; v1 split it out. A positions tick is about 1 KB and a timing frame about 2 KB, so a two-hour race costs about 45 MB of mobile data.
 
 ## Web
 
@@ -146,7 +161,9 @@ data. Re-measure on a device and during a live session in M9.
 | Opening a real session | 17 requests, about 40 s | Singapore qualifying on the free tier, 2.1 s spacing |
 | `intervals` for one race | 3,044,250 bytes, 4.1 s | Real session 11731. `laps` is 527,507 bytes, `race_control` 79,757 |
 | Frame rate out | 4.0 ticks/s, 1.0 timing/s | Measured through the Vite dev proxy and direct |
-| Built web bundle | 502 KB, 129 KB gzipped | Vite, three.js included |
+| Built web bundle | 502 KB, 129 KB gzipped at M0; 597 KB, 156 KB with React | Vite, three.js included |
+| Self-hosted font | 91 KB, four weights | Barlow Semi Condensed, latin subset, SIL OFL |
+| Portrait layout | every region exact against `Main.dc.html` | Measured by `npm run layout`, not eyeballed |
 
 The `intervals` figure is the one to watch: a real race replay moves about
 3.7 MB over its eight session-open requests, which puts 25 to 30 seconds between

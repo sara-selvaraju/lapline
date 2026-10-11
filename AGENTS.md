@@ -13,8 +13,12 @@ A personal, non-commercial, phone-first second screen for F1 sessions: a 3D circ
 
 ## Status
 
-M0 done: the prototype is ported to the workspace layout in TypeScript with its
-behaviour unchanged, and deployed. Next is M1 in `docs/BUILD-PLAN.md`.
+M1 done: protocol v2 with zod schemas and a version check, a Zustand store, the
+design tokens and self-hosted font, and the main screen built to
+`Main.dc.html`. Next is M2 in `docs/BUILD-PLAN.md`.
+
+`npm run layout` measures the rendered screen against the artboard and fails on
+drift; run it for any change to the layout.
 
 Live at https://lapline.live, behind the password. `www.lapline.live` serves the
 same app. DNS is Cloudflare, registration GoDaddy, hosting Railway.

@@ -29,6 +29,22 @@ let es: EventSource | undefined;
 /** Only reload once, so a persistently wrong version cannot loop the page. */
 let reloadedForVersion = false;
 
+/**
+ * Whether a hello from this server means the page should reload.
+ *
+ * Pure so it can be tested: the reload itself is one line that cannot run
+ * outside a browser, but the rule about when to reload is worth pinning. The
+ * guard matters — a server stuck on the wrong version would otherwise reload
+ * the page every few seconds forever.
+ */
+export function shouldReloadForProtocol(
+  serverVersion: number,
+  clientVersion: number,
+  alreadyReloaded: boolean,
+): boolean {
+  return serverVersion !== clientVersion && !alreadyReloaded;
+}
+
 /** Validates one payload against the protocol, or returns null and says why. */
 function parse<E extends SseEvent>(event: E, raw: string): unknown | null {
   let json: unknown;
@@ -68,7 +84,7 @@ export function connect(): void {
 export function onHello(d: Hello): void {
   // A server speaking a different protocol cannot be read; reload to get the
   // matching client bundle.
-  if (d.protocolVersion !== PROTOCOL_VERSION && !reloadedForVersion) {
+  if (shouldReloadForProtocol(d.protocolVersion, PROTOCOL_VERSION, reloadedForVersion)) {
     reloadedForVersion = true;
     console.warn(`protocol v${d.protocolVersion} from the server, this client is v${PROTOCOL_VERSION}; reloading`);
     location.reload();
