@@ -10,9 +10,11 @@
 import type {
   CarTuple,
   LiveMeta,
+  MarshalSectorFlag,
   Mode,
   RaceControlLine,
   ReplayMeta,
+  SectorFlag,
   Tick,
   Timing,
   TowerRow,
@@ -107,6 +109,33 @@ export function trackFlag(buffers: Buffers, t: number): TrackFlag {
   return flag;
 }
 
+/**
+ * Which marshal sectors are showing a flag at `t`.
+ *
+ * Race control sends these as a running commentary rather than a state: a
+ * YELLOW at a sector, then later a CLEAR at the same sector. Replaying them in
+ * order gives the set standing at any moment.
+ *
+ * Scope is what separates these from the track-wide flag. A driver-scoped blue
+ * flag is about one car and a track-scoped red is about everyone; only
+ * sector-scoped rows belong to a marshal sector, and Singapore's race carried
+ * 18 of them.
+ */
+export function marshalSectorFlags(buffers: Buffers, t: number): MarshalSectorFlag[] {
+  const active = new Map<number, SectorFlag>();
+  for (const [rt, r] of buffers.rc) {
+    if (rt > t) break;
+    if (r.scope !== 'Sector' || r.sector == null) continue;
+    const flag = (r.flag || '').toUpperCase();
+    if (flag === 'CLEAR' || flag === 'GREEN') active.delete(r.sector);
+    else if (flag === 'YELLOW') active.set(r.sector, 'YELLOW');
+    else if (flag === 'DOUBLE YELLOW') active.set(r.sector, 'DOUBLE YELLOW');
+  }
+  return [...active.entries()]
+    .map(([sector, flag]) => ({ sector, flag }))
+    .sort((a, b) => a.sector - b.sector);
+}
+
 /** Positions and telemetry for every car with a location sample at or before `t`. */
 export function buildCars(buffers: Buffers, t: number): CarTuple[] {
   const cars: CarTuple[] = [];
@@ -195,7 +224,7 @@ export function buildTiming(buffers: Buffers, t: number): Timing {
     // OpenF1 publishes no total-lap figure, so there is nothing honest to send.
     totalLaps: null,
     flag: trackFlag(buffers, t),
-    marshalSectors: [],
+    marshalSectors: marshalSectorFlags(buffers, t),
     rc,
     battles: [],
   };

@@ -11,6 +11,7 @@
 import http from 'node:http';
 import { T0, type MockSession } from './circuit.js';
 import { SESSIONS, iso, isLive } from './drivers.js';
+import { circuitFile } from './circuit-file.js';
 import { parseFilters, matches } from './filters.js';
 import { rowsFor } from './rows.js';
 
@@ -40,11 +41,31 @@ http
       return send(200, { access_token: TOKEN, expires_in: '3600', token_type: 'bearer' });
     }
 
+    // The circuit detail file a meeting links to. Not an OpenF1 path, which is
+    // the point: it stands in for the third-party host.
+    if (pathname === '/circuit/9001') return send(200, circuitFile());
+
     const m = pathname?.match(/^\/v1\/([a-z_]+)$/);
     if (!m) return send(404, { detail: 'Not found' });
     const ep = m[1]!;
     const filters = parseFilters(qs);
     const authed = req.headers.authorization === `Bearer ${TOKEN}`;
+
+    if (ep === 'meetings') {
+      const rows = [
+        {
+          meeting_key: 9001,
+          meeting_name: 'Harbourfront Grand Prix',
+          circuit_key: 99,
+          circuit_short_name: 'Harbourfront',
+          country_name: 'Mockland',
+          circuit_info_url: `http://localhost:${PORT}/circuit/9001`,
+          gmt_offset: '08:00:00',
+          year: new Date().getUTCFullYear(),
+        },
+      ].filter((r) => filters.every((f) => matches(r, f)));
+      return rows.length ? send(200, rows) : send(404, { detail: 'No results found.' });
+    }
 
     if (ep === 'sessions') {
       const out = sessionRows().filter((r) => filters.every((f) => matches(r, f)));
