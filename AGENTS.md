@@ -13,7 +13,12 @@ A personal, non-commercial, phone-first second screen for F1 sessions: a 3D circ
 
 ## Status
 
-Planned. Start at M0 in `docs/BUILD-PLAN.md`.
+M0 done: the prototype is ported to the workspace layout in TypeScript with its
+behaviour unchanged, and deployed. Next is M1 in `docs/BUILD-PLAN.md`.
+
+The deployed service is `lapline` on Railway. `lapline.live` is not registered
+yet, so it runs at the generated Railway domain until that is bought and
+pointed at the service.
 
 ## Stack
 

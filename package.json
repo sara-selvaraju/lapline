@@ -21,7 +21,8 @@
     "typecheck": "tsc -b tsconfig.json && tsc --noEmit -p apps/web",
     "mock": "npm run start -w @lapline/mock-openf1",
     "parity": "node tools/parity-check.mjs",
-    "screenshot": "node tools/screenshot.mjs"
+    "screenshot": "node tools/screenshot.mjs",
+    "clean": "rm -rf apps/*/dist packages/*/dist tools/*/dist apps/*/*.tsbuildinfo packages/*/*.tsbuildinfo tools/*/*.tsbuildinfo"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
