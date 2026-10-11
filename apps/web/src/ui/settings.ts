@@ -3,14 +3,14 @@
 // Ported from reference/prototype/public/app.js.
 
 import { $ } from '../dom.js';
-import { state } from '../state.js';
+import { storeState } from '../store/store.js';
 import { esc } from './format.js';
 
 export function renderSessionSelect(): void {
-  $('sessSelect').innerHTML = state.sessions
+  $('sessSelect').innerHTML = storeState().sessions
     .map((s: { key: number; label: string; start: string; live: boolean }) => {
       const when = new Date(s.start).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
-      return `<option value="${s.key}" ${state.session?.key === s.key ? 'selected' : ''}>${esc(
+      return `<option value="${s.key}" ${storeState().session?.key === s.key ? 'selected' : ''}>${esc(
         s.label,
       )}, ${when}${s.live ? ' (live)' : ''}</option>`;
     })
@@ -18,7 +18,7 @@ export function renderSessionSelect(): void {
 }
 
 export function renderStatusText(): void {
-  const s = state.status;
+  const s = storeState().status;
   if (!s) return;
   const n = s.api?.requests ?? 0;
   const free = s.freeAt ? ` Free to replay from ${new Date(s.freeAt).toLocaleString('en-AU', { weekday: 'short', hour: 'numeric', minute: '2-digit' })}.` : '';

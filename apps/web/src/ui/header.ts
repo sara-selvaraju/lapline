@@ -4,7 +4,7 @@
 
 import type { TrackFlag } from '@lapline/shared';
 import { $ } from '../dom.js';
-import { state } from '../state.js';
+import { storeState } from '../store/store.js';
 
 const FLAG_LABEL: Partial<Record<TrackFlag, string>> = {
   YELLOW: 'Yellow flag',
@@ -24,13 +24,13 @@ const MODE_LABEL: Record<string, string> = {
 };
 
 export function renderHeader(): void {
-  const s = state.session;
+  const s = storeState().session;
   $('sessname').textContent = s ? `${s.circuit || s.country} ${s.name.toLowerCase()}` : 'No session';
 
-  const lap = state.timing?.lap;
+  const lap = storeState().timing?.lap;
   $('lap').innerHTML = lap ? `Lap <b>${lap}</b>` : '';
 
-  const flag = state.timing?.flag || 'GREEN';
+  const flag = storeState().timing?.flag || 'GREEN';
   // The band keeps one class per state; 'ending' variants share their base colour.
   const base = flag.replace(' ENDING', '');
   const band = $('flagband');
@@ -38,12 +38,12 @@ export function renderHeader(): void {
   band.textContent = FLAG_LABEL[flag as TrackFlag] || '';
 
   const b = $('modebadge');
-  b.className = `badge ${state.mode === 'live' ? 'live' : ''}`;
-  b.textContent = MODE_LABEL[state.mode] || '';
+  b.className = `badge ${storeState().mode === 'live' ? 'live' : ''}`;
+  b.textContent = MODE_LABEL[storeState().mode] || '';
 }
 
 export function renderRc(): void {
-  const m = state.timing?.rc?.[0];
+  const m = storeState().timing?.rc?.[0];
   // Upstream shouts in capitals; sentence case reads better in a glance.
   const msg = m?.msg;
   $('rc').textContent = msg ? msg.charAt(0) + msg.slice(1).toLowerCase() : '';

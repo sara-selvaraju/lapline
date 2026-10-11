@@ -6,7 +6,7 @@
 // Ported from reference/prototype/public/app.js.
 
 import { $ } from '../dom.js';
-import { state } from '../state.js';
+import { storeState } from '../store/store.js';
 import { esc, fmtGap, fmtLap, tyreHtml } from './format.js';
 
 let towerKey = '';
@@ -17,15 +17,15 @@ export function invalidateTower(): void {
 }
 
 export function renderTower(): void {
-  const rows = state.timing?.rows || [];
+  const rows = storeState().timing?.rows || [];
   const bestOverall = Math.min(...rows.map((r: { best: number | null }) => r.best ?? Infinity));
 
   const html = rows
     .map((r) => {
-      const d = state.drivers.get(r.n) || { code: String(r.n), colour: '#8C9AB5' };
-      const gap = state.gapMode === 'int' ? fmtGap(r.int, r.p) : fmtGap(r.gap, r.p);
+      const d = storeState().drivers.get(r.n) || { code: String(r.n), colour: '#8C9AB5' };
+      const gap = storeState().gapMode === 'int' ? fmtGap(r.int, r.p) : fmtGap(r.gap, r.p);
       const pb = r.last != null && r.last === r.best;
-      return `<li class="row ${r.n === state.sel ? 'sel' : ''}" data-n="${r.n}">
+      return `<li class="row ${r.n === storeState().sel ? 'sel' : ''}" data-n="${r.n}">
         <span class="p">${r.p ?? ''}</span>
         <span class="c" style="background:${esc(d.colour)}"></span>
         <span class="code">${esc(d.code)}${r.pit ? '<span class="pit">Pit</span>' : ''}</span>
@@ -45,5 +45,5 @@ export function renderTower(): void {
 }
 
 export function setGapToggleLabel(): void {
-  $('gapToggle').textContent = state.gapMode === 'int' ? 'Interval' : 'To leader';
+  $('gapToggle').textContent = storeState().gapMode === 'int' ? 'Interval' : 'To leader';
 }

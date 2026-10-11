@@ -22,7 +22,7 @@ import {
 } from '@lapline/shared';
 import { cars, clearCars, ensureCar } from '../scene/cars.js';
 import { buildTrack, toWorld, trackGroup } from '../scene/track.js';
-import { state } from '../state.js';
+import { useStore } from '../store/store.js';
 import { renderClock, renderControls } from '../ui/controls.js';
 import { renderHeader, renderRc } from '../ui/header.js';
 import { renderOverlay } from '../ui/overlay.js';
@@ -93,23 +93,13 @@ export function onHello(d: Hello): void {
     return;
   }
 
-  const changed = !state.session || !d.session || state.session.key !== d.session.key;
-  state.session = d.session;
-  state.mode = d.mode;
-  state.sessions = d.sessions;
-  state.canLive = d.canLive;
+  const before = useStore.getState();
+  const fieldChanged =
+    !before.session || !d.session || before.session.key !== d.session.key || before.drivers.size !== d.drivers.length;
 
-  const prevDrivers = state.drivers;
-  state.drivers = new Map(d.drivers.map((x) => [x.n, x]));
-  // A different field means the car meshes carry the wrong colours and codes.
-  if (changed || prevDrivers.size !== state.drivers.size) {
+  useStore.getState().applyHello(d);
+  if (fieldChanged) {
     clearCars();
-    state.history = [];
-    state.timing = null;
-  }
-  if (changed) {
-    state.circuit = null;
-    state.transform = null;
     trackGroup.clear();
   }
 
@@ -121,17 +111,15 @@ export function onHello(d: Hello): void {
 }
 
 export function onCircuit(c: Circuit): void {
-  const newTransform = !state.transform || JSON.stringify(state.transform) !== JSON.stringify(c.transform);
-  state.circuit = c;
-  state.transform = c.transform;
+  const before = useStore.getState().circuitEpoch;
+  useStore.getState().applyCircuit(c);
   buildTrack();
   // Positions computed under the old transform are meaningless now.
-  if (newTransform) for (const car of cars.values()) car.from = null;
+  if (useStore.getState().circuitEpoch !== before) for (const car of cars.values()) car.from = null;
 }
 
 export function onStatus(s: Status): void {
-  state.status = s;
-  state.mode = s.mode || state.mode;
+  useStore.getState().applyStatus(s);
   renderStatusText();
   renderOverlay();
   renderHeader();
@@ -139,15 +127,13 @@ export function onStatus(s: Status): void {
 }
 
 export function onTick(f: Tick): void {
-  state.lastTick = f;
-  state.mode = f.mode;
-  state.replay = f.replay ?? null;
-  state.live = f.live ?? null;
+  useStore.getState().applyTick(f);
+  const { transform, sel } = useStore.getState();
 
   const now = performance.now();
   for (const row of f.cars) {
     const [n, x, y, z, sp, gear, rpm, thr, brk, drs, stale] = row;
-    if (!state.transform) continue;
+    if (!transform) continue;
     const c = ensureCar(n);
     const to = toWorld(x, y, z);
     to.y += 0.9;
@@ -158,16 +144,7 @@ export function onTick(f: Tick): void {
     c.stale = Boolean(stale);
     c.tel = { sp, gear, rpm, thr, brk, drs };
   }
-
-  const sc = state.sel != null ? cars.get(state.sel) : undefined;
-  if (sc?.tel) {
-    state.history.push([f.t, sc.tel.sp, sc.tel.thr, sc.tel.brk]);
-    while (state.history.length && f.t - state.history[0]![0] > 30_000) state.history.shift();
-    // A seek can move the clock backwards; a trace spanning it would be a lie.
-    if (state.history.length > 1 && state.history.at(-1)![0] < state.history.at(-2)![0]) {
-      state.history = [state.history.at(-1)!];
-    }
-  }
+  void sel;
 
   renderTele();
   renderClock();
@@ -175,10 +152,7 @@ export function onTick(f: Tick): void {
 }
 
 export function onTiming(t: Timing): void {
-  state.timing = t;
-  state.timingByN = new Map(t.rows.map((r) => [r.n, r]));
-  // Nothing chosen yet: start on the leader rather than an empty panel.
-  if (state.sel == null && t.rows[0]?.p) select(t.rows[0].n, false);
+  useStore.getState().applyTiming(t);
   renderTower();
   renderHeader();
   renderRc();
