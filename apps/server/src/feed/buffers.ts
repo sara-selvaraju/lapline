@@ -37,6 +37,8 @@ export interface Lap {
   start: number | null;
   dur: number | null;
   pitOut: boolean;
+  /** Sector durations, where upstream gave them. Used to place S1/S2/S3. */
+  sectors: { s1: number; s2: number; s3: number } | null;
 }
 
 export interface Stint {

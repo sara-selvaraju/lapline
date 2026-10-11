@@ -21,6 +21,7 @@ export interface LapCandidate {
   start: number | null;
   dur: number | null;
   pitOut: boolean;
+  sectors?: { s1: number; s2: number; s3: number } | null;
 }
 
 /**

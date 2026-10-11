@@ -12,8 +12,11 @@ import {
   type Mode,
   type SessionListEntry,
   type SessionRow,
+  type CircuitDetailSource,
+  type SectorBoundary,
   type Status,
   type StatusLevel,
+  type TrackMarker,
   type Transform,
 } from '@lapline/shared';
 import { isLiveWindow } from './sessions.js';
@@ -29,6 +32,11 @@ export interface TrackState {
   points: Point[];
   transform: Transform;
   source: string;
+  turns: TrackMarker[];
+  sectors: SectorBoundary[];
+  marshalSectors: TrackMarker[];
+  pitLane: Point[];
+  detailSource: CircuitDetailSource;
 }
 
 export function statusPayload(
@@ -42,8 +50,19 @@ export function statusPayload(
 
 /** The outline, or just a transform while one is still being worked out. */
 export function circuitPayload(track: TrackState | null, provisional: Transform | null): Circuit | null {
-  if (track) return { points: track.points, transform: track.transform, source: track.source };
-  if (provisional) return { points: [], transform: provisional, source: 'provisional' };
+  if (track) return { ...track };
+  if (provisional) {
+    return {
+      points: [],
+      transform: provisional,
+      source: 'provisional',
+      turns: [],
+      sectors: [],
+      marshalSectors: [],
+      pitLane: [],
+      detailSource: 'none',
+    };
+  }
   return null;
 }
 
