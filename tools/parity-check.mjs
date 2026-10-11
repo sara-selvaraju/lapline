@@ -42,7 +42,8 @@ async function main() {
   const decoder = new TextDecoder();
   let buf = '';
   const ticks = [];
-  let init = null;
+  const timings = [];
+  let hello = null;
   let lastTiming = null;
   let statusCount = 0;
 
@@ -59,8 +60,11 @@ async function main() {
       const data = JSON.parse(m[2]);
       if (m[1] === 'tick') {
         ticks.push({ wall: Date.now(), t: data.t, data });
-        if (data.timing) lastTiming = data.timing;
-      } else if (m[1] === 'init') init = data;
+      } else if (m[1] === 'timing') {
+        // Protocol v1 split timing out of tick into its own 1 Hz event.
+        timings.push({ wall: Date.now(), data });
+        lastTiming = data;
+      } else if (m[1] === 'hello') hello = data;
       else if (m[1] === 'status') statusCount++;
     }
   }
@@ -79,16 +83,15 @@ async function main() {
   const last = ticks.at(-1);
   const wallSpan = (last.wall - first.wall) / 1000;
   const sessSpan = (last.t - first.t) / 1000;
-  const withTiming = ticks.filter((x) => x.data.timing).length;
   const cars = last.data.cars;
   const stale = cars.filter((c) => c[10] === 1).length;
   const noSpeed = cars.filter((c) => c[4] === null).length;
 
-  console.log(`\n  session       ${init?.session ? `${init.session.name} (${init.session.key})` : '—'}`);
+  console.log(`\n  session       ${hello?.session ? `${hello.session.name} (${hello.session.key})` : '—'}`);
   console.log(`  mode          ${last.data.mode}`);
   console.log(`  window        ${fmt(elapsedS, 1)} s wall`);
   console.log(`  ticks         ${ticks.length}  (${fmt(ticks.length / wallSpan)}/s, want 4.0)`);
-  console.log(`  timing frames ${withTiming}  (${fmt(withTiming / wallSpan)}/s, want 1.0)`);
+  console.log(`  timing frames ${timings.length}  (${fmt(timings.length / wallSpan)}/s, want 1.0)`);
   console.log(`  clock advance ${fmt(sessSpan / wallSpan)}x  (${fmt(sessSpan, 1)} s of session in ${fmt(wallSpan, 1)} s)`);
   console.log(`  cars          ${cars.length}  (${stale} stale, ${noSpeed} without speed)`);
   if (lastTiming) {
@@ -104,7 +107,7 @@ async function main() {
     console.log(`  live          delay ${last.data.live.delayS} s, mqtt ${last.data.live.mqtt}`);
     console.log(`  clock vs now  ${fmt((Date.now() - last.t) / 1000, 1)} s behind real time`);
   }
-  console.log(`  track         ${init?.track ? `${init.track.points.length} points from "${init.track.source}"` : 'none yet'}`);
+  console.log(`  track         ${hello?.circuit ? `${hello.circuit.points.length} points from "${hello.circuit.source}"` : 'none yet'}`);
   console.log(`  status events ${statusCount}`);
 
   if (WANT_RATE) {
