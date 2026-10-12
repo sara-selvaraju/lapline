@@ -7,6 +7,7 @@ import http, { type IncomingMessage, type Server, type ServerResponse } from 'no
 import type { Feed } from '../feed/feed.js';
 import { authorised, CHALLENGE } from './auth.js';
 import { control, readBody } from './control.js';
+import { crossingsPayload, periodsPayload } from './query.js';
 import { serveStatic } from './static.js';
 import { openStream } from './sse.js';
 
@@ -46,6 +47,13 @@ export function createServer({ feed, appPassword, publicDir }: ServerOptions): S
           return json(res, 400, { error: e instanceof Error ? e.message : String(e) });
         }
       }
+
+      if (url.pathname === '/api/crossings') {
+        const since = Number(url.searchParams.get('since')) || 0;
+        return json(res, 200, crossingsPayload(feed, since));
+      }
+
+      if (url.pathname === '/api/periods') return json(res, 200, periodsPayload(feed));
 
       if (url.pathname === '/api/state') return json(res, 200, feed.helloPayload());
 

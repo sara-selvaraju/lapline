@@ -89,6 +89,55 @@ export function flagState(buffers: Buffers, t: number): FlagState {
   return { flag, since, sinceLap: since == null ? null : leaderLapAt(buffers, since) };
 }
 
+export interface FlagPeriod {
+  flag: TrackFlag;
+  from: number;
+  /** Null while the period is still running at the end of the data. */
+  to: number | null;
+}
+
+/**
+ * Every stretch the track was not green, across the whole session.
+ *
+ * The replay scrubber marks these, and the timing frames cannot carry them:
+ * they hold the standing flag and the last four race control lines, not a
+ * history. Rather than a second state machine, this replays the same one and
+ * writes down where each state started and stopped.
+ *
+ * Green is not a period — it is the absence of one — and neither is the
+ * chequered flag, which is a moment at the end rather than a stretch to mark.
+ */
+export function flagPeriods(buffers: Buffers): FlagPeriod[] {
+  const out: FlagPeriod[] = [];
+  let open: FlagPeriod | null = null;
+  let last: TrackFlag = 'GREEN';
+
+  for (const [t] of buffers.rc) {
+    const flag = trackFlag(buffers, t);
+    if (flag === last) continue;
+    last = flag;
+
+    const marks = flag !== 'GREEN' && flag !== 'CHEQUERED';
+    // A safety car ending is still a safety car as far as the scrubber is
+    // concerned: one stretch of yellow, not two abutting ones.
+    const same = open && base(open.flag) === base(flag);
+    if (open && !same) {
+      open.to = t;
+      open = null;
+    }
+    if (marks && !open) {
+      open = { flag, from: t, to: null };
+      out.push(open);
+    }
+  }
+  return out;
+}
+
+/** SC and SC ENDING are one stretch; so are VSC and VSC ENDING. */
+function base(flag: TrackFlag): string {
+  return flag.replace(' ENDING', '');
+}
+
 /** The highest lap any car had started by `t`, which is the leader's lap. */
 function leaderLapAt(buffers: Buffers, t: number): number | null {
   let lap: number | null = null;

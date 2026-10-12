@@ -1,12 +1,15 @@
 // POST /api/control.
 //
-// Ported from reference/prototype/server.js. The clamps are the prototype's:
-// delay 3-180 s where ARCHITECTURE.md says 4-180, and speed 0.25-32 where the UI
-// offers 1-16. Both carried over for parity and noted for M6.
+// Ported from reference/prototype/server.js. The delay floor was the
+// prototype's 3 s against the 4 the design asks for everywhere else; M6
+// raised it, because OpenF1's own data arrives about 3 s behind real time and
+// a smaller delay is not one anybody can have. Speed is still clamped wider
+// than the UI offers, which costs nothing: the cycle sends 1 to 16.
 
 import type { IncomingMessage } from 'node:http';
 import type { ControlRequest, ControlResponse } from '@lapline/shared';
 import type { Feed } from '../feed/feed.js';
+import { MAX_DELAY_S, MIN_DELAY_S } from '../derive/crossings.js';
 
 const BODY_LIMIT = 10_000;
 
@@ -57,7 +60,7 @@ export async function control(feed: Feed, body: ControlRequest): Promise<Control
   }
 
   if (feed.mode === 'live' && typeof body.delayS === 'number') {
-    feed.liveDelayMs = Math.min(Math.max(body.delayS, 3), 180) * 1000;
+    feed.liveDelayMs = Math.min(Math.max(body.delayS, MIN_DELAY_S), MAX_DELAY_S) * 1000;
     feed.broadcastStatus();
   }
 

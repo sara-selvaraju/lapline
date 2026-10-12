@@ -529,6 +529,24 @@ export class Feed {
     }
   }
 
+  /** The buffers, for the read-only queries in http/query.ts. */
+  buffersRef(): Buffers {
+    return this.buffers;
+  }
+
+  /** The outline, or an empty list before one is built. */
+  trackPoints(): ReadonlyArray<readonly [number, number, number]> {
+    return this.track?.points ?? [];
+  }
+
+  /** Whether any car has a position sample at or before `t`. */
+  private hasPositionsAt(t: number): boolean {
+    for (const rows of this.buffers.loc.values()) {
+      if (rows.length > 0 && rows[0]![0] <= t) return true;
+    }
+    return false;
+  }
+
   circuitPayload(): Circuit | null {
     return circuitPayload(this.track, this.provisional);
   }
@@ -567,7 +585,12 @@ export class Feed {
       sessEnd: this.sessEnd as number,
     });
     this.replay = replay;
-    if (seeked) {
+    // A small jump normally stays inside what is already buffered — but not
+    // if the buffer was refilled by an earlier seek and so begins at that
+    // point with nothing behind it. Dragging the scrubber a little to the
+    // left then lands before any data at all and every car disappears. So the
+    // test is what we actually hold, not only how far the clock moved.
+    if (seeked || !this.hasPositionsAt(replayNow(replay, this.sessEnd as number))) {
       // The buffered window is useless now; drop it and refetch around the new spot.
       this.buffers.loc = new Map();
       this.buffers.car = new Map();
