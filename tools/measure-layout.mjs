@@ -32,6 +32,9 @@ const EXPECTED = {
   towerRow: 36,
   controls: 68,
 };
+// Replay.dc.html stacks a scrubber row above the transport row, so its bar is
+// taller than the live one Main.dc.html draws. Everything else is the same.
+const REPLAY_CONTROLS = 90;
 const TOLERANCE = 2;
 
 const browser = await chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL ?? 'chrome' });
@@ -150,8 +153,17 @@ await ctx.close();
 await browser.close();
 
 let failed = false;
-console.log('\nregion heights, against Main.dc.html');
-for (const [k, want] of Object.entries(EXPECTED)) {
+const mode = await (async () => {
+  const auth = PASSWORD
+    ? { Authorization: `Basic ${Buffer.from(`any:${PASSWORD}`).toString('base64')}` }
+    : {};
+  const st = await (await fetch(`${URLBASE}/api/state`, { headers: auth })).json();
+  return st.mode;
+})();
+
+console.log(`\nregion heights, against ${mode === 'replay' ? 'Replay' : 'Main'}.dc.html`);
+for (const [k, base] of Object.entries(EXPECTED)) {
+  const want = k === 'controls' && mode === 'replay' ? REPLAY_CONTROLS : base;
   const got = m.heights[k];
   const ok = got != null && Math.abs(got - want) <= TOLERANCE;
   if (!ok) failed = true;

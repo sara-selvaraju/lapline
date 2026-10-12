@@ -107,7 +107,8 @@ Builds everything the track drawing needs, once per session, and caches it per m
 
 - `GET /events`: the SSE stream (protocol below). Sends a heartbeat every 15 s, with `X-Accel-Buffering: no`.
 - `POST /api/control`: select session, play or pause, speed, seek, live delay, follow-live-sessions.
-- `GET /api/crossings?since=`: the leader's recent line-crossing times, for the sync flow.
+- `GET /api/crossings?since=`: the leader's recent line-crossing times, for the sync flow, with the lap's length in metres and where the leader is in it.
+- `GET /api/periods`: the stretches the track was not green, for the replay scrubber's markings. A query rather than a protocol field: it is asked for once, by one screen, and the scrubber only exists in replay.
 - `GET /api/state`: a debug snapshot. `GET /healthz`: liveness, outside the password.
 - Auth: a password page sets a signed cookie, or the site is open when `APP_PASSWORD` is unset.
 - Static: the built web app, with long cache headers for hashed assets.
@@ -142,6 +143,8 @@ promised live data it could not deliver.
 The prototype sent timing inside every fourth tick; v1 split it out. A positions tick is about 1 KB and a timing frame about 2 KB, so a two-hour race costs about 45 MB of mobile data.
 
 ## Web
+
+The live delay is one value on the feed, shared by everyone connected, and each phone remembers its own per session and re-asserts it on opening that session. With two phones watching the same session, whoever syncs last moves both views. That is the cost of a single shared clock, and it is the right trade while the design is for one viewer.
 
 - **store/:** a single store, fed only by the SSE client. It holds the latest frame plus the previous one per car for interpolation, the timing state, status, circuit and preferences. Preferences (selected driver, gap mode, elevation scale, labels, camera preset and per-session sync delay) persist to `localStorage`, with every access wrapped in try/catch.
 - **scene/:** a class with `setCircuit()`, `setFrame()`, `setSelection()`, `setCamera(preset)` and `dispose()`. It owns its render loop and reads the store directly. It handles car labels with screen-space collision avoidance, picking with a generous hit radius, and tap-on-a-bunch detection that opens the car picker. Camera presets are Map (top-down), Tilt (default) and Chase (low and behind the selected car). Manual orbit, pinch and pan still work.

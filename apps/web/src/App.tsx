@@ -7,6 +7,7 @@ import { Header } from './ui/Header.js';
 import { Finished } from './ui/Finished.js';
 import { Overlay } from './ui/Overlay.js';
 import { SessionPicker } from './ui/SessionPicker.js';
+import { SyncSheet } from './ui/SyncSheet.js';
 import { TelemetryPanel } from './ui/TelemetryPanel.js';
 import { TimingTower } from './ui/TimingTower.js';
 import { TrackArea } from './ui/TrackArea.js';
@@ -49,6 +50,8 @@ export function App(): React.JSX.Element {
         </>
       )}
       <ControlsBar />
+      <SyncSheet />
+      <SessionPicker />
       <Overlay />
     </>
   );

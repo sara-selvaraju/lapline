@@ -62,6 +62,8 @@ describe('portrait layout tokens match the artboard', () => {
     'h-tower-head': '30px',
     'h-tower-row': '36px',
     'h-controls': '68px',
+    // Replay.dc.html stacks a scrubber row above the transport row.
+    'h-controls-replay': '90px',
     gutter: '16px',
     tap: '44px',
   };

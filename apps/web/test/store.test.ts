@@ -2,6 +2,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Hello, Tick, Timing } from '@lapline/shared';
+import { loadPrefs } from '../src/store/prefs.js';
 import { useStore } from '../src/store/store.js';
 
 const T = 1_760_000_000_000;
@@ -285,5 +286,73 @@ describe('selectByOffset', () => {
     useStore.setState({ timing: null, sel: 4 });
     useStore.getState().selectByOffset(1);
     expect(useStore.getState().sel).toBe(4);
+  });
+});
+
+describe('the sync delay, remembered per session', () => {
+  it('clamps to what the server will accept', () => {
+    const s = useStore.getState();
+    s.applyHello(hello());
+    s.setDelay(1);
+    expect(useStore.getState().delays['1002']).toBe(4);
+    useStore.getState().setDelay(500);
+    expect(useStore.getState().delays['1002']).toBe(180);
+  });
+
+  it('keeps a tenth of a second, which is what a tap resolves to', () => {
+    const s = useStore.getState();
+    s.applyHello(hello());
+    s.setDelay(12.44);
+    expect(useStore.getState().delays['1002']).toBe(12.4);
+  });
+
+  it('remembers one delay per session, not one overall', () => {
+    const s = useStore.getState();
+    s.applyHello(hello());
+    s.setDelay(12);
+    useStore.getState().applyHello(
+      hello({ session: { key: 1001, name: 'Sprint', circuit: 'X', country: 'X', start: T, end: T + 1 } }),
+    );
+    useStore.getState().setDelay(20);
+    const { delays } = useStore.getState();
+    expect(delays['1002']).toBe(12);
+    expect(delays['1001']).toBe(20);
+  });
+});
+
+describe('prefs validation of the remembered delays', () => {
+  // These tests run under node, where there is no localStorage, so one is
+  // stood up for the duration: the point is what loadPrefs does with what it
+  // reads, not where it read it from.
+  const withStored = (value: unknown): ReturnType<typeof loadPrefs> => {
+    const store = new Map<string, string>([['lapline', JSON.stringify(value)]]);
+    const original = globalThis.localStorage;
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => void store.set(k, v),
+      },
+    });
+    try {
+      return loadPrefs();
+    } finally {
+      Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: original });
+    }
+  };
+
+  it('drops entries that are not a session and a sane delay', () => {
+    const prefs = withStored({
+      delays: { '1002': 12, nonsense: 9, '1003': 'x', '1004': 1, '1005': 900 },
+    });
+    expect(prefs.delays).toEqual({ '1002': 12 });
+  });
+
+  it('survives a delays field that is not an object at all', () => {
+    expect(withStored({ delays: 'nope' }).delays).toEqual({});
+  });
+
+  it('defaults to none when nothing has been stored', () => {
+    expect(withStored({}).delays).toEqual({});
   });
 });

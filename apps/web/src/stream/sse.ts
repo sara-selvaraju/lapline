@@ -20,6 +20,7 @@ import {
 } from '@lapline/shared';
 import { getScene } from '../scene/instance.js';
 import { useStore } from '../store/store.js';
+import { fetchPeriods } from './queries.js';
 
 let es: EventSource | undefined;
 /** Only reload once, so a persistently wrong version cannot loop the page. */
@@ -96,6 +97,25 @@ export function onHello(d: Hello): void {
   // throwing them away rather than recolouring in place.
   if (fieldChanged) getScene()?.clearCars();
   if (d.circuit) onCircuit(d.circuit);
+
+  const after = useStore.getState();
+  // The scrubber's markings, once per session. Replay only: they mark a
+  // scrubber that live mode does not have.
+  if (d.mode === 'replay' && after.periods == null) {
+    void fetchPeriods().then((r) => {
+      if (r) useStore.getState().setPeriods(r.periods);
+    });
+  }
+
+  // A delay this phone worked out earlier for this session. The server holds
+  // one delay for everyone, so this re-asserts ours on opening the session.
+  const key = d.session?.key;
+  if (d.mode === 'live' && key != null) {
+    const remembered = after.delays[String(key)];
+    // Hello arrives on connect and on a session change, not every frame, so
+    // re-asserting here is cheap and happens exactly when it should.
+    if (remembered != null) after.setDelay(remembered);
+  }
 }
 
 export function onCircuit(c: Circuit): void {

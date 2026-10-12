@@ -20,6 +20,15 @@ export interface Prefs {
   showPitLane: boolean;
   /** Whether the telemetry panel is open, kept across sessions. */
   expanded: boolean;
+  /**
+   * The sync delay, in seconds, remembered per session key.
+   *
+   * Per session because a broadcast's delay is a property of that broadcast,
+   * and per phone because that is where the television is. The server still
+   * holds one delay for the feed, so two phones watching the same session
+   * means whoever synced last moves both views.
+   */
+  delays: Record<string, number>;
 }
 
 const KEY = 'lapline';
@@ -34,6 +43,7 @@ export const DEFAULT_PREFS: Prefs = {
   showSectors: true,
   showPitLane: true,
   expanded: false,
+  delays: {},
 };
 
 export function loadPrefs(): Prefs {
@@ -52,10 +62,31 @@ export function loadPrefs(): Prefs {
       showSectors: typeof raw.showSectors === 'boolean' ? raw.showSectors : DEFAULT_PREFS.showSectors,
       showPitLane: typeof raw.showPitLane === 'boolean' ? raw.showPitLane : DEFAULT_PREFS.showPitLane,
       expanded: typeof raw.expanded === 'boolean' ? raw.expanded : DEFAULT_PREFS.expanded,
+      delays: readDelays(raw.delays),
     };
   } catch {
     return { ...DEFAULT_PREFS };
   }
+}
+
+/**
+ * The remembered delays, keeping only what makes sense.
+ *
+ * The first keyed value in here, so it gets the same treatment every scalar
+ * does: nothing from storage is spread in, each entry is checked, and a key
+ * that is not a session number or a delay outside the range the server will
+ * accept is simply dropped.
+ */
+function readDelays(raw: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!raw || typeof raw !== 'object') return out;
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!/^\d+$/.test(key)) continue;
+    if (typeof value !== 'number' || !Number.isFinite(value)) continue;
+    if (value < 4 || value > 180) continue;
+    out[key] = value;
+  }
+  return out;
 }
 
 export function savePrefs(p: Prefs): void {

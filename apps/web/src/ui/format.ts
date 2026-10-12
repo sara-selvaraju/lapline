@@ -48,6 +48,14 @@ export function sentenceCase(msg: string): string {
   return lower.charAt(0).toUpperCase() + lower.slice(1);
 }
 
+/** Elapsed time as h:mm:ss, for the replay transport. */
+export function fmtDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
 /** The compound's colour token, or haze when upstream sent something odd. */
 export function tyreVar(compound: string | null): string {
   const key = (compound ?? '').toLowerCase();

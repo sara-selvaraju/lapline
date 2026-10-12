@@ -50,7 +50,7 @@ username=…&password=…
 | `sessions` | `session_key`, `session_name`, `session_type`, `date_start`, `date_end`, `meeting_key`, `circuit_key`, `circuit_short_name`, `country_name`, `year`, `is_cancelled` | `date_end` is scheduled; races can overrun |
 | `meetings` | `meeting_key`, `meeting_name`, `circuit_key`, `circuit_info_url`, `gmt_offset`, `date_start`, `date_end` | `circuit_info_url` feeds the circuit detail (see below) |
 | `drivers` | `driver_number`, `name_acronym`, `full_name`, `broadcast_name`, `team_name`, `team_colour` (hex, no `#`) | Per session |
-| `location` | `date`, `driver_number`, `x`, `y`, `z` | About 3.7 Hz. Origin is arbitrary. Units look like decimetres. No lateral placement. Rows of 0,0,0 mean no fix |
+| `location` | `date`, `driver_number`, `x`, `y`, `z` | About 3.7 Hz. Origin is arbitrary. **Units are decimetres** (measured, see below). No lateral placement. Rows of 0,0,0 mean no fix |
 | `car_data` | `date`, `driver_number`, `speed` (km/h), `rpm`, `n_gear` (0 = neutral), `throttle` (0 to 100), `brake` (0 or 100), `drs` | About 3.7 Hz. DRS no longer exists from 2026; ignore the field |
 | `position` | `date`, `driver_number`, `position` | Changes only |
 | `intervals` | `date`, `driver_number`, `gap_to_leader`, `interval` | Races only, about every 4 s. Values are seconds, or text such as `+1 LAP`, or null for the leader |
@@ -70,6 +70,16 @@ Not used yet, but available: `weather`, `team_radio` (coverage dropped sharply i
 - Fetch it server-side once per meeting and cache it, including failures, so a meeting without one is not retried on every session change. It is not OpenF1, so it must not go through the OpenF1 request queue.
 - If it fails, turns are derived from curvature on our own outline. That fallback finds about two thirds of a street circuit's corners — 12 at Singapore against the 19 the file lists — so it is a degraded mode, not an equivalent.
 - No sector boundaries are published by either source. They have to be derived from a reference lap's sector durations.
+
+## Coordinates are decimetres
+
+- Measured on 13 October 2026, not assumed. Singapore's outline traces 49,641 units against an official lap of 4,940 m: **10.05 units per metre**. The earlier note said "units look like decimetres"; they are.
+- So a path length converts straight to a distance. The sync sheet uses it to say how far the leader is from the line, and the lap comes out at 4,977 m against the official 4,940 — 0.7% long, which is the sampling error of a 3.7 Hz trace rather than a scale problem.
+
+## Lap start times are good enough to sync by
+
+- `laps.date_start` is documented as approximate, and it is, but it is consistent: across Singapore's 62 laps each start matches the previous start plus its duration to within 350 ms, mean 72 ms.
+- That is what "Sync with TV" rests on, and it is well inside the ±1 s the build plan asks for.
 
 ## The pit lane, from position traces
 

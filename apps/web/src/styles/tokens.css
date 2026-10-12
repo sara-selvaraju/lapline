@@ -67,7 +67,8 @@
   --h-strip: 88px;
   --h-tower-head: 30px;
   --h-tower-row: 36px;
-  --h-controls: 68px;      /* live; about 90 in replay */
+  --h-controls: 68px;      /* live */
+  --h-controls-replay: 90px;
 
   /* The flag band grows and changes colour over 200-300ms. Nothing else moves. */
   --flag-transition: 240ms;
