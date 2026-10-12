@@ -13,18 +13,20 @@ A personal, non-commercial, phone-first second screen for F1 sessions: a 3D circ
 
 ## Status
 
-M5 done, with one check that cannot be run here. All seven flag states draw
-their own band, and the safety car, red flag and finished layouts are built to
-their artboards: the SC marker and yellow glow, the dimmed track and
-suspension card, and the podium with the final classification. Protocol is v5.
-Next is M6 in `docs/BUILD-PLAN.md`.
+M6 done, with one check that cannot be run here. The replay transport has its
+two-row bar with ±10 s and a scrubber marked with safety car, VSC and red-flag
+periods; "Sync with TV" works out the broadcast delay from a single tap; and
+each phone remembers its delay per session. Protocol is still v5 — the
+scrubber's markings come from `GET /api/periods` and the sync flow from
+`GET /api/crossings`, neither of which belongs in a frame sent every second.
+Next is M7 in `docs/BUILD-PLAN.md`.
 
-The acceptance check is in two halves, both automated. `npm test` walks the
-mock replay and asserts the flag at each scripted moment; `npm run states`
-drives the same replay in a browser and checks the band's colour, label and
-height and the tower's columns for all eight states. A real bug came out of
-M5's planning: `VSC DEPLOYED` was being read as a full safety car, so both of
-Singapore 2026's virtual safety car periods were reported wrongly.
+Both acceptance checks are automated. Seeking leaves no stuck cars after a
+±10 s jump or a small backwards drag — that second case was a real bug, found
+by writing the check: a refilled buffer begins at the seek point with nothing
+behind it, so dragging the scrubber slightly left landed before any data and
+every car vanished. And against the live mock, a tap recovers an injected
+broadcast delay to within a second across five values.
 
 **Unverified:** "60 fps on the target iPhone", carried over from M2. There is
 no device here, so it is measured in headless Chrome instead — a steady 60 fps

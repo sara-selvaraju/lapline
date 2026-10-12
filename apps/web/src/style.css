@@ -1079,3 +1079,250 @@ button {
 .camera-group.is-hidden {
   display: none;
 }
+
+/* ---- replay transport (Replay.dc.html) ---- */
+
+.controls-replay {
+  height: var(--h-controls-replay);
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 10px 12px 14px 16px;
+}
+
+.scrub-row {
+  position: relative;
+  height: 22px;
+  flex: none;
+}
+.scrub-track,
+.scrub-progress {
+  position: absolute;
+  top: 9px;
+  height: 4px;
+  border-radius: 2px;
+  pointer-events: none;
+}
+.scrub-track {
+  left: 0;
+  right: 0;
+  background: var(--line);
+}
+.scrub-progress {
+  left: 0;
+  background: var(--flood);
+}
+/* A safety car is a stretch to see the length of; a red flag is a moment to
+   find, so the artboard draws it as a tick rather than a band. */
+.scrub-period {
+  position: absolute;
+  top: 7px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--yellow);
+  pointer-events: none;
+}
+.scrub-period.is-vsc {
+  opacity: 0.65;
+}
+.scrub-red {
+  position: absolute;
+  top: 3px;
+  width: 3px;
+  height: 16px;
+  border-radius: 1px;
+  background: var(--red);
+  pointer-events: none;
+}
+/* The input is only the touch target and the thumb: the track, the elapsed
+   bar and the markers are drawn underneath it, where they can be coloured. */
+.scrub-row .scrub {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.scrub-row .scrub::-webkit-slider-runnable-track {
+  background: none;
+  height: 100%;
+}
+.scrub-row .scrub::-moz-range-track {
+  background: none;
+  height: 100%;
+}
+.scrub-row .scrub::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--flood);
+  box-shadow: 0 0 0 3px var(--panel);
+}
+.scrub-row .scrub::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--flood);
+  box-shadow: 0 0 0 3px var(--panel);
+}
+
+.transport-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.play-button {
+  width: 48px;
+  height: 48px;
+  flex: none;
+  border: 0;
+  border-radius: 24px;
+  background: var(--flood);
+  color: var(--night);
+  font-size: 20px;
+  display: grid;
+  place-items: center;
+}
+.step-button {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font-size: 15px;
+}
+.transport-clock {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.transport-clock .controls-clock {
+  font-size: 18px;
+  font-weight: 600;
+}
+.transport-total {
+  font-size: 13px;
+  color: var(--haze);
+}
+.speed-button {
+  height: 44px;
+  min-width: 56px;
+  flex: none;
+  padding: 0 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--night);
+  color: var(--flood);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+/* ---- sync sheet (SyncSheet.dc.html) ---- */
+
+.sync-sheet {
+  gap: 18px;
+  display: flex;
+  flex-direction: column;
+  padding: 10px var(--gutter) 24px;
+}
+.sheet-handle {
+  width: 40px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--line);
+  align-self: center;
+}
+.sheet-done {
+  height: 44px;
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  color: var(--flood);
+  font-size: 17px;
+}
+.sync-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.sync-copy {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.4;
+  color: var(--text-2);
+}
+.sync-copy b {
+  color: var(--flood);
+}
+.sync-mark {
+  height: 96px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--flood);
+  color: var(--night);
+  font-size: 24px;
+  font-weight: 700;
+}
+.sync-mark:disabled {
+  opacity: 0.5;
+}
+.sync-note,
+.sync-foot {
+  margin: 0;
+  color: var(--haze);
+  line-height: 1.4;
+}
+.sync-note {
+  font-size: 15px;
+}
+.sync-foot {
+  font-size: 14px;
+}
+.sync-delay {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.sync-delay-value {
+  font-size: 64px;
+  font-weight: 700;
+  line-height: 1;
+}
+.sync-delay-unit {
+  font-size: 18px;
+  color: var(--haze);
+}
+.sync-tune {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.sync-tune button {
+  height: 52px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--night);
+  color: var(--flood);
+  font-size: 18px;
+}
+.sync-again {
+  height: 48px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--flood);
+  font-size: 17px;
+}

@@ -21,6 +21,7 @@ import type {
   Transform,
 } from '@lapline/shared';
 import { post } from '../stream/control.js';
+import type { FlagPeriod } from '../stream/queries.js';
 import { DEFAULT_PREFS, loadPrefs, savePrefs, type CameraPreset, type GapMode, type Prefs } from './prefs.js';
 
 /** One sample of the selected car, for the 30-second speed trace. */
@@ -55,12 +56,18 @@ export interface StoreState {
   showPitLane: boolean;
   /** Whether the telemetry panel is open. */
   expanded: boolean;
+  /** Delays remembered per session key, from prefs. */
+  delays: Record<string, number>;
   follow: boolean;
   scrubbing: boolean;
   /** Driver numbers under the last ambiguous tap, or null when closed. */
   picker: number[] | null;
   /** Whether the session list sheet is open. */
   sessionsOpen: boolean;
+  /** Whether the sync sheet is open. */
+  syncOpen: boolean;
+  /** Flag periods for the replay scrubber, fetched once per session. */
+  periods: FlagPeriod[] | null;
   history: HistorySample[];
   /** Bumps whenever the circuit's transform changes, so the scene can rebuild. */
   circuitEpoch: number;
@@ -84,6 +91,11 @@ export interface StoreState {
   setScrubbing: (on: boolean) => void;
   openPicker: (ns: number[]) => void;
   openSessions: () => void;
+  openSync: () => void;
+  closeSync: () => void;
+  /** Sets the delay and remembers it for this session on this phone. */
+  setDelay: (delayS: number) => void;
+  setPeriods: (periods: FlagPeriod[]) => void;
   closeSessions: () => void;
   chooseSession: (key: number) => void;
   replayFromStart: () => void;
@@ -104,6 +116,7 @@ const persist = (s: StoreState): void => {
     showSectors: s.showSectors,
     showPitLane: s.showPitLane,
     expanded: s.expanded,
+    delays: s.delays,
   } satisfies Prefs);
 };
 
@@ -131,11 +144,14 @@ export const useStore = create<StoreState>((set, get) => ({
   showTurns: prefs.showTurns,
   showSectors: prefs.showSectors,
   showPitLane: prefs.showPitLane,
+  delays: prefs.delays,
   expanded: prefs.expanded,
   follow: false,
   scrubbing: false,
   picker: null,
   sessionsOpen: false,
+  syncOpen: false,
+  periods: null,
   history: [],
   circuitEpoch: 0,
 
@@ -152,6 +168,9 @@ export const useStore = create<StoreState>((set, get) => ({
         drivers,
         canLive: h.canLive,
         result: h.result,
+        // A different session means the scrubber's markings belong to the
+        // old one, and the remembered delay belongs to the new one.
+        periods: changed ? null : s.periods,
         status: h.status,
         ...(fieldChanged ? { history: [], timing: null, timingByN: new Map() } : {}),
         ...(changed ? { circuit: null, transform: null, circuitEpoch: s.circuitEpoch + 1 } : {}),
@@ -272,6 +291,20 @@ export const useStore = create<StoreState>((set, get) => ({
   setFollow: (follow) => set({ follow }),
   setScrubbing: (scrubbing) => set({ scrubbing }),
   openSessions: () => set({ sessionsOpen: true }),
+  openSync: () => set({ syncOpen: true }),
+  closeSync: () => set({ syncOpen: false }),
+  setPeriods: (periods) => set({ periods }),
+
+  setDelay: (delayS) =>
+    set((s) => {
+      // The server's own floor, so the two agree about what is possible.
+      const clamped = Math.max(4, Math.min(180, Math.round(delayS * 10) / 10));
+      const key = s.session?.key;
+      if (key != null) persist({ ...s, delays: { ...s.delays, [String(key)]: clamped } });
+      void post({ delayS: clamped });
+      return key == null ? {} : { delays: { ...s.delays, [String(key)]: clamped } };
+    }),
+
   closeSessions: () => set({ sessionsOpen: false }),
 
   // Both of these ask the server; the feed answers with a fresh hello.

@@ -6,6 +6,7 @@ function LivePill(): React.JSX.Element | null {
   const mode = useStore((s) => s.mode);
   const delayS = useStore((s) => s.live?.delayS ?? null);
   const finished = useStore((s) => s.timing?.flag === 'CHEQUERED' && s.result != null);
+  const openSync = useStore((s) => s.openSync);
 
   // Finished.dc.html replaces the pill with plain text: there is nothing live
   // about a race that is over, and nothing to sync to.
@@ -13,7 +14,11 @@ function LivePill(): React.JSX.Element | null {
 
   if (mode === 'live') {
     return (
-      <button className="pill" aria-label={`Live, ${delayS ?? 10} seconds behind real time. Open sync.`}>
+      <button
+        className="pill"
+        aria-label={`Live, ${delayS ?? 10} seconds behind real time. Open sync.`}
+        onClick={openSync}
+      >
         <span className="pill-dot" aria-hidden="true" />
         <span className="pill-label">Live</span>
         <span className="pill-note">{delayS ?? 10} s behind</span>
