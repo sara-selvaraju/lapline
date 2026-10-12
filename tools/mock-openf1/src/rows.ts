@@ -4,7 +4,7 @@
 // window request returns exactly what a real session would have published in it.
 // Ported from reference/prototype/mock/mock-openf1.js.
 
-import { N, progress, pitLap, v, where, T0, type MockSession } from './circuit.js';
+import { N, progress, pitLap, lapWobble, v, where, T0, type MockSession } from './circuit.js';
 import { DRIVERS, iso } from './drivers.js';
 
 type Row = Record<string, unknown>;
@@ -96,7 +96,7 @@ export function rowsFor(ep: string, s: MockSession, from: number, to: number): R
       for (let lap = 1; lap <= s.laps; lap++) {
         const st = s.start + ((d.n - 2) * 0.3 + (lap - 1) * T0 * d.f) * 1000;
         if (st > lim) break;
-        const dur = T0 * d.f;
+        const dur = T0 * d.f + lapWobble(d.n, lap);
         const done = st + dur * 1000 <= lim;
         out.push({
           ...base,

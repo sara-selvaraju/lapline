@@ -11,6 +11,14 @@ export const TYRE_LETTER: Record<string, string> = {
 };
 
 /** Australian English, short weekday and time: 'Sat, 9:30 pm'. */
+/** The compound's colour token, or haze when upstream sent something odd. */
+export function tyreVar(compound: string | null): string {
+  const key = (compound ?? '').toLowerCase();
+  if (key === 'intermediate') return 'var(--tyre-inter)';
+  if (key === 'soft' || key === 'medium' || key === 'hard' || key === 'wet') return `var(--tyre-${key})`;
+  return 'var(--haze)';
+}
+
 export function fmtWhen(isoStr: string): string {
   return new Date(isoStr).toLocaleString('en-AU', {
     weekday: 'short',

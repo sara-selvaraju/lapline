@@ -405,3 +405,96 @@ describe('a session upstream has no positions for', () => {
     feed.stop();
   }, 40_000);
 });
+
+describe('the lap-colour rule against mock data', () => {
+  // docs/BUILD-PLAN.md M4: "Mock data shows purple on exactly one row, only on
+  // the lap just completed."
+  //
+  // Walks the replay through the Sprint and reads the timing frame at each
+  // step, rather than waiting on the 1 Hz broadcast timer.
+  async function walk(feed: Feed, fromS: number, toS: number, stepS: number): Promise<Timing[]> {
+    const out: Timing[] = [];
+    for (let at = fromS; at <= toS; at += stepS) {
+      feed.setReplay({ at: (feed.sessStart as number) + at * 1000, playing: false });
+      await feed.fetchStep();
+      const t = feed.timing();
+      if (t) out.push(t);
+    }
+    return out;
+  }
+
+  it('shows purple on exactly one row, and only while that lap is their last', async () => {
+    const feed = freeFeed();
+    try {
+      await feed.loadSessionList();
+      await feed.selectSession(SPRINT);
+      const frames = await walk(feed, 120, 900, 30);
+
+      const withLaps = frames.filter((f) => f.rows.some((r) => r.last != null));
+      expect(withLaps.length).toBeGreaterThan(0);
+
+      let sawPurple = false;
+      for (const frame of withLaps) {
+        const purple = frame.rows.filter((r) => r.lapFlag === 'fastest');
+        // Never more than one, which is the "exactly one row" half.
+        expect(purple.length).toBeLessThanOrEqual(1);
+        if (purple.length === 0) continue;
+        sawPurple = true;
+        // It is the lap they have just completed, not a best they hold.
+        expect(purple[0]!.last).toBe(purple[0]!.best);
+        // And nobody in the field has gone quicker.
+        const best = Math.min(...frame.rows.map((r) => r.best ?? Infinity));
+        expect(purple[0]!.last).toBe(best);
+      }
+      expect(sawPurple).toBe(true);
+
+      // The lap times must actually differ, or none of the above means much.
+      const times = withLaps.at(-1)!.rows.map((r) => r.last).filter((v): v is number => v != null);
+      expect(new Set(times).size).toBeGreaterThan(1);
+    } finally {
+      feed.stop();
+    }
+  }, 60_000);
+
+  it('takes purple off a driver once they complete a slower lap', async () => {
+    const feed = freeFeed();
+    try {
+      await feed.loadSessionList();
+      await feed.selectSession(SPRINT);
+      const frames = await walk(feed, 120, 900, 30);
+
+      // Somebody must have held purple and then lost it, or the variation in
+      // the mock's lap times is not doing its job.
+      const runs = new Map<number, boolean[]>();
+      for (const f of frames) {
+        for (const r of f.rows) {
+          if (r.last == null) continue;
+          const run = runs.get(r.n) ?? [];
+          run.push(r.lapFlag === 'fastest');
+          runs.set(r.n, run);
+        }
+      }
+      const lostIt = [...runs.values()].some((run) => run.includes(true) && run.at(-1) === false);
+      expect(lostIt).toBe(true);
+    } finally {
+      feed.stop();
+    }
+  }, 60_000);
+
+  it('marks a personal best that is not the session best', async () => {
+    const feed = freeFeed();
+    try {
+      await feed.loadSessionList();
+      await feed.selectSession(SPRINT);
+      const frames = await walk(feed, 120, 900, 30);
+      const sawPb = frames.some((f) => f.rows.some((r) => r.lapFlag === 'pb'));
+      expect(sawPb).toBe(true);
+      // A row is never both.
+      for (const f of frames) {
+        for (const r of f.rows) expect(['fastest', 'pb', null]).toContain(r.lapFlag);
+      }
+    } finally {
+      feed.stop();
+    }
+  }, 60_000);
+});
