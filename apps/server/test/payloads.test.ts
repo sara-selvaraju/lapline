@@ -76,6 +76,7 @@ describe('helloPayload', () => {
     circuit: null,
     status: statusPayload({ level: 'ok', text: 'Live' }, 'live', api, null),
     canLive: true,
+  result: null,
     now: NOW,
   };
 

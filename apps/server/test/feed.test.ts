@@ -163,7 +163,7 @@ describe('replaying the finished mock Sprint', () => {
         feed.setReplay({ at: start + offset, playing: false });
         return (feed.timing() as Timing).flag;
       };
-      // The mock scripts a sector yellow at 5 min, safety car at 9, ending at 11.
+      // A sector yellow at 5 min colours a marshal sector, not the track.
       expect(flagAt(60_000)).toBe('GREEN');
       expect(flagAt(330_000)).toBe('GREEN');
       expect(flagAt(600_000)).toBe('SC');
@@ -173,6 +173,71 @@ describe('replaying the finished mock Sprint', () => {
       feed.stop();
     }
   }, 30_000);
+
+  // docs/BUILD-PLAN.md M5: "The mock's scripted race control events step
+  // through every state in replay, with the matching band and layout." This
+  // is the server half; tools/measure-layout.mjs checks what gets drawn.
+  it('steps through every state the band draws', async () => {
+    const feed = freeFeed();
+    try {
+      await feed.loadSessionList();
+      await feed.selectSession(SPRINT);
+      const start = feed.sessStart as number;
+      const at = (offset: number): Timing => {
+        feed.setReplay({ at: start + offset, playing: false });
+        return feed.timing() as Timing;
+      };
+
+      const walk: Array<[label: string, offsetS: number, want: string]> = [
+        ['the formation', 60, 'GREEN'],
+        ['a track-wide yellow', 140, 'YELLOW'],
+        ['cleared again', 180, 'GREEN'],
+        ['a sector yellow, which is not a track flag', 330, 'GREEN'],
+        ['a virtual safety car', 430, 'VSC'],
+        ['the virtual safety car ending', 470, 'VSC ENDING'],
+        ['green between the two', 500, 'GREEN'],
+        ['a safety car', 600, 'SC'],
+        ['the safety car ending', 700, 'SC ENDING'],
+        ['green again', 780, 'GREEN'],
+        ['a red flag', 860, 'RED'],
+        ['the restart', 960, 'GREEN'],
+      ];
+      for (const [label, offsetS, want] of walk) {
+        expect({ label, flag: at(offsetS * 1000).flag }).toEqual({ label, flag: want });
+      }
+
+      // Every state but the chequered, which falls after the last lap.
+      const seen = new Set(walk.map(([, , want]) => want));
+      expect(seen).toEqual(new Set(['GREEN', 'YELLOW', 'VSC', 'VSC ENDING', 'SC', 'SC ENDING', 'RED']));
+
+      const end = at((feed.sessEnd as number) - start + 60_000);
+      expect(end.flag).toBe('CHEQUERED');
+    } finally {
+      feed.stop();
+    }
+  }, 40_000);
+
+  it('suspends the session for the red flag, rather than racing through it', async () => {
+    const feed = freeFeed();
+    try {
+      await feed.loadSessionList();
+      await feed.selectSession(SPRINT);
+      const start = feed.sessStart as number;
+      const leaderAt = (offsetS: number): number | null => {
+        feed.setReplay({ at: start + offsetS * 1000, playing: false });
+        return (feed.timing() as Timing).lap;
+      };
+      // Across the stoppage the leader is on the same lap at both ends.
+      const before = leaderAt(850);
+      const during = leaderAt(900);
+      expect(before).not.toBeNull();
+      expect(during).toBe(before);
+      // And racing resumes after it.
+      expect(leaderAt(1050)).toBeGreaterThan(before as number);
+    } finally {
+      feed.stop();
+    }
+  }, 40_000);
 
   it('drops the high-rate buffers on a seek and refills them', async () => {
     const feed = freeFeed();
@@ -497,4 +562,72 @@ describe('the lap-colour rule against mock data', () => {
       feed.stop();
     }
   }, 60_000);
+});
+
+describe('the final classification', () => {
+  it('arrives once the chequered flag has fallen, and not before', async () => {
+    const feed = freeFeed();
+    try {
+      await feed.loadSessionList();
+      await feed.selectSession(SPRINT);
+      const start = feed.sessStart as number;
+
+      // Mid-race there is nothing to classify.
+      feed.setReplay({ at: start + 600_000, playing: false });
+      await feed.fetchStep();
+      expect(feed.helloPayload().result).toBeNull();
+
+      // Past the flag it is fetched once and sent on hello.
+      feed.setReplay({ at: (feed.sessEnd as number) + 60_000, playing: false });
+      await feed.fetchStep();
+      await feed.fetchStep();
+
+      const result = feed.helloPayload().result;
+      expect(result).not.toBeNull();
+      expect(result!.rows.length).toBeGreaterThan(10);
+
+      // The winner leads, with no gap and the total race time.
+      const winner = result!.rows[0]!;
+      expect(winner.position).toBe(1);
+      expect(winner.gap).toBe(0);
+      expect(result!.winnerTime).toBeGreaterThan(0);
+
+      // Everyone classified is in order, and the one retirement is last.
+      const classified = result!.rows.filter((r) => r.status === 'finished');
+      expect(classified.map((r) => r.position)).toEqual(classified.map((_, i) => i + 1));
+      const dnf = result!.rows.filter((r) => r.status === 'dnf');
+      expect(dnf).toHaveLength(1);
+      expect(dnf[0]!.position).toBeNull();
+      expect(result!.rows.at(-1)!.status).toBe('dnf');
+
+      // And the fastest lap names a driver, a lap and a time.
+      expect(result!.fastest).not.toBeNull();
+      expect(result!.fastest!.time).toBeGreaterThan(0);
+      expect(result!.fastest!.lap).toBeGreaterThan(0);
+    } finally {
+      feed.stop();
+    }
+  }, 40_000);
+
+  it('counts each car’s pit stops on the timing rows', async () => {
+    const feed = freeFeed();
+    try {
+      await feed.loadSessionList();
+      await feed.selectSession(SPRINT);
+      const start = feed.sessStart as number;
+
+      feed.setReplay({ at: start + 60_000, playing: false });
+      await feed.fetchStep();
+      const early = (feed.timing() as Timing).rows;
+      expect(early.every((r) => r.stops === 0)).toBe(true);
+
+      feed.setReplay({ at: (feed.sessEnd as number) - 60_000, playing: false });
+      await feed.fetchStep();
+      const late = (feed.timing() as Timing).rows;
+      expect(late.some((r) => r.stops > 0)).toBe(true);
+      expect(late.every((r) => r.stops >= 0 && Number.isInteger(r.stops))).toBe(true);
+    } finally {
+      feed.stop();
+    }
+  }, 40_000);
 });

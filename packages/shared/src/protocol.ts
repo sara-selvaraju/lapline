@@ -10,7 +10,7 @@
 import { z } from 'zod';
 
 /** Bump on any incompatible change to the messages below. */
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 export const SSE_EVENTS = ['hello', 'tick', 'timing', 'status', 'circuit', 'ping'] as const;
 export type SseEvent = (typeof SSE_EVENTS)[number];
@@ -149,6 +149,39 @@ export const StatusSchema = z.object({
 });
 export type Status = z.infer<typeof StatusSchema>;
 
+/** How a car was classified at the end. */
+export const ResultStatusSchema = z.enum(['finished', 'dnf', 'dns', 'dsq']);
+export type ResultStatus = z.infer<typeof ResultStatusSchema>;
+
+export const ResultRowSchema = z.object({
+  n: z.number().int(),
+  position: z.number().int().nullable(),
+  /** Seconds behind the winner, or upstream text such as '+1 lap'. */
+  gap: z.union([z.number(), z.string()]).nullable(),
+  laps: z.number().int().nullable(),
+  points: z.number().nullable(),
+  status: ResultStatusSchema,
+});
+export type ResultRow = z.infer<typeof ResultRowSchema>;
+
+/**
+ * The final classification, once a session has finished.
+ *
+ * Carried on `hello` rather than on every timing frame: it is twenty-odd rows
+ * that never change again, and repeating them every second for as long as
+ * someone watches a finished race is waste. The feed re-sends hello when it
+ * arrives.
+ */
+export const SessionResultSchema = z.object({
+  rows: z.array(ResultRowSchema),
+  /** The winner's total race time, in seconds. */
+  winnerTime: z.number().nullable(),
+  fastest: z
+    .object({ n: z.number().int(), lap: z.number().int().nullable(), time: z.number() })
+    .nullable(),
+});
+export type SessionResult = z.infer<typeof SessionResultSchema>;
+
 export const HelloSchema = z.object({
   protocolVersion: z.number().int(),
   session: SessionSummarySchema.nullable(),
@@ -159,6 +192,8 @@ export const HelloSchema = z.object({
   circuit: CircuitSchema.nullable(),
   status: StatusSchema,
   canLive: z.boolean(),
+  /** Null until the session has finished and the classification is in. */
+  result: SessionResultSchema.nullable(),
 });
 export type Hello = z.infer<typeof HelloSchema>;
 
@@ -229,6 +264,8 @@ export const TowerRowSchema = z.object({
    * about lap history that the wire does not otherwise carry.
    */
   lapFlag: z.enum(['fastest', 'pb']).nullable(),
+  /** Pit stops made so far, which the tower shows under a safety car. */
+  stops: z.number().int(),
 });
 export type TowerRow = z.infer<typeof TowerRowSchema>;
 
@@ -267,6 +304,10 @@ export const TimingSchema = z.object({
   rc: z.array(RaceControlLineSchema),
   /** Driver numbers within 1.0 s of the car ahead, under green. */
   battles: z.array(z.number().int()),
+  /** When the standing flag began, and the leader's lap then. The safety car
+   *  band and the red flag card both name these. */
+  flagSince: z.number().nullable(),
+  flagSinceLap: z.number().int().nullable(),
 });
 export type Timing = z.infer<typeof TimingSchema>;
 

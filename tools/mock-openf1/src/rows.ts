@@ -4,7 +4,19 @@
 // window request returns exactly what a real session would have published in it.
 // Ported from reference/prototype/mock/mock-openf1.js.
 
-import { N, progress, pitLap, lapWobble, v, where, T0, type MockSession } from './circuit.js';
+import {
+  N,
+  progress,
+  pitLap,
+  lapWobble,
+  v,
+  where,
+  wallOffset,
+  RED_FROM_MS,
+  RED_MS,
+  T0,
+  type MockSession,
+} from './circuit.js';
 import { DRIVERS, iso } from './drivers.js';
 
 type Row = Record<string, unknown>;
@@ -94,7 +106,7 @@ export function rowsFor(ep: string, s: MockSession, from: number, to: number): R
   if (ep === 'laps') {
     for (const d of DRIVERS) {
       for (let lap = 1; lap <= s.laps; lap++) {
-        const st = s.start + ((d.n - 2) * 0.3 + (lap - 1) * T0 * d.f) * 1000;
+        const st = s.start + wallOffset(((d.n - 2) * 0.3 + (lap - 1) * T0 * d.f) * 1000);
         if (st > lim) break;
         const dur = T0 * d.f + lapWobble(d.n, lap);
         const done = st + dur * 1000 <= lim;
@@ -154,19 +166,70 @@ export function rowsFor(ep: string, s: MockSession, from: number, to: number): R
     return out;
   }
 
+  if (ep === 'session_result') {
+    // Only once the session is over, as upstream does: there is no
+    // classification to publish while cars are still running.
+    const finishedAt = s.start + wallOffset(s.laps * T0 * 1000);
+    if (lim < finishedAt) return out;
+
+    // Total time is the sum of the laps this mock actually generated, so the
+    // classification agrees with the lap times the tower has been showing.
+    const totals = DRIVERS.map((d) => {
+      let total = 0;
+      for (let lap = 1; lap <= s.laps; lap++) {
+        total += T0 * d.f + lapWobble(d.n, lap) + (lap === 1 ? 4 : 0);
+      }
+      return { d, total: +total.toFixed(3) };
+    }).sort((a, b) => a.total - b.total);
+
+    const winner = totals[0]!.total;
+    const POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
+    totals.forEach(({ d, total }, i) => {
+      // One retirement, so the finished layout has a car to classify as DNF.
+      const dnf = d.n === DRIVERS[DRIVERS.length - 1]!.n;
+      out.push({
+        ...base,
+        position: dnf ? null : i + 1,
+        driver_number: d.n,
+        number_of_laps: dnf ? Math.floor(s.laps / 2) : s.laps,
+        points: dnf ? 0 : (POINTS[i] ?? 0),
+        dnf,
+        dns: false,
+        dsq: false,
+        duration: dnf ? null : total,
+        gap_to_leader: dnf ? null : i === 0 ? 0 : +(total - winner).toFixed(3),
+      });
+    });
+    return out;
+  }
+
   if (ep === 'race_control') {
-    // Scripted so replay steps through yellow, safety car and chequered.
+    // Scripted so a replay steps through every state the band draws: green,
+    // track yellow, VSC, VSC ending, safety car, safety car ending, red and
+    // chequered, plus a sector-scoped yellow for the marshal sectors.
     // Sector-scoped rows carry their marshal sector, as the real feed does:
     // Singapore's race sent 18 of them. Without the number nothing downstream
     // can tell which part of the track to paint.
     const ev: Array<[number, string, string | null, string, string, number | null]> = [
       [0, 'Flag', 'GREEN', 'Track', 'GREEN LIGHT - PIT EXIT OPEN', null],
+      // Track-wide yellow, which is a different state from the sector one.
+      [2 * 60_000, 'Flag', 'YELLOW', 'Track', 'YELLOW FLAG', null],
+      [2 * 60_000 + 40_000, 'Flag', 'CLEAR', 'Track', 'TRACK CLEAR', null],
       [5 * 60_000, 'Flag', 'YELLOW', 'Sector', 'YELLOW IN TRACK SECTOR 7', 7],
       [6 * 60_000, 'Flag', 'CLEAR', 'Sector', 'CLEAR IN TRACK SECTOR 7', 7],
+      // Worded as OpenF1 words it. Singapore 2026 sent exactly this.
+      [7 * 60_000, 'SafetyCar', null, 'Track', 'VSC DEPLOYED', null],
+      [7 * 60_000 + 45_000, 'SafetyCar', null, 'Track', 'VSC ENDING', null],
+      [8 * 60_000, 'Flag', 'CLEAR', 'Track', 'TRACK CLEAR', null],
       [9 * 60_000, 'SafetyCar', null, 'Track', 'SAFETY CAR DEPLOYED', null],
       [11 * 60_000, 'SafetyCar', null, 'Track', 'SAFETY CAR IN THIS LAP', null],
       [12 * 60_000, 'Flag', 'GREEN', 'Track', 'TRACK CLEAR', null],
-      [s.laps * T0 * 1000, 'Flag', 'CHEQUERED', 'Track', 'CHEQUERED FLAG', null],
+      // The red flag the clock above really suspends the session for. The
+      // turn number is what the incident overlay reads out of the message.
+      [RED_FROM_MS, 'Flag', 'RED', 'Track', 'RED FLAG', null],
+      [RED_FROM_MS + 2000, 'Other', null, 'Track', 'INCIDENT AT TURN 7 INVOLVING CAR 18 (ORI) - SESSION SUSPENDED', null],
+      [RED_FROM_MS + RED_MS, 'Flag', 'GREEN', 'Track', 'GREEN LIGHT - PIT EXIT OPEN', null],
+      [wallOffset(s.laps * T0 * 1000), 'Flag', 'CHEQUERED', 'Track', 'CHEQUERED FLAG', null],
     ];
     for (const [dt, category, flag, scope, message, sector] of ev) {
       const t = s.start + dt;

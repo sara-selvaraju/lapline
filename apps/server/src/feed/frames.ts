@@ -23,12 +23,12 @@ import type {
 import { lastAtOrBefore, type Buffers } from './buffers.js';
 import { battles } from '../derive/battles.js';
 import { currentLap, lapColour } from '../derive/laps.js';
-import { marshalSectorFlags, trackFlag } from '../derive/flags.js';
+import { flagState, marshalSectorFlags, trackFlag } from '../derive/flags.js';
 import { tyre } from '../derive/tyres.js';
 
 // Re-exported because the frame builders are the only callers outside derive/,
 // and the tests for each rule live beside it now.
-export { currentLap, lapColour, marshalSectorFlags, trackFlag, tyre, battles };
+export { currentLap, flagState, lapColour, marshalSectorFlags, trackFlag, tyre, battles };
 
 /** A car is stale when its newest sample is older than this. */
 export const STALE_MS = 8000;
@@ -92,7 +92,13 @@ export function buildTiming(buffers: Buffers, t: number): Timing {
     const ty = tyre(buffers, d.n, lap.lap);
     const pits = buffers.pits.get(d.n);
     let inPit = false;
-    if (pits) for (const [pt, dur] of pits) if (pt <= t && t <= pt + dur * 1000) inPit = true;
+    let stops = 0;
+    if (pits) {
+      for (const [pt, dur] of pits) {
+        if (pt <= t) stops++;
+        if (pt <= t && t <= pt + dur * 1000) inPit = true;
+      }
+    }
     const p = pi >= 0 ? pa![pi]![1] ?? null : null;
     if (p === 1) leaderLap = lap.lap;
     rows.push({
@@ -107,9 +113,12 @@ export function buildTiming(buffers: Buffers, t: number): Timing {
       age: ty.age,
       pit: inPit,
       lapFlag: lapColour(buffers, d.n, t),
+      stops,
     });
   }
   rows.sort((a, b) => (a.p ?? 99) - (b.p ?? 99));
+
+  const state = flagState(buffers, t);
 
   const rc: RaceControlLine[] = [];
   const k = lastAtOrBefore(buffers.rc, t);
@@ -123,10 +132,12 @@ export function buildTiming(buffers: Buffers, t: number): Timing {
     lap: leaderLap,
     // OpenF1 publishes no total-lap figure, so there is nothing honest to send.
     totalLaps: null,
-    flag: trackFlag(buffers, t),
+    flag: state.flag,
     marshalSectors: marshalSectorFlags(buffers, t),
     rc,
     battles: battles(buffers, t),
+    flagSince: state.since,
+    flagSinceLap: state.sinceLap,
   };
 }
 

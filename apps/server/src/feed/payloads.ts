@@ -11,6 +11,7 @@ import {
   type Hello,
   type Mode,
   type SessionListEntry,
+  type SessionResult,
   type SessionRow,
   type CircuitDetailSource,
   type SectorBoundary,
@@ -82,6 +83,7 @@ export interface HelloInput {
   circuit: Circuit | null;
   status: Status;
   canLive: boolean;
+  result: SessionResult | null;
   now?: number;
 }
 
@@ -113,5 +115,6 @@ export function helloPayload(i: HelloInput): Hello {
     circuit: i.circuit,
     status: i.status,
     canLive: i.canLive,
+    result: i.result,
   };
 }

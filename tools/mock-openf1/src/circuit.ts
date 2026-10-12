@@ -81,9 +81,36 @@ export interface MockSession {
   year: number;
 }
 
+/**
+ * The scripted red flag, as offsets from the session start.
+ *
+ * The session really is suspended for this window: cars stop where they are
+ * and every lap after it shifts later by the same amount. Without that the
+ * red-flag layout would be drawn over a field still racing, which tells us
+ * nothing about whether the layout is right.
+ */
+export const RED_FROM_MS = 14 * 60_000;
+export const RED_MS = 90_000;
+
+/** How much of the window up to `dt` was spent suspended. */
+export function suspendedBy(dt: number): number {
+  if (dt <= RED_FROM_MS) return 0;
+  return Math.min(RED_MS, dt - RED_FROM_MS);
+}
+
+/** Wall-clock offset to racing time: the clock the cars run on. */
+export function racingOffset(dt: number): number {
+  return dt - suspendedBy(dt);
+}
+
+/** Racing time back to a wall-clock offset, for scheduling laps and the flag. */
+export function wallOffset(racing: number): number {
+  return racing >= RED_FROM_MS ? racing + RED_MS : racing;
+}
+
 /** Progress in laps for a driver at a given time, capped at the session distance. */
 export function progress(s: MockSession, d: MockDriver, t: number): number {
-  const tau = (t - s.start) / 1000 - (d.n - 2) * 0.3;
+  const tau = racingOffset(t - s.start) / 1000 - (d.n - 2) * 0.3;
   if (tau < 0) return 0;
   return Math.min(tau / (T0 * d.f), s.laps);
 }
