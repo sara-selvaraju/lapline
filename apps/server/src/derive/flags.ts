@@ -4,33 +4,100 @@ import type { MarshalSectorFlag, SectorFlag, TrackFlag } from '@lapline/shared';
 import type { Buffers } from '../feed/buffers.js';
 
 /**
+ * Whether a safety-car message is about the virtual safety car.
+ *
+ * OpenF1 writes "VSC DEPLOYED", not "VIRTUAL SAFETY CAR DEPLOYED". Looking
+ * only for the spelt-out form is why both of Singapore 2026's VSC periods
+ * reported as a full safety car, which is a different thing entirely: a
+ * physical car and a bunched field, against delta times and a green track.
+ * Both spellings are accepted, since race control uses them interchangeably.
+ */
+function isVirtual(msg: string): boolean {
+  return msg.includes('VSC') || msg.includes('VIRTUAL');
+}
+
+/** Whether this is an end-of-period message rather than a deployment. */
+function isEnding(msg: string): boolean {
+  return msg.includes('ENDING') || msg.includes('IN THIS LAP');
+}
+
+/**
  * The track flag at `t`, by replaying race control in order.
  *
- * Sector-scoped flags are ignored: they colour a marshal sector, not the track.
- * Marshal-sector flags and a proper state machine arrive in M3 and M5.
+ * Sector-scoped flags are ignored: they colour a marshal sector, not the
+ * track, and `marshalSectorFlags` reads those instead.
  */
 export function trackFlag(buffers: Buffers, t: number): TrackFlag {
-  let flag: TrackFlag = 'GREEN';
+  return flagState(buffers, t).flag;
+}
+
+export interface FlagState {
+  flag: TrackFlag;
+  /** When the standing flag began, or null if the track has only been green. */
+  since: number | null;
+  /** The leader's lap when it began, which the safety car band and the red
+   *  flag card both name. Null when no lap is known yet. */
+  sinceLap: number | null;
+}
+
+/**
+ * The standing flag and when it started.
+ *
+ * The artboards ask for "Safety car since lap 24", "Suspended 12:40" and
+ * "Order frozen at the end of lap 31", none of which the flag alone can
+ * answer, so the moment the flag last changed is derived here beside it.
+ */
+export function flagState(buffers: Buffers, t: number): FlagState {
+  // Held in an object rather than two locals: the setter below mutates them,
+  // and a plain `let` would be narrowed to its initial value at every read.
+  const state: { flag: TrackFlag; since: number | null } = { flag: 'GREEN', since: null };
+
+  const set = (next: TrackFlag, at: number): void => {
+    if (next === state.flag) return;
+    state.flag = next;
+    state.since = at;
+  };
+
   for (const [rt, r] of buffers.rc) {
     if (rt > t) break;
     const msg = (r.message || '').toUpperCase();
-    if (r.category === 'SafetyCar' || msg.includes('SAFETY CAR')) {
-      if (msg.includes('VIRTUAL') && msg.includes('DEPLOYED')) flag = 'VSC';
-      else if (msg.includes('DEPLOYED')) flag = 'SC';
-      else if (msg.includes('ENDING') || msg.includes('IN THIS LAP')) {
-        flag = flag === 'VSC' ? 'VSC ENDING' : 'SC ENDING';
+
+    if (r.category === 'SafetyCar' || msg.includes('SAFETY CAR') || msg.includes('VSC')) {
+      const virtual = isVirtual(msg);
+      // An ending message belongs to whatever is running: race control does
+      // not always repeat which kind it was, so the message is read in the
+      // context of the flag it is ending.
+      if (isEnding(msg)) {
+        const ending = virtual || state.flag === 'VSC' || state.flag === 'VSC ENDING';
+        set(ending ? 'VSC ENDING' : 'SC ENDING', rt);
+      } else if (msg.includes('DEPLOYED')) {
+        set(virtual ? 'VSC' : 'SC', rt);
       }
       continue;
     }
+
     if (r.category === 'Flag' && (r.scope === 'Track' || !r.scope)) {
       const f = (r.flag || '').toUpperCase();
-      if (f === 'GREEN' || f === 'CLEAR') flag = 'GREEN';
-      else if (f === 'RED') flag = 'RED';
-      else if (f === 'CHEQUERED') flag = 'CHEQUERED';
-      else if (f.includes('YELLOW')) flag = 'YELLOW';
+      if (f === 'GREEN' || f === 'CLEAR') set('GREEN', rt);
+      else if (f === 'RED') set('RED', rt);
+      else if (f === 'CHEQUERED') set('CHEQUERED', rt);
+      else if (f.includes('YELLOW')) set('YELLOW', rt);
     }
   }
-  return flag;
+
+  const { flag, since } = state;
+  return { flag, since, sinceLap: since == null ? null : leaderLapAt(buffers, since) };
+}
+
+/** The highest lap any car had started by `t`, which is the leader's lap. */
+function leaderLapAt(buffers: Buffers, t: number): number | null {
+  let lap: number | null = null;
+  for (const m of buffers.laps.values()) {
+    for (const l of m.values()) {
+      if (l.start != null && l.start <= t && (lap == null || l.n > lap)) lap = l.n;
+    }
+  }
+  return lap;
 }
 
 /**
