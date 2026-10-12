@@ -16,6 +16,7 @@ const row = (n: number, p: number | null, gap: number | string | null): TowerRow
   age: null,
   pit: false,
   lapFlag: null,
+  stops: 0,
 });
 
 // Leader, then a pack, then one a long way back.

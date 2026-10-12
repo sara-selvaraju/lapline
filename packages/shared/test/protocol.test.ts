@@ -40,6 +40,7 @@ const hello = {
   },
   status,
   canLive: true,
+  result: null,
 };
 
 const tick = {
@@ -52,7 +53,7 @@ const tick = {
 const timing = {
   t: 1_760_000_000_000,
   rows: [
-    { n: 4, p: 1, gap: null, int: null, lap: 7, last: 92.4, best: 92.4, tyre: 'SOFT', age: 3, pit: false, lapFlag: 'pb' },
+    { n: 4, p: 1, gap: null, int: null, lap: 7, last: 92.4, best: 92.4, tyre: 'SOFT', age: 3, pit: false, lapFlag: 'pb', stops: 1 },
   ],
   lap: 7,
   totalLaps: null,
@@ -60,11 +61,13 @@ const timing = {
   marshalSectors: [],
   rc: [{ t: 1, msg: 'GREEN LIGHT' }],
   battles: [],
+  flagSince: null,
+  flagSinceLap: null,
 };
 
 describe('the protocol surface', () => {
-  it('is version 4', () => {
-    expect(PROTOCOL_VERSION).toBe(4);
+  it('is version 5', () => {
+    expect(PROTOCOL_VERSION).toBe(5);
   });
 
   it('names six events, and has a schema for each', () => {

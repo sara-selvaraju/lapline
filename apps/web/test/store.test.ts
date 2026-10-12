@@ -11,6 +11,7 @@ const hello = (over: Partial<Hello> = {}): Hello => ({
   session: { key: 1002, name: 'Race', circuit: 'Singapore', country: 'Singapore', start: T, end: T + 1 },
   mode: 'live',
   userPicked: false,
+  result: null,
   drivers: [
     { n: 4, code: 'NOR', name: 'A', team: 'X', colour: '#f00' },
     { n: 81, code: 'PIA', name: 'B', team: 'X', colour: '#f00' },
@@ -32,8 +33,8 @@ const tick = (over: Partial<Tick> = {}): Tick => ({
 const timing = (over: Partial<Timing> = {}): Timing => ({
   t: T,
   rows: [
-    { n: 81, p: 1, gap: null, int: null, lap: 5, last: 92, best: 92, tyre: 'SOFT', age: 2, pit: false, lapFlag: null },
-    { n: 4, p: 2, gap: 1.2, int: 1.2, lap: 5, last: 93, best: 92.5, tyre: 'HARD', age: 9, pit: false, lapFlag: null },
+    { n: 81, p: 1, gap: null, int: null, lap: 5, last: 92, best: 92, tyre: 'SOFT', age: 2, pit: false, lapFlag: null, stops: 1 },
+    { n: 4, p: 2, gap: 1.2, int: 1.2, lap: 5, last: 93, best: 92.5, tyre: 'HARD', age: 9, pit: false, lapFlag: null, stops: 1 },
   ],
   lap: 5,
   totalLaps: null,
@@ -41,6 +42,8 @@ const timing = (over: Partial<Timing> = {}): Timing => ({
   marshalSectors: [],
   rc: [],
   battles: [],
+  flagSince: null,
+  flagSinceLap: null,
   ...over,
 });
 
@@ -231,9 +234,9 @@ describe('selectByOffset', () => {
   const field = (): Timing =>
     timing({
       rows: [
-        { n: 81, p: 1, gap: null, int: null, lap: 5, last: 92, best: 92, tyre: 'SOFT', age: 2, pit: false, lapFlag: 'fastest' },
-        { n: 4, p: 2, gap: 1.2, int: 1.2, lap: 5, last: 93, best: 92.5, tyre: 'HARD', age: 9, pit: false, lapFlag: null },
-        { n: 16, p: 3, gap: 2.4, int: 1.2, lap: 5, last: 94, best: 93.5, tyre: 'HARD', age: 9, pit: false, lapFlag: null },
+        { n: 81, p: 1, gap: null, int: null, lap: 5, last: 92, best: 92, tyre: 'SOFT', age: 2, pit: false, lapFlag: 'fastest', stops: 1 },
+        { n: 4, p: 2, gap: 1.2, int: 1.2, lap: 5, last: 93, best: 92.5, tyre: 'HARD', age: 9, pit: false, lapFlag: null, stops: 1 },
+        { n: 16, p: 3, gap: 2.4, int: 1.2, lap: 5, last: 94, best: 93.5, tyre: 'HARD', age: 9, pit: false, lapFlag: null, stops: 1 },
       ],
     });
 

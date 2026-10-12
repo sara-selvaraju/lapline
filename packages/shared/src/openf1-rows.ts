@@ -123,6 +123,24 @@ export interface MeetingRow {
 }
 
 /** Endpoints the feed ingests, keyed as `ingest()` dispatches on them. */
+/**
+ * A row of `session_result`, the official classification. Fetched once when a
+ * session has finished; every field optional, as everywhere else here.
+ */
+export interface SessionResultRow {
+  position?: number | null;
+  driver_number?: number | null;
+  number_of_laps?: number | null;
+  points?: number | null;
+  dnf?: boolean | null;
+  dns?: boolean | null;
+  dsq?: boolean | null;
+  duration?: number | null;
+  gap_to_leader?: number | string | null;
+  session_key?: number | null;
+  meeting_key?: number | null;
+}
+
 export type IngestTopic =
   | 'location'
   | 'car_data'

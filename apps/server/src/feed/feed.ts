@@ -10,12 +10,24 @@
 //
 // Ported from reference/prototype/lib/feed.js.
 
-import type { Circuit, LapRow, LocationRow, Mode, SessionRow, Tick, Timing, Transform } from '@lapline/shared';
+import type {
+  Circuit,
+  LapRow,
+  LocationRow,
+  Mode,
+  SessionResult,
+  SessionResultRow,
+  SessionRow,
+  Tick,
+  Timing,
+  Transform,
+} from '@lapline/shared';
 import { LockedError, type OpenF1 } from '../openf1/client.js';
 import { LiveMqtt } from '../openf1/live-mqtt.js';
 import { createBuffers, num, prune, type Buffers } from './buffers.js';
 import { applyReplayControl, clock, newReplayState, replayNow, type ReplayState } from './clock.js';
-import { buildTick, buildTiming } from './frames.js';
+import { buildTick, buildTiming, trackFlag } from './frames.js';
+import { classification } from '../derive/result.js';
 import { ingest } from './ingest.js';
 import {
   circuitPayload,
@@ -68,6 +80,8 @@ const PIT_LANE_RETRY_MS = 60_000;
 const MAX_PIT_LANE_ATTEMPTS = 4;
 /** Tries before concluding a session has no position data at all. */
 const MAX_EMPTY_TRACK_ATTEMPTS = 3;
+/** A session whose result never appears will not start producing one. */
+const MAX_RESULT_ATTEMPTS = 4;
 const NO_POSITIONS_TEXT =
   'No usable car positions for this session, so the track and cars cannot be drawn.';
 
@@ -95,6 +109,9 @@ export class Feed {
   private track: TrackState | null = null;
   private provisional: Transform | null = null;
   private trackAttemptAt = 0;
+  /** The final classification, once the session has finished. */
+  private result: SessionResult | null = null;
+  private resultAttempts = 0;
   /** Attempts where a reference lap existed but had no positions behind it. */
   private trackEmptyAttempts = 0;
   /** Set once we conclude this session simply has no position data. */
@@ -121,6 +138,8 @@ export class Feed {
     this.provisional = null;
     this.trackAttemptAt = 0;
     this.trackEmptyAttempts = 0;
+    this.result = null;
+    this.resultAttempts = 0;
     this.trackUnavailable = false;
     this.pitLaneAttemptAt = 0;
     this.pitLaneAttempts = 0;
@@ -481,6 +500,35 @@ export class Feed {
     }
   }
 
+  /**
+   * The final classification, fetched once the chequered flag has fallen.
+   *
+   * Asked for only when the session is actually over, because upstream has
+   * nothing to say before then, and only a few times, so a session whose
+   * result never appears does not cost a request a minute for ever. It goes
+   * out on hello rather than on every timing frame: twenty-odd rows that will
+   * never change again have no business being repeated once a second.
+   */
+  private async ensureResult(gen: number): Promise<void> {
+    if (this.result || !this.session) return;
+    if (this.resultAttempts >= MAX_RESULT_ATTEMPTS) return;
+    if (trackFlag(this.buffers, this.clock()) !== 'CHEQUERED') return;
+
+    this.resultAttempts++;
+    try {
+      const rows = await this.api.get<SessionResultRow>('session_result', [
+        ['session_key', '=', this.session.session_key as number],
+      ]);
+      if (gen !== this.generation) return;
+      if (rows.length === 0) return;
+      this.result = classification(rows, this.buffers, this.clock());
+      // Hello is how the result reaches anyone already watching.
+      this.broadcastHello();
+    } catch (e) {
+      if (!(e instanceof LockedError)) console.error('session result', message(e));
+    }
+  }
+
   circuitPayload(): Circuit | null {
     return circuitPayload(this.track, this.provisional);
   }
@@ -629,6 +677,7 @@ export class Feed {
       this.maybeProvisionalTransform();
       await this.ensureTrack(gen);
       await this.ensurePitLane(gen);
+      await this.ensureResult(gen);
       return;
     }
 
@@ -652,6 +701,7 @@ export class Feed {
     this.maybeProvisionalTransform();
     await this.ensureTrack(gen);
     await this.ensurePitLane(gen);
+    await this.ensureResult(gen);
   }
 
   // ---------- MQTT ----------
@@ -764,6 +814,7 @@ export class Feed {
       circuit: this.circuitPayload(),
       status: this.statusPayload(),
       canLive: this.canLive(),
+      result: this.result,
     });
   }
 
