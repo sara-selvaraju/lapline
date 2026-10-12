@@ -172,9 +172,16 @@ if (opened) {
 }
 
 // ---- circuit detail layout (M3) ----
+// Running again: the badges must hold still with the field moving, which is
+// the condition the viewer actually sees.
+await fetch(`${URLBASE}/api/control`, {
+  method: 'POST',
+  headers: { ...headers, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ playing: true }),
+});
 // The default view, which is what the acceptance check is about.
 await page.getByRole('button', { name: 'Tilt', exact: true }).click();
-await page.waitForTimeout(1200);
+await page.waitForTimeout(2000);
 
 console.log('\ncircuit detail');
 const layout = await page.evaluate(() => {

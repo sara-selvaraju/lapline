@@ -44,6 +44,23 @@ export type CameraPreset = 'map' | 'tilt' | 'chase';
  */
 const BADGE_KEY = -1000;
 
+/** How quickly a turn badge fades back in once a car label has passed. */
+const BADGE_FADE_PER_S = 6;
+
+/** How far a hidden badge must be clear before it returns, in pixels. */
+const BADGE_UNBLOCK_PAD = 6;
+
+/** How quickly a car label slides to the position the resolver chose. */
+const LABEL_EASE_PER_S = 10;
+
+/** How long a badge must stay clear before it starts coming back, in ms. */
+const BADGE_RETURN_MS = 400;
+
+/** Whether two screen rectangles meet. */
+function overlaps(a: Obstacle, b: Obstacle): boolean {
+  return a.right > b.left && a.left < b.right && a.bottom > b.top && a.top < b.bottom;
+}
+
 /** How the camera sits for each preset, as a direction and a distance factor. */
 const PRESETS: Record<CameraPreset, { dir: THREE.Vector3; fit: number }> = {
   // Straight down: the whole circuit, no perspective.
@@ -400,7 +417,7 @@ export class Scene {
       if (car.label.visible) setLabelSelected(car, n === sel);
     }
 
-    this.layOutLabels(sel, rows);
+    this.layOutLabels(sel, rows, now, dt);
 
     // Follow, and the chase camera, both track the selected car.
     const target = sel != null ? this.cars.get(sel) : undefined;
@@ -416,35 +433,30 @@ export class Scene {
    * Keeps visible labels off each other. Projecting to screen space is the only
    * way to judge this: two cars far apart in the world can sit on top of each
    * other on screen, and which pairs collide changes as the camera moves.
+   *
+   * Badges and car labels are laid out separately, and deliberately. A badge
+   * marks a corner, and the field streams past every corner continuously, so
+   * nudging badges around moving car labels meant re-deciding their positions
+   * every frame: the resolver is greedy and order-dependent, so a car creeping
+   * a few pixels could flip the order and throw a badge a quarter of the way
+   * across the circuit, then snap it back. Badges therefore avoid only things
+   * that hold still — each other and the camera group — and fade out of the
+   * way of a car label instead of dodging it.
    */
-  private layOutLabels(sel: number | null, rows: readonly { n: number; p: number | null }[]): void {
+  private layOutLabels(
+    sel: number | null,
+    rows: readonly { n: number; p: number | null }[],
+    now: number,
+    dt: number,
+  ): void {
     const r = this.canvas.getBoundingClientRect();
     if (r.width === 0) return;
     const leader = rows.find((row) => row.p === 1)?.n;
+    const obstacles = this.obstacles();
 
+    // Car labels first, as M2 placed them: they hold the positions, and the
+    // selected car holds its place ahead of the leader, ahead of the rest.
     this.labelBoxes.length = 0;
-
-    // Turn badges join the same pass. docs/DESIGN.md asks for them "nudged
-    // clear of car labels", and a car label is the more urgent thing to read,
-    // so badges sort last and move around whatever is already placed.
-    for (let i = 0; i < this.badges.length; i++) {
-      const b = this.badges[i]!;
-      this.projected.copy(b.base).project(this.camera);
-      if (this.projected.z > 1) {
-        b.sprite.visible = false;
-        continue;
-      }
-      b.sprite.visible = true;
-      this.labelBoxes.push({
-        n: BADGE_KEY - i,
-        x: ((this.projected.x + 1) / 2) * r.width,
-        y: ((1 - this.projected.y) / 2) * r.height,
-        width: b.sprite.scale.x / PX,
-        height: b.sprite.scale.y / PX,
-        priority: 3,
-      });
-    }
-
     for (const [n, car] of this.cars) {
       if (!car.label.visible) continue;
       this.projected.copy(car.group.position).add(this.labelOffset).project(this.camera);
@@ -459,70 +471,101 @@ export class Scene {
         y: ((1 - this.projected.y) / 2) * r.height,
         width: car.label.scale.x / PX,
         height: car.label.scale.y / PX,
-        // The selected car holds its place, then the leader, then the rest.
         priority: n === sel ? 0 : n === leader ? 1 : 2,
       });
     }
-
-    const obstacles = this.obstacles();
-    const offsets = resolveCollisions(this.labelBoxes, 2, obstacles);
-    for (const [n, dyPx] of offsets) {
-      if (n <= BADGE_KEY) {
-        const b = this.badges[BADGE_KEY - n];
-        if (!b) continue;
-        b.sprite.position
-          .copy(b.base)
-          .setY(b.base.y + this.worldLiftForScreenOffset(b.base, dyPx, r.height));
-        continue;
-      }
+    // Ease the labels into place rather than snapping. The resolver is greedy
+    // and order-dependent, so two cars drawing level can swap which of them
+    // holds its place and which gives way, and the answer jumps. Measured at
+    // Singapore, a label moved 41 world units between two frames. Easing keeps
+    // the decision while losing the teleport — and since a badge yields to
+    // whatever a label covers, a steady label is what stops badges blinking.
+    const labelOffsets = resolveCollisions(this.labelBoxes, 2, obstacles);
+    const ease = Math.min(1, (dt / 1000) * LABEL_EASE_PER_S);
+    for (const [n, dyPx] of labelOffsets) {
       const car = this.cars.get(n);
       if (!car) continue;
-      // Measured the same way as the badges, so the label lands where the
-      // collision pass put it and the badges that moved around it stay clear.
+      car.labelDy += (dyPx - car.labelDy) * ease;
       const base = car.group.position.clone().setY(car.group.position.y + this.labelBase);
-      car.label.position.set(0, this.labelBase + this.worldLiftForScreenOffset(base, dyPx, r.height), 0);
+      car.label.position.set(0, this.labelBase + this.worldLiftForScreenOffset(base, car.labelDy, r.height), 0);
     }
+    // Where the labels ended up, not where they started: a badge has to clear
+    // the label's resolved position, which is the one the viewer sees.
+    const labelBoxes = this.labelBoxes.map((b) => this.rectAfter(b, this.cars.get(b.n)?.labelDy ?? 0));
 
-    this.hideUnplaceableBadges(obstacles, r.width, r.height);
+    // Badges next, against each other and the camera group only. Nothing in
+    // that set moves unless the camera does, so a badge's position is steady.
+    this.labelBoxes.length = 0;
+    for (let i = 0; i < this.badges.length; i++) {
+      const b = this.badges[i]!;
+      this.projected.copy(b.base).project(this.camera);
+      if (this.projected.z > 1) {
+        b.sprite.visible = false;
+        b.fade = 0;
+        b.clearSince = 0;
+        continue;
+      }
+      this.labelBoxes.push({
+        n: BADGE_KEY - i,
+        x: ((this.projected.x + 1) / 2) * r.width,
+        y: ((1 - this.projected.y) / 2) * r.height,
+        width: b.sprite.scale.x / PX,
+        height: b.sprite.scale.y / PX,
+        priority: 3,
+      });
+    }
+    const badgeOffsets = resolveCollisions(this.labelBoxes, 2, obstacles);
+    const placed = new Map(this.labelBoxes.map((b) => [b.n, b]));
+
+    for (const [n, dyPx] of badgeOffsets) {
+      const b = this.badges[BADGE_KEY - n];
+      const box = placed.get(n);
+      if (!b || !box) continue;
+      b.sprite.position.copy(b.base).setY(b.base.y + this.worldLiftForScreenOffset(b.base, dyPx, r.height));
+
+      // Fade for anything it could not be placed clear of: a car label, which
+      // it is not allowed to dodge, or the camera group when there was nowhere
+      // above it to go. A car label and a camera control are both worth more
+      // than a turn number, and a badge shoved off its corner names nothing.
+      // Hysteresis: a hidden badge has to be clear by a margin before it comes
+      // back, so a car label sliding along its edge cannot toggle it frame by
+      // frame. Without this a badge by the racing line blinks several times a
+      // second as a label creeps past.
+      const pad = b.fade > 0.02 ? 0 : BADGE_UNBLOCK_PAD;
+      const rect = this.rectAfter(box, dyPx, pad);
+      const blocked =
+        labelBoxes.some((l) => overlaps(rect, l)) || obstacles.some((o) => overlaps(rect, o));
+      // Out at once, back in gently. Going instantly means a badge never
+      // actually sits over a car label, and the abrupt half of the change is
+      // the one nobody notices — the car label arriving is the eye's event.
+      // Easing the return is what stops a badge flickering as cars stream by.
+      if (blocked) {
+        b.clearSince = 0;
+        b.fade = 0;
+      } else {
+        // Clear, but not back yet: it has to stay clear for a moment first.
+        // A pack running line astern sweeps labels back and forth across a
+        // badge, and without this the badge answers every one of them.
+        if (b.clearSince === 0) b.clearSince = now;
+        if (now - b.clearSince >= BADGE_RETURN_MS) {
+          b.fade += (1 - b.fade) * Math.min(1, (dt / 1000) * BADGE_FADE_PER_S);
+        }
+      }
+      const material = b.sprite.material as THREE.SpriteMaterial;
+      material.opacity = b.fade;
+      // Fully faded counts as not drawn, so the layout checks agree with the eye.
+      b.sprite.visible = b.fade > 0.02;
+    }
   }
 
-  /**
-   * Drops any turn badge the nudge could not get clear.
-   *
-   * docs/DESIGN.md asks for badges "nudged clear of car labels and controls",
-   * but a badge beside a corner at the edge of the view sometimes has nowhere
-   * to go: the resolver only moves things up the screen, and above this one is
-   * the camera group. Hiding it is the better answer. A car label and a camera
-   * control both matter more than a turn number, and a badge shoved halfway
-   * across the view no longer marks the corner it names. Visibility is decided
-   * afresh every frame, so it comes back as soon as the view moves.
-   */
-  private hideUnplaceableBadges(obstacles: readonly Obstacle[], widthPx: number, heightPx: number): void {
-    const at = new THREE.Vector3();
-    const rectOf = (sprite: THREE.Sprite): Obstacle | null => {
-      sprite.getWorldPosition(at).project(this.camera);
-      if (at.z > 1) return null;
-      const x = ((at.x + 1) / 2) * widthPx;
-      const y = ((1 - at.y) / 2) * heightPx;
-      const w = sprite.scale.x / PX;
-      const h = sprite.scale.y / PX;
-      return { left: x - w / 2, right: x + w / 2, top: y - h / 2, bottom: y + h / 2 };
+  /** A laid-out box as a screen rectangle, once its offset is applied. */
+  private rectAfter(box: LabelBox, dyPx: number, pad = 0): Obstacle {
+    return {
+      left: box.x - box.width / 2 - pad,
+      right: box.x + box.width / 2 + pad,
+      top: box.y - box.height / 2 + dyPx - pad,
+      bottom: box.y + box.height / 2 + dyPx + pad,
     };
-    const hits = (a: Obstacle, b: Obstacle): boolean =>
-      a.right > b.left && a.left < b.right && a.bottom > b.top && a.top < b.bottom;
-
-    const labels: Obstacle[] = [];
-    for (const [, car] of this.cars) {
-      if (!car.label.visible) continue;
-      const box = rectOf(car.label);
-      if (box) labels.push(box);
-    }
-    for (const b of this.badges) {
-      if (!b.sprite.visible) continue;
-      const box = rectOf(b.sprite);
-      if (!box) continue;
-      if (labels.some((l) => hits(box, l)) || obstacles.some((o) => hits(box, o))) b.sprite.visible = false;
-    }
   }
 
   /**
