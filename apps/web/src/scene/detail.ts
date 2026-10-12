@@ -135,6 +135,10 @@ export interface BadgeSprite {
   base: THREE.Vector3;
   /** The turn it marks, so a failing layout check can name it. */
   number: number;
+  /** Current opacity, eased so a passing car label does not make it blink. */
+  fade: number;
+  /** When it last became unobstructed, or 0 while it is obstructed. */
+  clearSince: number;
 }
 
 /** Turn badges, each pushed out from its apex and clear of the track. */
@@ -151,7 +155,7 @@ export function buildTurnBadges(points: readonly THREE.Vector3[], turns: readonl
     sprite.scale.set(BADGE_PX * PX, BADGE_PX * PX, 1);
     sprite.position.copy(base);
     sprite.renderOrder = 8;
-    out.push({ sprite, base, number: t.number });
+    out.push({ sprite, base, number: t.number, fade: 1, clearSince: 0 });
   }
   return out;
 }

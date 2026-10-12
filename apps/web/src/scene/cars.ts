@@ -43,6 +43,12 @@ export interface Car {
   to: THREE.Vector3 | null;
   t0: number;
   stale: boolean;
+  /**
+   * The label's current collision offset in screen pixels, eased towards
+   * whatever the resolver last asked for. Held per car because the resolver's
+   * answer can change abruptly and the label must not.
+   */
+  labelDy: number;
 }
 
 function roundRect(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
@@ -139,6 +145,7 @@ export function makeCar(n: number, code: string, colour: string): Car {
     to: null,
     t0: 0,
     stale: false,
+    labelDy: 0,
   };
 }
 
