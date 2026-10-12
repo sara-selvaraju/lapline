@@ -23,7 +23,13 @@ import {
   buildYellowOverlays,
   type BadgeSprite,
 } from './detail.js';
-import { labelledDrivers, resolveCollisions, type LabelBox, type Obstacle } from './labels.js';
+import {
+  labelledDrivers,
+  visibleBadges,
+  resolveCollisions,
+  type LabelBox,
+  type Obstacle,
+} from './labels.js';
 import {
   GLOW_HALF_WIDTH,
   PX,
@@ -47,8 +53,14 @@ const BADGE_KEY = -1000;
 /** How quickly a turn badge fades back in once a car label has passed. */
 const BADGE_FADE_PER_S = 6;
 
-/** How far a hidden badge must be clear before it returns, in pixels. */
-const BADGE_UNBLOCK_PAD = 6;
+/**
+ * How far a hidden badge must be clear before it returns, in pixels.
+ *
+ * Small, because the dwell below does most of the steadying. A wide margin
+ * here keeps badges away long after the car has gone, and since they no
+ * longer move aside, one kept out is one not shown at all.
+ */
+const BADGE_UNBLOCK_PAD = 2;
 
 /** How quickly a car label slides to the position the resolver chose. */
 const LABEL_EASE_PER_S = 10;
@@ -56,10 +68,6 @@ const LABEL_EASE_PER_S = 10;
 /** How long a badge must stay clear before it starts coming back, in ms. */
 const BADGE_RETURN_MS = 400;
 
-/** Whether two screen rectangles meet. */
-function overlaps(a: Obstacle, b: Obstacle): boolean {
-  return a.right > b.left && a.left < b.right && a.bottom > b.top && a.top < b.bottom;
-}
 
 /** How the camera sits for each preset, as a direction and a distance factor. */
 const PRESETS: Record<CameraPreset, { dir: THREE.Vector3; fit: number }> = {
@@ -522,32 +530,31 @@ export class Scene {
         priority: 3,
       });
     }
-    const badgeOffsets = resolveCollisions(this.labelBoxes, 2, obstacles);
-    const placed = new Map(this.labelBoxes.map((b) => [b.n, b]));
+    // Badges are never moved, only kept or dropped: one names the corner it
+    // sits beside, so shifting it moves the answer. Car labels and the camera
+    // group are fixed here — a badge gives way to both, never the reverse.
+    //
+    // Hysteresis: a hidden badge is measured a little larger, so it has to be
+    // clear by a margin before it returns and a car label sliding along its
+    // edge cannot toggle it frame by frame.
+    const padded = this.labelBoxes.map((box) => {
+      const b = this.badges[BADGE_KEY - box.n];
+      if (!b || b.fade > 0.02) return box;
+      return { ...box, width: box.width + BADGE_UNBLOCK_PAD * 2, height: box.height + BADGE_UNBLOCK_PAD * 2 };
+    });
+    const shown = visibleBadges(padded, [...labelBoxes, ...obstacles]);
 
-    for (const [n, dyPx] of badgeOffsets) {
-      const b = this.badges[BADGE_KEY - n];
-      const box = placed.get(n);
-      if (!b || !box) continue;
-      b.sprite.position.copy(b.base).setY(b.base.y + this.worldLiftForScreenOffset(b.base, dyPx, r.height));
+    for (const box of this.labelBoxes) {
+      const b = this.badges[BADGE_KEY - box.n];
+      if (!b) continue;
+      // Always exactly on its corner. The only question is whether it is drawn.
+      b.sprite.position.copy(b.base);
 
-      // Fade for anything it could not be placed clear of: a car label, which
-      // it is not allowed to dodge, or the camera group when there was nowhere
-      // above it to go. A car label and a camera control are both worth more
-      // than a turn number, and a badge shoved off its corner names nothing.
-      // Hysteresis: a hidden badge has to be clear by a margin before it comes
-      // back, so a car label sliding along its edge cannot toggle it frame by
-      // frame. Without this a badge by the racing line blinks several times a
-      // second as a label creeps past.
-      const pad = b.fade > 0.02 ? 0 : BADGE_UNBLOCK_PAD;
-      const rect = this.rectAfter(box, dyPx, pad);
-      const blocked =
-        labelBoxes.some((l) => overlaps(rect, l)) || obstacles.some((o) => overlaps(rect, o));
       // Out at once, back in gently. Going instantly means a badge never
       // actually sits over a car label, and the abrupt half of the change is
       // the one nobody notices — the car label arriving is the eye's event.
       // Easing the return is what stops a badge flickering as cars stream by.
-      if (blocked) {
+      if (!shown.has(box.n)) {
         b.clearSince = 0;
         b.fade = 0;
       } else {
@@ -567,12 +574,12 @@ export class Scene {
   }
 
   /** A laid-out box as a screen rectangle, once its offset is applied. */
-  private rectAfter(box: LabelBox, dyPx: number, pad = 0): Obstacle {
+  private rectAfter(box: LabelBox, dyPx: number): Obstacle {
     return {
-      left: box.x - box.width / 2 - pad,
-      right: box.x + box.width / 2 + pad,
-      top: box.y - box.height / 2 + dyPx - pad,
-      bottom: box.y + box.height / 2 + dyPx + pad,
+      left: box.x - box.width / 2,
+      right: box.x + box.width / 2,
+      top: box.y - box.height / 2 + dyPx,
+      bottom: box.y + box.height / 2 + dyPx,
     };
   }
 

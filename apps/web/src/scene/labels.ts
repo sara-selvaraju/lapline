@@ -143,3 +143,43 @@ export function resolveCollisions(
   return offsets;
 }
 
+
+/**
+ * Which turn badges can be drawn where they belong.
+ *
+ * A badge is never moved. It names the corner it sits beside, so shifting it
+ * does not tidy the view, it moves the answer — at Singapore a badge was being
+ * pushed 61px off its apex and landed nearer the next corner's, and another
+ * went clean off the top of the canvas. Nor is a small shift a way out: two
+ * badges only separate once one has moved its whole height clear of the other,
+ * which is already far enough to look detached.
+ *
+ * So a badge is either on its corner or not shown. Where several crowd
+ * together, the topmost wins and the rest are dropped, which at phone size
+ * says more than three overlapping numbers would. `fixed` holds what a badge
+ * must give way to and never displaces: car labels and the camera group.
+ */
+export function visibleBadges(
+  boxes: readonly LabelBox[],
+  fixed: readonly Obstacle[],
+): Set<number> {
+  const shown = new Set<number>();
+  const placed: Obstacle[] = [...fixed];
+
+  // Topmost first, so the same badges survive every frame. Badges do not move
+  // unless the camera does, so this order is stable.
+  for (const b of [...boxes].sort((a, c) => a.y - c.y || a.n - c.n)) {
+    const r = {
+      top: b.y - b.height / 2,
+      bottom: b.y + b.height / 2,
+      left: b.x - b.width / 2,
+      right: b.x + b.width / 2,
+    };
+    if (placed.some((p) => r.right > p.left && r.left < p.right && r.bottom > p.top && r.top < p.bottom)) {
+      continue;
+    }
+    placed.push(r);
+    shown.add(b.n);
+  }
+  return shown;
+}

@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { TowerRow } from '@lapline/shared';
-import { labelledDrivers, resolveCollisions, type LabelBox } from '../src/scene/labels.js';
+import { labelledDrivers, resolveCollisions, type LabelBox, visibleBadges, type Obstacle } from '../src/scene/labels.js';
 
 const row = (n: number, p: number | null, gap: number | string | null): TowerRow => ({
   n,
@@ -205,5 +205,54 @@ describe('resolveCollisions, keeping positions between frames', () => {
     const withNone = resolveCollisions([box(1, 100, 0), box(2, 100, 2)], 2);
     const withEmpty = resolveCollisions([box(1, 100, 0), box(2, 100, 2)], 2, [], new Map());
     expect([...withEmpty]).toEqual([...withNone]);
+  });
+});
+
+describe('visibleBadges', () => {
+  const badge = (n: number, y: number, x = 100): LabelBox => ({
+    n,
+    x,
+    y,
+    width: 17,
+    height: 17,
+    priority: 3,
+  });
+
+  it('shows every badge when nothing is in the way', () => {
+    expect(visibleBadges([badge(1, 50), badge(2, 150)], [])).toEqual(new Set([1, 2]));
+  });
+
+  it('drops the lower of two that overlap rather than moving either', () => {
+    // This is what put turn 12 in the wrong place: it was being shifted 61px
+    // off its apex to dodge its neighbours.
+    const shown = visibleBadges([badge(1, 100), badge(2, 110)], []);
+    expect(shown).toEqual(new Set([1]));
+  });
+
+  it('keeps only one where several crowd a hairpin', () => {
+    const shown = visibleBadges([badge(1, 100), badge(2, 104), badge(3, 108)], []);
+    expect(shown.size).toBe(1);
+  });
+
+  it('gives way to a car label instead of displacing it', () => {
+    const label: Obstacle = { top: 92, bottom: 108, left: 80, right: 120 };
+    expect(visibleBadges([badge(1, 100)], [label])).toEqual(new Set());
+  });
+
+  it('leaves badges elsewhere on the circuit alone', () => {
+    const label: Obstacle = { top: 92, bottom: 108, left: 80, right: 120 };
+    expect(visibleBadges([badge(1, 100), badge(2, 250, 300)], [label])).toEqual(new Set([2]));
+  });
+
+  it('picks the same badges whatever order they arrive in, so none flicker', () => {
+    const boxes = [badge(3, 100), badge(1, 104), badge(2, 108)];
+    const a = visibleBadges(boxes, []);
+    const b = visibleBadges([...boxes].reverse(), []);
+    expect([...a]).toEqual([...b]);
+  });
+
+  it('keeps badges that only touch at the edges', () => {
+    // Exactly adjacent, not overlapping: both are legible, so both stay.
+    expect(visibleBadges([badge(1, 100), badge(2, 117)], []).size).toBe(2);
   });
 });
