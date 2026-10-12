@@ -32,8 +32,8 @@ const tick = (over: Partial<Tick> = {}): Tick => ({
 const timing = (over: Partial<Timing> = {}): Timing => ({
   t: T,
   rows: [
-    { n: 81, p: 1, gap: null, int: null, lap: 5, last: 92, best: 92, tyre: 'SOFT', age: 2, pit: false },
-    { n: 4, p: 2, gap: 1.2, int: 1.2, lap: 5, last: 93, best: 92.5, tyre: 'HARD', age: 9, pit: false },
+    { n: 81, p: 1, gap: null, int: null, lap: 5, last: 92, best: 92, tyre: 'SOFT', age: 2, pit: false, lapFlag: null },
+    { n: 4, p: 2, gap: 1.2, int: 1.2, lap: 5, last: 93, best: 92.5, tyre: 'HARD', age: 9, pit: false, lapFlag: null },
   ],
   lap: 5,
   totalLaps: null,

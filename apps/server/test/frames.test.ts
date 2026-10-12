@@ -134,7 +134,7 @@ describe('currentLap', () => {
   });
 
   it('returns nulls for a driver with no laps', () => {
-    expect(currentLap(b, 99, T)).toEqual({ lap: null, last: null, best: null });
+    expect(currentLap(b, 99, T)).toEqual({ lap: null, last: null, best: null, lastEnd: null });
   });
 });
 
@@ -309,10 +309,13 @@ describe('the timing event', () => {
     expect(buildTiming(createBuffers(), T).t).toBe(T);
   });
 
-  it('declares totalLaps, marshal sectors and battles, empty until later milestones', () => {
+  it('declares totalLaps as null, because OpenF1 publishes no total-lap figure', () => {
     const timing = buildTiming(createBuffers(), T);
-    // OpenF1 publishes no total-lap figure; M3 fills marshal sectors, M4 battles.
     expect(timing.totalLaps).toBeNull();
+  });
+
+  it('has no marshal sectors or battles when race control and intervals are empty', () => {
+    const timing = buildTiming(createBuffers(), T);
     expect(timing.marshalSectors).toEqual([]);
     expect(timing.battles).toEqual([]);
   });

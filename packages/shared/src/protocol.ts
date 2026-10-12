@@ -10,7 +10,7 @@
 import { z } from 'zod';
 
 /** Bump on any incompatible change to the messages below. */
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 export const SSE_EVENTS = ['hello', 'tick', 'timing', 'status', 'circuit', 'ping'] as const;
 export type SseEvent = (typeof SSE_EVENTS)[number];
@@ -223,6 +223,12 @@ export const TowerRowSchema = z.object({
   tyre: z.string().nullable(),
   age: z.number().int().nullable(),
   pit: z.boolean(),
+  /**
+   * Whether the lap just completed was the session's fastest or this driver's
+   * personal best. Decided on the server, because "just completed" is a fact
+   * about lap history that the wire does not otherwise carry.
+   */
+  lapFlag: z.enum(['fastest', 'pb']).nullable(),
 });
 export type TowerRow = z.infer<typeof TowerRowSchema>;
 
@@ -259,7 +265,7 @@ export const TimingSchema = z.object({
   marshalSectors: z.array(MarshalSectorFlagSchema),
   /** The four most recent race control messages, newest first. */
   rc: z.array(RaceControlLineSchema),
-  /** Driver numbers within 1.0 s of the car ahead, under green. Filled from M4. */
+  /** Driver numbers within 1.0 s of the car ahead, under green. */
   battles: z.array(z.number().int()),
 });
 export type Timing = z.infer<typeof TimingSchema>;
