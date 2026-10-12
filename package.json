@@ -25,7 +25,8 @@
     "clean": "rm -rf apps/*/dist packages/*/dist tools/*/dist apps/*/*.tsbuildinfo packages/*/*.tsbuildinfo tools/*/*.tsbuildinfo",
     "layout": "node tools/measure-layout.mjs",
     "scene": "node tools/scene-check.mjs",
-    "circuits": "node tools/circuit-check.mjs"
+    "circuits": "node tools/circuit-check.mjs",
+    "states": "node tools/state-check.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

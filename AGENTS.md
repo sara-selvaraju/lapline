@@ -13,19 +13,18 @@ A personal, non-commercial, phone-first second screen for F1 sessions: a 3D circ
 
 ## Status
 
-M4 done, with one check that cannot be run here. The tower's two rules now
-come off the wire — who is in a battle, and what colour a lap time takes —
-decided in `apps/server/src/derive/` as pure functions, which is where
-`docs/ARCHITECTURE.md` has always put them. The telemetry panel behind the
-driver strip's chevron is built to `DriverDetail.dc.html`: speed, gear,
-throttle, brake and RPM, a 30 s speed trace with braking zones, the cars
-either side, and ahead/behind cycling. Protocol is v4. Next is M5 in
-`docs/BUILD-PLAN.md`.
+M5 done, with one check that cannot be run here. All seven flag states draw
+their own band, and the safety car, red flag and finished layouts are built to
+their artboards: the SC marker and yellow glow, the dimmed track and
+suspension card, and the podium with the final classification. Protocol is v5.
+Next is M6 in `docs/BUILD-PLAN.md`.
 
-Both M4 acceptance checks pass: unit tests for the battle and lap-colour
-rules (`apps/server/test/derive-rules.test.ts`), and purple on exactly one
-row, only on the lap just completed, asserted against mock data
-(`apps/server/test/feed.test.ts`).
+The acceptance check is in two halves, both automated. `npm test` walks the
+mock replay and asserts the flag at each scripted moment; `npm run states`
+drives the same replay in a browser and checks the band's colour, label and
+height and the tower's columns for all eight states. A real bug came out of
+M5's planning: `VSC DEPLOYED` was being read as a full safety car, so both of
+Singapore 2026's virtual safety car periods were reported wrongly.
 
 **Unverified:** "60 fps on the target iPhone", carried over from M2. There is
 no device here, so it is measured in headless Chrome instead — a steady 60 fps
@@ -57,8 +56,9 @@ corners placed, worst 0.51% of span, pit lane derived. See `docs/OPENF1.md`
 for what the failures look like and how a trace is judged.
 
 `npm run layout` measures the rendered screen against the artboard,
-`npm run scene` runs the scene checks and `npm run circuits` checks the
-pipeline against real circuits; the first two fail on drift. Run them for any
+`npm run scene` runs the scene checks, `npm run states` checks every race
+state against its artboard and `npm run circuits` checks the pipeline against
+real circuits; the first three fail on drift. Run them for any
 change to the layout or the 3D view.
 
 Live at https://lapline.live, behind the password. `www.lapline.live` serves the

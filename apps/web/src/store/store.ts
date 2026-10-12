@@ -7,7 +7,20 @@
 // Do not select the whole state anywhere.
 
 import { create } from 'zustand';
-import type { Circuit, Driver, Hello, LiveMeta, ReplayMeta, Status, Tick, Timing, TowerRow, Transform } from '@lapline/shared';
+import type {
+  Circuit,
+  Driver,
+  Hello,
+  LiveMeta,
+  ReplayMeta,
+  SessionResult,
+  Status,
+  Tick,
+  Timing,
+  TowerRow,
+  Transform,
+} from '@lapline/shared';
+import { post } from '../stream/control.js';
 import { DEFAULT_PREFS, loadPrefs, savePrefs, type CameraPreset, type GapMode, type Prefs } from './prefs.js';
 
 /** One sample of the selected car, for the 30-second speed trace. */
@@ -23,6 +36,8 @@ export interface StoreState {
   transform: Transform | null;
   status: Status | null;
   canLive: boolean;
+  /** The final classification, once the session has finished. */
+  result: SessionResult | null;
   tick: Tick | null;
   timing: Timing | null;
   timingByN: Map<number, TowerRow>;
@@ -44,6 +59,8 @@ export interface StoreState {
   scrubbing: boolean;
   /** Driver numbers under the last ambiguous tap, or null when closed. */
   picker: number[] | null;
+  /** Whether the session list sheet is open. */
+  sessionsOpen: boolean;
   history: HistorySample[];
   /** Bumps whenever the circuit's transform changes, so the scene can rebuild. */
   circuitEpoch: number;
@@ -66,6 +83,10 @@ export interface StoreState {
   setFollow: (on: boolean) => void;
   setScrubbing: (on: boolean) => void;
   openPicker: (ns: number[]) => void;
+  openSessions: () => void;
+  closeSessions: () => void;
+  chooseSession: (key: number) => void;
+  replayFromStart: () => void;
   closePicker: () => void;
   clearHistory: () => void;
 }
@@ -95,6 +116,7 @@ export const useStore = create<StoreState>((set, get) => ({
   transform: null,
   status: null,
   canLive: false,
+  result: null,
   tick: null,
   timing: null,
   timingByN: new Map(),
@@ -113,6 +135,7 @@ export const useStore = create<StoreState>((set, get) => ({
   follow: false,
   scrubbing: false,
   picker: null,
+  sessionsOpen: false,
   history: [],
   circuitEpoch: 0,
 
@@ -128,6 +151,7 @@ export const useStore = create<StoreState>((set, get) => ({
         mode: h.mode,
         drivers,
         canLive: h.canLive,
+        result: h.result,
         status: h.status,
         ...(fieldChanged ? { history: [], timing: null, timingByN: new Map() } : {}),
         ...(changed ? { circuit: null, transform: null, circuitEpoch: s.circuitEpoch + 1 } : {}),
@@ -247,6 +271,18 @@ export const useStore = create<StoreState>((set, get) => ({
 
   setFollow: (follow) => set({ follow }),
   setScrubbing: (scrubbing) => set({ scrubbing }),
+  openSessions: () => set({ sessionsOpen: true }),
+  closeSessions: () => set({ sessionsOpen: false }),
+
+  // Both of these ask the server; the feed answers with a fresh hello.
+  chooseSession: (key) => {
+    set({ sessionsOpen: false });
+    void post({ session: key });
+  },
+  replayFromStart: () => {
+    void post({ mode: 'replay', playing: true });
+  },
+
   openPicker: (picker) => set({ picker }),
   closePicker: () => set({ picker: null }),
   clearHistory: () => set({ history: [] }),

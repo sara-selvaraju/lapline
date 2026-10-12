@@ -18,6 +18,8 @@ import { COLORS, FRAME_MS } from './colours.js';
 import {
   buildMarshalTicks,
   buildPitLane,
+  buildSafetyCar,
+  textTexture,
   buildSectorTicks,
   buildTurnBadges,
   buildYellowOverlays,
@@ -87,6 +89,7 @@ export class Scene {
   readonly trackGroup = new THREE.Group();
   readonly detailGroup = new THREE.Group();
   readonly flagGroup = new THREE.Group();
+  readonly scGroup = new THREE.Group();
   readonly carGroup = new THREE.Group();
 
   private readonly canvas: HTMLCanvasElement;
@@ -122,7 +125,15 @@ export class Scene {
     const gridMat = grid.material as THREE.Material;
     gridMat.transparent = true;
     gridMat.opacity = 0.35;
-    this.scene.add(grid, this.backgroundGroup, this.trackGroup, this.detailGroup, this.flagGroup, this.carGroup);
+    this.scene.add(
+      grid,
+      this.backgroundGroup,
+      this.trackGroup,
+      this.detailGroup,
+      this.flagGroup,
+      this.scGroup,
+      this.carGroup,
+    );
 
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
@@ -147,6 +158,8 @@ export class Scene {
     this.clearGroup(this.flagGroup);
     this.badges = [];
     this.worldPoints = [];
+    this.pitLaneLabel = null;
+    this.paintedState = '';
     this.circuit = circuit;
     this.paintedFlags = '';
     this.zx = zx;
@@ -157,21 +170,17 @@ export class Scene {
     const points = raw.map((p) => this.toWorld(p, circuit.transform, zx));
 
     // Glow first: a wide, faint ribbon under the track, like floodlight spill.
-    this.add(
-      this.trackGroup,
-      new THREE.Mesh(
-        this.own(ribbonGeometry(points, GLOW_HALF_WIDTH, 0.01)),
-        this.own(
-          new THREE.MeshBasicMaterial({
-            color: COLORS.flood,
-            transparent: true,
-            opacity: 0.1,
-            side: THREE.DoubleSide,
-            depthWrite: false,
-          }),
-        ),
-      ),
+    // Kept to hand, because a safety car tints it yellow.
+    this.glow = this.own(
+      new THREE.MeshBasicMaterial({
+        color: COLORS.flood,
+        transparent: true,
+        opacity: 0.1,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
     );
+    this.add(this.trackGroup, new THREE.Mesh(this.own(ribbonGeometry(points, GLOW_HALF_WIDTH, 0.01)), this.glow));
 
     // The ribbon itself.
     this.add(
@@ -264,7 +273,10 @@ export class Scene {
         circuit.pitLane.map((p) => this.toWorld(p, circuit.transform, this.zx)),
         points,
       );
-      if (lane) this.detailGroup.add(lane.line, lane.label);
+      if (lane) {
+        this.detailGroup.add(lane.line, lane.label);
+        this.pitLaneLabel = lane.label;
+      }
     }
   }
 
@@ -392,6 +404,12 @@ export class Scene {
   private readonly followTarget = new THREE.Vector3();
   private readonly projected = new THREE.Vector3();
   private readonly labelBoxes: LabelBox[] = [];
+  /** The track's glow, tinted yellow while the field is neutralised. */
+  private glow: THREE.MeshBasicMaterial | null = null;
+  /** What the flag group was last painted for, so it is rebuilt only on change. */
+  private paintedState = '';
+  /** The pit lane's label, which is relabelled while the lane is open. */
+  private pitLaneLabel: THREE.Sprite | null = null;
 
   /**
    * Paints marshal sectors showing a flag. Rebuilt only when the set changes,
@@ -409,9 +427,66 @@ export class Scene {
     }
   }
 
+  /**
+   * What the race state does to the track itself.
+   *
+   * docs/DESIGN.md: the glow tints yellow under a safety car, the pit lane
+   * reads "Pit lane open", and a red flag dims everything so the incident and
+   * the stopped cars are what is left to look at.
+   */
+  private paintState(timing: Timing | null): void {
+    const flag = timing?.flag ?? 'GREEN';
+    const leader = timing?.rows.find((r) => r.p === 1)?.n ?? null;
+    const neutralised = flag === 'SC' || flag === 'SC ENDING';
+    // The leader's position is not known on the very first frame after a
+    // flag change, so the marker's presence is part of the key: without it
+    // the early return below would cache a state that never got drawn.
+    const placed = leader != null && Boolean(this.cars.get(leader)?.to);
+    const key = `${flag}:${leader}:${placed}`;
+    if (key === this.paintedState) return;
+    this.paintedState = key;
+
+    if (this.glow) {
+      this.glow.color.set(neutralised ? COLORS.yellow : COLORS.flood);
+      this.glow.opacity = neutralised ? 0.12 : 0.1;
+    }
+
+    // A red flag dims the lot. RedFlag.dc.html draws the outline at 0.3 and
+    // its detail fainter still.
+    const red = flag === 'RED';
+    this.trackGroup.traverse((o) => {
+      const m = (o as THREE.Mesh).material as THREE.Material | undefined;
+      if (m && 'opacity' in m) {
+        const base = (m.userData.baseOpacity as number | undefined) ?? (m as THREE.Material & { opacity: number }).opacity;
+        m.userData.baseOpacity = base;
+        (m as THREE.Material & { opacity: number }).opacity = red ? base * 0.3 : base;
+        m.transparent = true;
+      }
+    });
+    this.detailGroup.visible = !red;
+
+    // docs/DESIGN.md: the pit lane reads "Pit lane open" under a safety car.
+    if (this.pitLaneLabel) {
+      const tex = textTexture(neutralised ? 'Pit lane open' : 'Pit lane', 11, neutralised ? '#f2ebdd' : '#8c9ab5');
+      const old = this.pitLaneLabel.material.map;
+      this.pitLaneLabel.material.map = tex;
+      this.pitLaneLabel.material.needsUpdate = true;
+      old?.dispose();
+      const hPx = tex.userData.heightPx as number;
+      this.pitLaneLabel.scale.set(hPx * PX * (tex.userData.aspect as number), hPx * PX, 1);
+    }
+
+    this.clearGroup(this.scGroup);
+    if (!neutralised || leader == null) return;
+    const car = this.cars.get(leader);
+    if (!car?.to) return;
+    for (const o of buildSafetyCar(this.worldPoints, car.to)) this.scGroup.add(o);
+  }
+
   private onFrame(now: number, dt: number): void {
     const { sel, follow, allLabels, timing } = storeState();
     this.paintFlags(timing);
+    this.paintState(timing);
     const rows = timing?.rows ?? [];
     const labelled = labelledDrivers(rows, sel, allLabels);
 

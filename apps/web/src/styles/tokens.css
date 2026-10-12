@@ -17,6 +17,8 @@
   --green: #2bb673;        /* track green, throttle */
   --yellow: #f5b700;       /* yellow, SC and VSC, reconnecting */
   --red: #e5383b;          /* red flag, brake, live dot */
+  /* RedFlag.dc.html sets the band's text in pure white, not flood. */
+  --white: #ffffff;
   --purple: #b794ff;       /* fastest lap of the session */
   --pb: #4cd08e;           /* personal best lap */
 
@@ -58,6 +60,8 @@
   --h-flag-label: 28px;
   --h-header: 56px;
   --h-track: 290px;
+  /* Finished.dc.html: the podium stands where the track was. */
+  --h-podium: 250px;
   /* DriverDetail.dc.html: the track gives up this much to the open panel. */
   --h-track-expanded: 236px;
   --h-strip: 88px;

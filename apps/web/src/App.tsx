@@ -4,7 +4,9 @@ import { ControlsBar } from './ui/ControlsBar.js';
 import { DriverStrip } from './ui/DriverStrip.js';
 import { FlagBand } from './ui/FlagBand.js';
 import { Header } from './ui/Header.js';
+import { Finished } from './ui/Finished.js';
 import { Overlay } from './ui/Overlay.js';
+import { SessionPicker } from './ui/SessionPicker.js';
 import { TelemetryPanel } from './ui/TelemetryPanel.js';
 import { TimingTower } from './ui/TimingTower.js';
 import { TrackArea } from './ui/TrackArea.js';
@@ -16,6 +18,22 @@ export function App(): React.JSX.Element {
   // everything the strip does and more, so showing both would be saying the
   // speed twice.
   const expanded = useStore((s) => s.expanded && s.sel != null);
+  // Finished.dc.html drops the track and the strip for the podium and the
+  // classification. Only once the result is actually in: a chequered flag with
+  // nothing to show would be a worse screen than the one it replaces.
+  const finished = useStore((s) => s.timing?.flag === 'CHEQUERED' && s.result != null);
+
+  if (finished) {
+    return (
+      <>
+        <FlagBand />
+        <Header />
+        <Finished />
+        <SessionPicker />
+        <Overlay />
+      </>
+    );
+  }
 
   return (
     <>

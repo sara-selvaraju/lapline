@@ -5,6 +5,11 @@ import { useStore } from '../store/store.js';
 function LivePill(): React.JSX.Element | null {
   const mode = useStore((s) => s.mode);
   const delayS = useStore((s) => s.live?.delayS ?? null);
+  const finished = useStore((s) => s.timing?.flag === 'CHEQUERED' && s.result != null);
+
+  // Finished.dc.html replaces the pill with plain text: there is nothing live
+  // about a race that is over, and nothing to sync to.
+  if (finished) return <span className="finished-note">Race finished</span>;
 
   if (mode === 'live') {
     return (
@@ -26,6 +31,7 @@ function LivePill(): React.JSX.Element | null {
 export function Header(): React.JSX.Element {
   const session = useStore((s) => s.session);
   const lap = useStore((s) => s.timing?.lap ?? null);
+  const finished = useStore((s) => s.timing?.flag === 'CHEQUERED' && s.result != null);
   // OpenF1 publishes no total-lap figure, so the artboard's "23/62" shows as
   // "23" until a source for the total turns up.
   const totalLaps = useStore((s) => s.timing?.totalLaps ?? null);
@@ -34,12 +40,18 @@ export function Header(): React.JSX.Element {
     <header className="header">
       <div className="header-title">
         <span className="circuit">{session ? session.circuit || session.country : 'Connecting'}</span>
-        {lap != null && (
-          <span className="lap">
-            Lap <b>{lap}</b>
-            {totalLaps != null && `/${totalLaps}`}
-          </span>
-        )}
+        {lap != null &&
+          (finished ? (
+            // A finished race is a distance, not a position in one.
+            <span className="lap">
+              <b>{lap}</b> laps
+            </span>
+          ) : (
+            <span className="lap">
+              Lap <b>{lap}</b>
+              {totalLaps != null && `/${totalLaps}`}
+            </span>
+          ))}
       </div>
       <div className="header-right">
         <LivePill />

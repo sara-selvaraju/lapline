@@ -7,6 +7,7 @@ import { CarPicker } from './CarPicker.js';
 import { getScene, setScene } from '../scene/instance.js';
 import { Scene, type CameraPreset } from '../scene/Scene.js';
 import { useStore } from '../store/store.js';
+import { RedFlagCard } from './RedFlagCard.js';
 
 /** Sentence case: race control shouts in capitals. */
 function sentence(msg: string): string {
@@ -23,6 +24,9 @@ export function TrackArea(): React.JSX.Element {
   const ref = useRef<HTMLCanvasElement>(null);
   const select = useStore((s) => s.select);
   const expanded = useStore((s) => s.expanded && s.sel != null);
+  // RedFlag.dc.html takes the camera group away: nothing is moving, and the
+  // card explaining the stoppage needs the room.
+  const red = useStore((s) => s.timing?.flag === 'RED');
   const openPicker = useStore((s) => s.openPicker);
   const rc = useStore((s) => s.timing?.rc?.[0]?.msg ?? null);
   const circuit = useStore((s) => s.circuit);
@@ -77,7 +81,7 @@ export function TrackArea(): React.JSX.Element {
           else if (hit.length > 1) openPicker(hit);
         }}
       />
-      <div className="camera-group" role="group" aria-label="Camera">
+      <div className={`camera-group${red ? ' is-hidden' : ''}`} role="group" aria-label="Camera">
         {PRESETS.map(([value, label]) => (
           <button
             key={value}
@@ -91,6 +95,7 @@ export function TrackArea(): React.JSX.Element {
       </div>
       {rc && <p className="race-control">{sentence(rc)}</p>}
       <CarPicker />
+      <RedFlagCard />
     </section>
   );
 }

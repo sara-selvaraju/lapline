@@ -27,6 +27,8 @@ describe('colour tokens match docs/DESIGN.md', () => {
     green: '#2bb673',
     yellow: '#f5b700',
     red: '#e5383b',
+    // RedFlag.dc.html sets the band's text in white rather than flood.
+    white: '#ffffff',
     purple: '#b794ff',
     pb: '#4cd08e',
     'tyre-soft': '#ff4d4f',
