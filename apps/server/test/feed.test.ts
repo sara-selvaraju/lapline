@@ -325,3 +325,83 @@ describe('a session that has left its live window', () => {
     }
   }, 30_000);
 });
+
+describe('a session upstream has no positions for', () => {
+  // Monaco 2026 is a real example: laps, timing and telemetry are all there,
+  // but every session of the meeting 404s on location, so no outline can ever
+  // be built. The viewer should be told, and we should stop asking.
+  const PORT2 = 4202;
+  const BASE2 = `http://localhost:${PORT2}`;
+  let blind: ChildProcess;
+
+  beforeAll(async () => {
+    blind = spawn(process.execPath, ['tools/mock-openf1/dist/src/index.js'], {
+      env: { ...process.env, MOCK_PORT: String(PORT2), MOCK_NO_LOCATION: '1' },
+      cwd: new URL('../../..', import.meta.url).pathname,
+      stdio: 'ignore',
+    });
+    for (let i = 0; i < 60; i++) {
+      try {
+        await fetch(`${BASE2}/v1/sessions?year=${new Date().getUTCFullYear()}`);
+        return;
+      } catch {
+        await new Promise((r) => setTimeout(r, 100));
+      }
+    }
+    throw new Error('mock did not start');
+  }, 20_000);
+
+  afterAll(() => blind?.kill());
+
+  it('says so, and stops asking, rather than reporting itself ready', async () => {
+    const api = new OpenF1({ baseUrl: BASE2, minGapMs: 0 });
+    // Count only the outline's own request. It is the one that asks for a
+    // single driver; the replay windows ask for the whole field.
+    let outlineTries = 0;
+    const get = api.get.bind(api);
+    api.get = ((ep: string, filters: ReadonlyArray<readonly [string, string, unknown]> = []) => {
+      if (ep === 'location' && filters.some((f) => f[0] === 'driver_number')) outlineTries++;
+      return get(ep as never, filters as never);
+    }) as typeof api.get;
+    const feed = new Feed(api, { liveTransport: 'rest' });
+    const seen = new Collector();
+    feed.addListener(seen);
+    await feed.boot(String(SPRINT));
+
+    // Attempts are spaced, so wind the clock on rather than waiting for it.
+    const now = Date.now;
+    let offset = 0;
+    Date.now = () => now() + offset;
+    try {
+      for (let i = 0; i < 6; i++) {
+        offset += 60_000;
+        await feed.fetchStep();
+      }
+    } finally {
+      Date.now = now;
+    }
+
+    const status = seen.last('status') as { level: string; text: string } | undefined;
+    expect(status?.level).toBe('warn');
+    expect(status?.text).toMatch(/no usable car positions/i);
+
+    // It tried a few times before concluding that, rather than once.
+    expect(outlineTries).toBeGreaterThanOrEqual(3);
+
+    // And it has given up: more time passing buys no more attempts.
+    const tried = outlineTries;
+    Date.now = () => now() + offset + 600_000;
+    try {
+      await feed.fetchStep();
+      await feed.fetchStep();
+    } finally {
+      Date.now = now;
+    }
+    expect(outlineTries).toBe(tried);
+
+    // The tower still has something to show.
+    expect((seen.last('hello') as { drivers: unknown[] }).drivers.length).toBeGreaterThan(0);
+    feed.removeListener(seen);
+    feed.stop();
+  }, 40_000);
+});

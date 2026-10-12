@@ -15,6 +15,12 @@ export function rowsFor(ep: string, s: MockSession, from: number, to: number): R
   const lim = Math.min(to, s.end, Date.now() - 2000);
   const base = { meeting_key: s.meeting_key, session_key: s.session_key };
 
+  // Reproduces a session that upstream has no positions for. Monaco 2026 is
+  // like this: every session of the meeting 404s on location while laps,
+  // timing and telemetry are all present. Opt-in, so the mock's default
+  // output stays exactly what the prototype's did.
+  if (ep === 'location' && process.env.MOCK_NO_LOCATION === '1') return [];
+
   if (ep === 'location' || ep === 'car_data') {
     const step = 270;
     const j0 = Math.max(0, Math.ceil((from - s.start) / step));

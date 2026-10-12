@@ -80,6 +80,21 @@ Not used yet, but available: `weather`, `team_radio` (coverage dropped sharply i
 - The threshold is scale-relative for the same reason the corner threshold is: coordinates are in whatever units the circuit uses, so an absolute figure is a figure about one circuit.
 - It costs one extra `location` request per session, and only once a stop has happened, so a session with no stops yet costs nothing.
 
+## Position data is not always usable
+
+Checked across eighteen circuits on 12 October 2026 with `npm run circuits`, which runs the shipped pipeline against real sessions. Fourteen were clean. The exceptions matter more than the average.
+
+- **A session can have no `location` at all.** Monaco 2026 (meeting 1286) returns 404 for location on every session of the weekend — practice, qualifying and race — while laps, timing and telemetry are all present. No outline can ever be built there.
+- **A session can have `location` that is worse than none.** Hungary 2026 (session 11342) serves a full complement of rows whose positions repeat only 26 values around the lap: x and y freeze while z keeps counting, then jump to catch up. Every driver and every lap is affected identically, so retrying does not help. A row count cannot tell this apart from a good lap, and it produced corners 11% of the circuit out of place and a pit lane derived from a clean racing lap.
+- **So a trace is judged, not counted.** Across the fourteen good circuits, 99–100% of a lap's samples are distinct positions and the largest step between samples is 3.5% to 6.1% of the circuit's longer axis. Hungary sits at 8% distinct and a 28.7% jump. `usableTrace` in `apps/server/src/feed/track.ts` gates on 60% distinct and a 15% step, which is roughly 2.5× clear of both ends.
+- Where a lap is rejected, the next-fastest is tried, up to three. Where all three fail, the viewer is told the session has no usable positions, and we stop asking — the tower and telemetry still work, so it is a degraded session rather than a broken one.
+
+## Circuits without a `circuit_info_url`
+
+- Two of the 2026 circuits have no MultiViewer file: **Madring** (Madrid) and **Kuala Lumpur**, both new that season. The meeting carries no `circuit_info_url` and the request 404s.
+- Both fall back to curvature on our own outline, which found 14 and 13 turns respectively. That is the degraded mode described above: positions are right, numbering is not authoritative, and there are no marshal sectors.
+- Expect this for any circuit new to the calendar, and re-check before its first race weekend.
+
 ## Volumes and budgets
 
 - One race of location plus car data is about a million rows for 22 cars over two hours.

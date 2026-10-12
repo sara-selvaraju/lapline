@@ -34,7 +34,15 @@ import {
   STATIC_ENDPOINTS,
 } from './schedule.js';
 import { filterSessionList, isLiveWindow, LIVE_POST_MS, pickAutoSession } from './sessions.js';
-import { pickReferenceLap, smoothZ, trackCandidates, transformFor, TRACK_RETRY_MS, type Point } from './track.js';
+import {
+  rankedReferenceLaps,
+  smoothZ,
+  trackCandidates,
+  transformFor,
+  usableTrace,
+  TRACK_RETRY_MS,
+  type Point,
+} from './track.js';
 import { pickPitStops, pitLaneFromTrace, stopWindow, type PitStop } from '../circuit/pitlane.js';
 import { fetchCircuitInfo } from '../circuit/multiviewer.js';
 import { resolveMarkers, sectorBoundaries, turnsFromOutline, type SectorDurations } from '../circuit/resolve.js';
@@ -58,6 +66,10 @@ const IDLE_MS = 60_000;
 const PIT_LANE_RETRY_MS = 60_000;
 /** A circuit whose traces do not give a clean lane will not start to. */
 const MAX_PIT_LANE_ATTEMPTS = 4;
+/** Tries before concluding a session has no position data at all. */
+const MAX_EMPTY_TRACK_ATTEMPTS = 3;
+const NO_POSITIONS_TEXT =
+  'No usable car positions for this session, so the track and cars cannot be drawn.';
 
 export class Feed {
   readonly api: OpenF1;
@@ -83,6 +95,10 @@ export class Feed {
   private track: TrackState | null = null;
   private provisional: Transform | null = null;
   private trackAttemptAt = 0;
+  /** Attempts where a reference lap existed but had no positions behind it. */
+  private trackEmptyAttempts = 0;
+  /** Set once we conclude this session simply has no position data. */
+  private trackUnavailable = false;
   private pitLaneAttemptAt = 0;
   private pitLaneAttempts = 0;
   private mqttLastMsg = 0;
@@ -104,6 +120,8 @@ export class Feed {
     this.track = null;
     this.provisional = null;
     this.trackAttemptAt = 0;
+    this.trackEmptyAttempts = 0;
+    this.trackUnavailable = false;
     this.pitLaneAttemptAt = 0;
     this.pitLaneAttempts = 0;
     this.mqttLastMsg = 0;
@@ -222,7 +240,7 @@ export class Feed {
       await this.loadStatic(gen);
       if (gen !== this.generation) return;
       if (this.mode === 'live') this.startMqtt();
-      this.setStatus('ok', this.mode === 'live' ? 'Live' : 'Replay ready');
+      this.setReadyStatus();
     } catch (e) {
       if (gen !== this.generation) return;
       if (e instanceof LockedError) {
@@ -267,21 +285,45 @@ export class Feed {
   // ---------- track ----------
 
   private async ensureTrack(gen: number): Promise<void> {
-    if (this.track || Date.now() - this.trackAttemptAt < TRACK_RETRY_MS) return;
+    if (this.track || this.trackUnavailable) return;
+    if (Date.now() - this.trackAttemptAt < TRACK_RETRY_MS) return;
     this.trackAttemptAt = Date.now();
+
+    // Laps with no usable positions behind them is the signal that upstream
+    // cannot give us an outline, as opposed to not having a finished lap yet.
+    // Two 2026 sessions are like this: Monaco 404s on location throughout, and
+    // Hungary serves rows whose positions repeat 26 values around the lap.
+    let sawEmptyLap = false;
     for (const c of trackCandidates(this.session!, this.sessions, this.mode)) {
       try {
         const ref = await this.referenceLap(c);
         if (gen !== this.generation) return;
-        if (ref && ref.points.length > 50) {
+        if (ref && ref.points.length > 0) {
+          this.trackEmptyAttempts = 0;
           this.setTrack(ref.points, c.session_name as string, ref.sectors);
           return;
         }
+        // Laps existed, but none of them had positions we could use.
+        if (ref) sawEmptyLap = true;
       } catch (e) {
         // A locked candidate is expected on the free tier; try the next one.
         if (e instanceof LockedError) continue;
         console.error('track', message(e));
       }
+    }
+
+    if (!sawEmptyLap) return;
+    // Several attempts apart, all finding laps but no positions. Stop asking,
+    // and say so: the tower and the telemetry still work, so this is a
+    // degraded session rather than a broken one.
+    // A replay's data is already complete, so one pass over the best laps
+    // settles it and the viewer is told straight away. A live session might
+    // simply not have published positions yet, so there we keep trying for a
+    // couple of minutes before saying anything.
+    const limit = this.mode === 'live' ? MAX_EMPTY_TRACK_ATTEMPTS : 1;
+    if (++this.trackEmptyAttempts >= limit) {
+      this.trackUnavailable = true;
+      this.setStatus('warn', NO_POSITIONS_TEXT);
     }
   }
 
@@ -310,20 +352,33 @@ export class Feed {
         },
       );
     }
-    const lap = pickReferenceLap(lapRows);
-    if (!lap) return null;
-    const start = lap.start as number;
-    const dur = lap.dur as number;
-    const rows = await this.api.get<LocationRow>('location', [
-      ['session_key', '=', sess.session_key as number],
-      ['driver_number', '=', lap.driver],
-      ['date', '>=', iso(start - 500)],
-      ['date', '<', iso(start + dur * 1000 + 500)],
-    ]);
-    const points = rows
-      .filter((r) => !(r.x === 0 && r.y === 0 && r.z === 0))
-      .map((r) => [r.x as number, r.y as number, r.z as number] as Point);
-    return { points, sectors: (lap as { sectors?: SectorDurations | null }).sectors ?? null };
+    // Fastest first, but a lap whose positions are unusable is skipped rather
+    // than accepted: everything else is placed against this trace, so a bad
+    // one puts every corner, sector and pit lane slightly wrong instead of
+    // failing visibly.
+    const candidates = rankedReferenceLaps(lapRows);
+    if (candidates.length === 0) return null;
+    for (const lap of candidates) {
+      const start = lap.start as number;
+      const dur = lap.dur as number;
+      const rows = await this.api.get<LocationRow>('location', [
+        ['session_key', '=', sess.session_key as number],
+        ['driver_number', '=', lap.driver],
+        ['date', '>=', iso(start - 500)],
+        ['date', '<', iso(start + dur * 1000 + 500)],
+      ]);
+      const points = rows
+        .filter((r) => !(r.x === 0 && r.y === 0 && r.z === 0))
+        .map((r) => [r.x as number, r.y as number, r.z as number] as Point);
+      const verdict = usableTrace(points);
+      if (verdict.ok) {
+        return { points, sectors: (lap as { sectors?: SectorDurations | null }).sectors ?? null };
+      }
+      console.error(
+        `track: ${sess.session_name} lap ${lap.n} for ${lap.driver} unusable, ${verdict.reason}`,
+      );
+    }
+    return { points: [], sectors: null };
   }
 
   private setTrack(raw: Point[], source: string, durations: SectorDurations | null): void {
@@ -663,6 +718,17 @@ export class Feed {
   }
 
   // ---------- clients ----------
+
+  /**
+   * "Live" or "Replay ready", unless we already know this session has no
+   * track to draw. Selecting a session says it is ready, and that generic
+   * line must not paper over the more specific warning a failed outline
+   * already published for the very same session.
+   */
+  private setReadyStatus(): void {
+    if (this.trackUnavailable) this.setStatus('warn', NO_POSITIONS_TEXT);
+    else this.setStatus('ok', this.mode === 'live' ? 'Live' : 'Replay ready');
+  }
 
   setStatus(level: FeedStatus['level'], text: string, extra: { freeAt?: string } = {}): void {
     this.status = { level, text, ...extra };

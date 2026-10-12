@@ -41,8 +41,19 @@ leave the racing line, so there is no lane to find, and the derivation fails
 closed rather than drawing one in the wrong place. It is verified against real
 Singapore data instead.
 
-`npm run layout` measures the rendered screen against the artboard and
-`npm run scene` runs the scene checks; both fail on drift. Run them for any
+**Other circuits:** `npm run circuits` runs the shipped pipeline against real
+sessions, a circuit at a time, and reports the outline, how well the circuit
+file's corners land on it, the sectors and the pit lane. Run it for a circuit
+new to the calendar before its first race weekend. Checked across eighteen
+circuits on 12 October 2026: fourteen clean, Madrid and Kuala Lumpur on the
+curvature fallback because they have no circuit file, Monaco and Hungary with
+no usable positions. Austin, the next race, is clean on its 2025 data — all 20
+corners placed, worst 0.51% of span, pit lane derived. See `docs/OPENF1.md`
+for what the failures look like and how a trace is judged.
+
+`npm run layout` measures the rendered screen against the artboard,
+`npm run scene` runs the scene checks and `npm run circuits` checks the
+pipeline against real circuits; the first two fail on drift. Run them for any
 change to the layout or the 3D view.
 
 Live at https://lapline.live, behind the password. `www.lapline.live` serves the
