@@ -1,9 +1,9 @@
 // Building a frame from the buffers at a given clock.
 //
 // Positions are interpolated between the samples either side of the clock, so
-// motion is smooth even though OpenF1 publishes at about 3.7 Hz. Timing rows,
-// the track flag and lap state are derived here too; they move to derive/ at M4,
-// when their rules change.
+// motion is smooth even though OpenF1 publishes at about 3.7 Hz. Everything
+// else here is assembly: the rules themselves live in derive/, as pure
+// functions over the buffers and a clock, so they can be tested on their own.
 //
 // Ported from reference/prototype/lib/feed.js.
 
@@ -21,120 +21,19 @@ import type {
   TrackFlag,
 } from '@lapline/shared';
 import { lastAtOrBefore, type Buffers } from './buffers.js';
+import { battles } from '../derive/battles.js';
+import { currentLap, lapColour } from '../derive/laps.js';
+import { marshalSectorFlags, trackFlag } from '../derive/flags.js';
+import { tyre } from '../derive/tyres.js';
+
+// Re-exported because the frame builders are the only callers outside derive/,
+// and the tests for each rule live beside it now.
+export { currentLap, lapColour, marshalSectorFlags, trackFlag, tyre, battles };
 
 /** A car is stale when its newest sample is older than this. */
 export const STALE_MS = 8000;
 /** Interpolate only when the next sample is closer than this. */
 export const INTERP_GAP_MS = 2500;
-
-export interface LapState {
-  lap: number | null;
-  last: number | null;
-  best: number | null;
-}
-
-/**
- * The lap in progress, the most recently completed lap time, and the best lap
- * completed by `t`. Pit-out laps never count towards the best.
- */
-export function currentLap(buffers: Buffers, n: number, t: number): LapState {
-  const m = buffers.laps.get(n);
-  if (!m) return { lap: null, last: null, best: null };
-  let lap: number | null = null;
-  let last: number | null = null;
-  let lastEnd = -Infinity;
-  let best: number | null = null;
-  for (const l of m.values()) {
-    if (l.start && l.start <= t && (lap == null || l.n > lap)) lap = l.n;
-    if (l.start && l.dur) {
-      const end = l.start + l.dur * 1000;
-      if (end <= t) {
-        if (end > lastEnd) {
-          lastEnd = end;
-          last = l.dur;
-        }
-        if (!l.pitOut && (best == null || l.dur < best)) best = l.dur;
-      }
-    }
-  }
-  return { lap, last, best };
-}
-
-export interface TyreState {
-  tyre: string | null;
-  age: number | null;
-}
-
-/** Compound and age for the stint covering this lap. */
-export function tyre(buffers: Buffers, n: number, lap: number | null): TyreState {
-  const m = buffers.stints.get(n);
-  if (!m || lap == null) return { tyre: null, age: null };
-  let found = null;
-  for (const s of m.values()) if (s.start <= lap && (s.end == null || lap <= s.end)) found = s;
-  if (!found) {
-    // Before the stints feed catches up, fall back to the latest stint started.
-    for (const s of m.values()) if (s.start <= lap && (!found || s.start > found.start)) found = s;
-  }
-  if (!found) return { tyre: null, age: null };
-  return { tyre: found.compound, age: found.age0 + (lap - found.start) };
-}
-
-/**
- * The track flag at `t`, by replaying race control in order.
- *
- * Sector-scoped flags are ignored: they colour a marshal sector, not the track.
- * Marshal-sector flags and a proper state machine arrive in M3 and M5.
- */
-export function trackFlag(buffers: Buffers, t: number): TrackFlag {
-  let flag: TrackFlag = 'GREEN';
-  for (const [rt, r] of buffers.rc) {
-    if (rt > t) break;
-    const msg = (r.message || '').toUpperCase();
-    if (r.category === 'SafetyCar' || msg.includes('SAFETY CAR')) {
-      if (msg.includes('VIRTUAL') && msg.includes('DEPLOYED')) flag = 'VSC';
-      else if (msg.includes('DEPLOYED')) flag = 'SC';
-      else if (msg.includes('ENDING') || msg.includes('IN THIS LAP')) {
-        flag = flag === 'VSC' ? 'VSC ENDING' : 'SC ENDING';
-      }
-      continue;
-    }
-    if (r.category === 'Flag' && (r.scope === 'Track' || !r.scope)) {
-      const f = (r.flag || '').toUpperCase();
-      if (f === 'GREEN' || f === 'CLEAR') flag = 'GREEN';
-      else if (f === 'RED') flag = 'RED';
-      else if (f === 'CHEQUERED') flag = 'CHEQUERED';
-      else if (f.includes('YELLOW')) flag = 'YELLOW';
-    }
-  }
-  return flag;
-}
-
-/**
- * Which marshal sectors are showing a flag at `t`.
- *
- * Race control sends these as a running commentary rather than a state: a
- * YELLOW at a sector, then later a CLEAR at the same sector. Replaying them in
- * order gives the set standing at any moment.
- *
- * Scope is what separates these from the track-wide flag. A driver-scoped blue
- * flag is about one car and a track-scoped red is about everyone; only
- * sector-scoped rows belong to a marshal sector, and Singapore's race carried
- * 18 of them.
- */
-export function marshalSectorFlags(buffers: Buffers, t: number): MarshalSectorFlag[] {
-  const active = new Map<number, SectorFlag>();
-  for (const [rt, r] of buffers.rc) {
-    if (rt > t) break;
-    if (r.scope !== 'Sector' || r.sector == null) continue;
-    const flag = (r.flag || '').toUpperCase();
-    if (flag === 'CLEAR' || flag === 'GREEN') active.delete(r.sector);
-    else if (flag === 'YELLOW') active.set(r.sector, 'YELLOW');
-    else if (flag === 'DOUBLE YELLOW') active.set(r.sector, 'DOUBLE YELLOW');
-  }
-  return [...active.entries()]
-    .map(([sector, flag]) => ({ sector, flag }))
-    .sort((a, b) => a.sector - b.sector);
-}
 
 /** Positions and telemetry for every car with a location sample at or before `t`. */
 export function buildCars(buffers: Buffers, t: number): CarTuple[] {
@@ -177,9 +76,9 @@ export function buildCars(buffers: Buffers, t: number): CarTuple[] {
 }
 
 /**
- * Tower rows, the leader's lap, the flag and the last four race control lines.
- * Sent at 1 Hz as its own event; marshal sectors arrive in M3 and battles in M4,
- * so both are declared in the protocol and empty until then.
+ * Tower rows, the leader's lap, the flag, the last four race control lines,
+ * the marshal sectors showing a flag and who is in a battle. Sent at 1 Hz as
+ * its own event. `totalLaps` stays null because OpenF1 publishes none.
  */
 export function buildTiming(buffers: Buffers, t: number): Timing {
   const rows: TowerRow[] = [];
@@ -207,6 +106,7 @@ export function buildTiming(buffers: Buffers, t: number): Timing {
       tyre: ty.tyre,
       age: ty.age,
       pit: inPit,
+      lapFlag: lapColour(buffers, d.n, t),
     });
   }
   rows.sort((a, b) => (a.p ?? 99) - (b.p ?? 99));
@@ -226,7 +126,7 @@ export function buildTiming(buffers: Buffers, t: number): Timing {
     flag: trackFlag(buffers, t),
     marshalSectors: marshalSectorFlags(buffers, t),
     rc,
-    battles: [],
+    battles: battles(buffers, t),
   };
 }
 
