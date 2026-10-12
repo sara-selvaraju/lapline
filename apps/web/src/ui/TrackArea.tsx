@@ -22,6 +22,7 @@ const PRESETS: Array<[CameraPreset, string]> = [
 export function TrackArea(): React.JSX.Element {
   const ref = useRef<HTMLCanvasElement>(null);
   const select = useStore((s) => s.select);
+  const expanded = useStore((s) => s.expanded && s.sel != null);
   const openPicker = useStore((s) => s.openPicker);
   const rc = useStore((s) => s.timing?.rc?.[0]?.msg ?? null);
   const circuit = useStore((s) => s.circuit);
@@ -59,7 +60,7 @@ export function TrackArea(): React.JSX.Element {
   const down = useRef<{ x: number; y: number } | null>(null);
 
   return (
-    <section className="track" aria-label="Track">
+    <section className={`track${expanded ? ' is-compact' : ''}`} aria-label="Track">
       <canvas
         ref={ref}
         className="track-canvas"

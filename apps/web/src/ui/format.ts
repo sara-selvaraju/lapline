@@ -11,6 +11,19 @@ export const TYRE_LETTER: Record<string, string> = {
 };
 
 /** Australian English, short weekday and time: 'Sat, 9:30 pm'. */
+/**
+ * The gap to the car behind, unsigned.
+ *
+ * DriverDetail.dc.html writes the car ahead as "+0.812" and the car behind as
+ * "0.684". The sign says which way the gap runs, and for the car behind the
+ * label has already said it.
+ */
+export function fmtBehind(v: number | string | null): string {
+  if (v == null) return '–';
+  if (typeof v === 'string') return v;
+  return Math.abs(v).toFixed(3);
+}
+
 /** The compound's colour token, or haze when upstream sent something odd. */
 export function tyreVar(compound: string | null): string {
   const key = (compound ?? '').toLowerCase();

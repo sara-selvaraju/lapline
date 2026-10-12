@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Measures the rendered main screen against the portrait layout table in
-// docs/DESIGN.md and Main.dc.html, and fails if anything drifts.
+// docs/DESIGN.md, Main.dc.html and DriverDetail.dc.html, and fails on drift.
 //
 //   node tools/measure-layout.mjs [--url http://localhost:3000] [--shot path.png]
 //
@@ -121,6 +121,31 @@ const m = await page.evaluate(() => {
 });
 
 if (SHOT) await page.screenshot({ path: SHOT });
+
+// The expanded state has its own artboard, DriverDetail.dc.html: the panel
+// takes the place of the strip and the tower, and the track gives up height.
+let expanded = null;
+const chevron = page.getByRole('button', { name: 'Show telemetry' });
+if (await chevron.isEnabled().catch(() => false)) {
+  await chevron.click();
+  await page.waitForTimeout(600);
+  expanded = await page.evaluate(() => {
+    const h = (sel) => {
+      const el = document.querySelector(sel);
+      return el ? Math.round(el.getBoundingClientRect().height) : null;
+    };
+    return {
+      track: h('.track'),
+      panel: h('.telemetry'),
+      strip: h('.strip'),
+      tower: h('.tower'),
+      speed: getComputedStyle(document.querySelector('.tel-big-value')).fontSize,
+      docScrollHeight: document.documentElement.scrollHeight,
+    };
+  });
+  if (SHOT) await page.screenshot({ path: SHOT.replace(/\.png$/, '-expanded.png') });
+}
+
 await ctx.close();
 await browser.close();
 
@@ -164,6 +189,24 @@ console.log(`  page scroll ${m.docScrollHeight}  (want 844, no vertical overflow
 if (m.circuitSize !== '21px' || m.rowSize !== '17px') failed = true;
 if (m.docScrollHeight > 846) failed = true;
 if (m.canvas === 'missing') failed = true;
+
+if (expanded) {
+  console.log('\nexpanded, against DriverDetail.dc.html');
+  const want = { track: 236, speed: '60px' };
+  const trackOk = Math.abs((expanded.track ?? -1) - want.track) <= TOLERANCE;
+  // The panel stands in for both, so neither should be on screen.
+  const replacedOk = expanded.strip === null && expanded.tower === null;
+  const speedOk = expanded.speed === want.speed;
+  const fits = expanded.docScrollHeight <= 846;
+  if (!trackOk || !replacedOk || !speedOk || !fits || !expanded.panel) failed = true;
+  console.log(`  track       ${expanded.track}  want ${want.track}  ${trackOk ? 'ok' : 'DRIFT'}`);
+  console.log(`  panel       ${expanded.panel}  ${expanded.panel ? 'ok' : 'MISSING'}`);
+  console.log(`  replaces    strip ${expanded.strip ?? 'gone'}, tower ${expanded.tower ?? 'gone'}  ${replacedOk ? 'ok' : 'DRIFT'}`);
+  console.log(`  speed       ${expanded.speed}  want ${want.speed}  ${speedOk ? 'ok' : 'DRIFT'}`);
+  console.log(`  page scroll ${expanded.docScrollHeight}  ${fits ? 'ok' : 'OVERFLOW'}`);
+} else {
+  console.log('\nexpanded: not checked, the telemetry chevron was not available');
+}
 
 console.log(`\nerrors: ${errors.length ? errors.join('; ') : 'none'}`);
 if (errors.length) failed = true;

@@ -18,6 +18,8 @@ export interface Prefs {
   showTurns: boolean;
   showSectors: boolean;
   showPitLane: boolean;
+  /** Whether the telemetry panel is open, kept across sessions. */
+  expanded: boolean;
 }
 
 const KEY = 'lapline';
@@ -31,6 +33,7 @@ export const DEFAULT_PREFS: Prefs = {
   showTurns: true,
   showSectors: true,
   showPitLane: true,
+  expanded: false,
 };
 
 export function loadPrefs(): Prefs {
@@ -48,6 +51,7 @@ export function loadPrefs(): Prefs {
       showTurns: typeof raw.showTurns === 'boolean' ? raw.showTurns : DEFAULT_PREFS.showTurns,
       showSectors: typeof raw.showSectors === 'boolean' ? raw.showSectors : DEFAULT_PREFS.showSectors,
       showPitLane: typeof raw.showPitLane === 'boolean' ? raw.showPitLane : DEFAULT_PREFS.showPitLane,
+      expanded: typeof raw.expanded === 'boolean' ? raw.expanded : DEFAULT_PREFS.expanded,
     };
   } catch {
     return { ...DEFAULT_PREFS };

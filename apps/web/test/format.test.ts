@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { esc, fmtGap, fmtLap, tyreHtml, TYRE_LETTER } from '../src/ui/format.js';
+import { esc, fmtGap, fmtLap, tyreHtml, TYRE_LETTER, fmtBehind } from '../src/ui/format.js';
 
 describe('fmtLap', () => {
   it('formats as m:ss.mmm with a padded seconds field', () => {
@@ -83,5 +83,23 @@ describe('tyreHtml', () => {
 
   it('escapes a compound name rather than trusting it as markup', () => {
     expect(tyreHtml('<b>', 1)).not.toContain('<b>');
+  });
+});
+
+describe('fmtBehind', () => {
+  it('drops the sign, because the label already says which way', () => {
+    expect(fmtBehind(0.684)).toBe('0.684');
+  });
+
+  it('always shows three decimals', () => {
+    expect(fmtBehind(2)).toBe('2.000');
+  });
+
+  it('passes upstream text through', () => {
+    expect(fmtBehind('+1 LAP')).toBe('+1 LAP');
+  });
+
+  it('shows a dash when there is nothing', () => {
+    expect(fmtBehind(null)).toBe('–');
   });
 });

@@ -13,14 +13,19 @@ A personal, non-commercial, phone-first second screen for F1 sessions: a 3D circ
 
 ## Status
 
-M3 done, with one check that cannot be run here. The circuit now carries its
-detail: turns from the meeting's `circuit_info_url` with curvature as a
-fallback, sector boundaries, marshal ticks, marshal-sector yellows, and a pit
-lane derived from a car's position trace through a stop. All three M3
-acceptance checks pass — corners aligned against real Singapore data, the mock
-yellow painting its sector, and no turn badge overlapping a car label or the
-camera group, which `npm run scene` now asserts. Next is M4 in
+M4 done, with one check that cannot be run here. The tower's two rules now
+come off the wire — who is in a battle, and what colour a lap time takes —
+decided in `apps/server/src/derive/` as pure functions, which is where
+`docs/ARCHITECTURE.md` has always put them. The telemetry panel behind the
+driver strip's chevron is built to `DriverDetail.dc.html`: speed, gear,
+throttle, brake and RPM, a 30 s speed trace with braking zones, the cars
+either side, and ahead/behind cycling. Protocol is v4. Next is M5 in
 `docs/BUILD-PLAN.md`.
+
+Both M4 acceptance checks pass: unit tests for the battle and lap-colour
+rules (`apps/server/test/derive-rules.test.ts`), and purple on exactly one
+row, only on the lap just completed, asserted against mock data
+(`apps/server/test/feed.test.ts`).
 
 **Unverified:** "60 fps on the target iPhone", carried over from M2. There is
 no device here, so it is measured in headless Chrome instead — a steady 60 fps
