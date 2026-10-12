@@ -24,7 +24,8 @@
     "screenshot": "node tools/screenshot.mjs",
     "clean": "rm -rf apps/*/dist packages/*/dist tools/*/dist apps/*/*.tsbuildinfo packages/*/*.tsbuildinfo tools/*/*.tsbuildinfo",
     "layout": "node tools/measure-layout.mjs",
-    "scene": "node tools/scene-check.mjs"
+    "scene": "node tools/scene-check.mjs",
+    "circuits": "node tools/circuit-check.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { SessionRow } from '@lapline/shared';
-import { pickReferenceLap, smoothZ, trackCandidates, transformFor, type Point } from '../src/feed/track.js';
+import {
+  pickReferenceLap,
+  rankedReferenceLaps,
+  smoothZ,
+  trackCandidates,
+  transformFor,
+  usableTrace,
+  type LapCandidate,
+  type Point,
+} from '../src/feed/track.js';
 
 const lap = (o: Partial<Parameters<typeof pickReferenceLap>[0][number]>) => ({
   driver: 4,
@@ -113,5 +122,88 @@ describe('transformFor', () => {
 
   it('survives a degenerate trace without dividing by zero', () => {
     expect(transformFor([[5, 5, 5]]).scale).toBe(100);
+  });
+});
+
+describe('usableTrace', () => {
+  /** A circle, which is what a healthy lap looks like to these checks. */
+  const circle = (n = 300, r = 5000): Point[] =>
+    Array.from({ length: n }, (_, i) => {
+      const a = (i / n) * Math.PI * 2;
+      return [Math.round(r * Math.cos(a)), Math.round(r * Math.sin(a)), 100] as Point;
+    });
+
+  it('accepts a normal lap', () => {
+    expect(usableTrace(circle()).ok).toBe(true);
+  });
+
+  it('rejects a trace with too few points to be a lap', () => {
+    expect(usableTrace(circle(20)).ok).toBe(false);
+  });
+
+  it('rejects the Hungary 2026 shape: many rows, few distinct positions', () => {
+    // x and y freeze while z counts on, so the rows look plentiful and the
+    // positions repeat a couple of dozen values around the whole lap.
+    const few = circle(26);
+    const frozen: Point[] = [];
+    for (let i = 0; i < 312; i++) {
+      const p = few[Math.floor(i / 12)]!;
+      frozen.push([p[0], p[1], 100 + i]);
+    }
+    const verdict = usableTrace(frozen);
+    expect(verdict.ok).toBe(false);
+    expect(verdict.reason).toMatch(/distinct/);
+  });
+
+  it('rejects a trace that teleports between samples', () => {
+    const pts = circle();
+    pts[150] = [60_000, 60_000, 100];
+    const verdict = usableTrace(pts);
+    expect(verdict.ok).toBe(false);
+    expect(verdict.reason).toMatch(/jump/);
+  });
+
+  it('allows the step a tight circuit really produces', () => {
+    // Zandvoort is the worst of the 2026 circuits at 6.1% of span; the gate
+    // must not be so tight that a real circuit trips it.
+    const pts = circle(279, 4858);
+    let span = 0;
+    for (const [x] of pts) span = Math.max(span, Math.abs(x) * 2);
+    pts[100] = [pts[100]![0] + Math.round(span * 0.061), pts[100]![1], 100];
+    expect(usableTrace(pts).ok).toBe(true);
+  });
+
+  it('rejects a trace with no extent rather than dividing by zero', () => {
+    expect(usableTrace(Array.from({ length: 100 }, () => [5, 5, 5] as Point)).ok).toBe(false);
+  });
+});
+
+describe('rankedReferenceLaps', () => {
+  const lap = (n: number, dur: number, driver = 1): LapCandidate => ({
+    driver,
+    n,
+    start: 1000 + n,
+    dur,
+    pitOut: false,
+    sectors: null,
+  });
+
+  it('offers several laps, fastest first, so a bad trace is not the end of it', () => {
+    const got = rankedReferenceLaps([lap(5, 90), lap(6, 85), lap(7, 88)]);
+    expect(got.map((l) => l.n)).toEqual([6, 7, 5]);
+  });
+
+  it('still applies the rules about which laps are worth tracing', () => {
+    const bad = [
+      { ...lap(1, 85), n: 1 },
+      { ...lap(5, 30) },
+      { ...lap(6, 85), pitOut: true },
+    ];
+    expect(rankedReferenceLaps(bad)).toEqual([]);
+  });
+
+  it('agrees with pickReferenceLap on the first choice', () => {
+    const laps = [lap(5, 90), lap(6, 85), lap(7, 88)];
+    expect(rankedReferenceLaps(laps)[0]).toEqual(pickReferenceLap(laps));
   });
 });
