@@ -2,7 +2,7 @@
 //
 // This is the one component that shows per-frame values, so it is deliberately
 // small: it selects only the fields it draws, and a 4 Hz re-render of this much
-// markup is cheap. The expanded telemetry panel behind the chevron is M4.
+// markup is cheap. The chevron opens TelemetryPanel, which shows the rest.
 
 import type { CarTuple } from '@lapline/shared';
 import { useStore } from '../store/store.js';
@@ -13,6 +13,8 @@ export function DriverStrip(): React.JSX.Element {
   const driver = useStore((s) => (s.sel == null ? undefined : s.drivers.get(s.sel)));
   const row = useStore((s) => (s.sel == null ? undefined : s.timingByN.get(s.sel)));
   const gapMode = useStore((s) => s.gapMode);
+  const expanded = useStore((s) => s.expanded);
+  const setExpanded = useStore((s) => s.setExpanded);
   // One selector, one array reference per frame, rather than four subscriptions.
   const car = useStore((s) => (s.sel == null ? undefined : s.tick?.cars.find((c) => c[0] === s.sel))) as
     | CarTuple
@@ -58,10 +60,22 @@ export function DriverStrip(): React.JSX.Element {
         </span>
       </div>
 
-      {/* The telemetry panel this opens is M4. */}
-      <button className="icon-button" aria-label="Show telemetry" disabled>
+      <button
+        className="icon-button"
+        aria-label={expanded ? 'Hide telemetry' : 'Show telemetry'}
+        aria-expanded={expanded}
+        disabled={sel == null}
+        onClick={() => setExpanded(!expanded)}
+      >
         <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M6 15l6-6 6 6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d={expanded ? 'M6 9l6 6 6-6' : 'M6 15l6-6 6 6'}
+            stroke="currentColor"
+            strokeWidth="2"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       </button>
     </section>

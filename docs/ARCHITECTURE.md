@@ -131,13 +131,13 @@ promised live data it could not deliver.
 
 | Event | Rate | Carries |
 |---|---|---|
-| `hello` | on connect and on session change | protocol version, session, mode, drivers, session list, circuit (outline and transform; turns, sectors, marshal sectors and the pit lane arrive in M3 and will bump the version), status, whether live is possible |
+| `hello` | on connect and on session change | protocol version, session, mode, drivers, session list, circuit (outline, transform, turns, sectors, marshal sectors and the pit lane), status, whether live is possible |
 | `tick` | 4 per second | session time; per car a compact tuple of number, x, y, z, speed, gear, RPM, throttle, brake and stale; replay or live meta |
 | `timing` | 1 per second | tower rows; leader lap and total laps; track flag; marshal-sector flags; last four race control messages; battles |
 | `status` | on change | level, text, mode, freshness (time of the newest upstream row), auth state, request count |
 | `circuit` | when the outline improves | same circuit block as in `hello` |
 
-`timing` also carries `battles` and `marshalSectors`, declared from v1 and empty until M4 and M3 fill them, and `totalLaps`, which stays null because OpenF1 publishes no total-lap figure.
+`timing` carries `battles` and `marshalSectors`, both filled since M4 and M3, and `totalLaps`, which stays null because OpenF1 publishes no total-lap figure. Each tower row also carries `lapFlag`, the lap colour decided server-side: the rule is about the lap just completed, which the client cannot see from a row's values alone.
 
 The prototype sent timing inside every fourth tick; v1 split it out. A positions tick is about 1 KB and a timing frame about 2 KB, so a two-hour race costs about 45 MB of mobile data.
 

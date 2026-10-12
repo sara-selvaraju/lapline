@@ -598,3 +598,205 @@ button {
   font-size: var(--fs-button);
   color: var(--text-2);
 }
+
+/* ---- telemetry panel (DriverDetail.dc.html) ---- */
+
+/* The track gives up height rather than the panel covering it: the viewer is
+   still watching the cars. */
+.track.is-compact {
+  height: var(--h-track-expanded);
+}
+
+.telemetry {
+  flex: 1;
+  min-height: 0;
+  box-sizing: border-box;
+  padding: 12px var(--gutter);
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  border-radius: 16px 16px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
+}
+
+.tel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.tel-swatch {
+  width: 4px;
+  height: 34px;
+  border-radius: 2px;
+  flex: none;
+}
+.tel-who {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.tel-name {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.tel-full {
+  font-size: 15px;
+  color: var(--haze);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tel-step {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--night);
+  color: var(--flood);
+  display: grid;
+  place-items: center;
+}
+.tel-step:disabled {
+  opacity: 0.4;
+}
+
+.tel-now {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 18px;
+  align-items: end;
+}
+.tel-big {
+  display: flex;
+  flex-direction: column;
+}
+.tel-big-gear {
+  align-items: center;
+}
+.tel-big-value {
+  font-size: 60px;
+  font-weight: 700;
+  line-height: 0.95;
+}
+.tel-gear-value {
+  font-weight: 500;
+}
+.tel-unit {
+  font-size: 14px;
+  color: var(--haze);
+}
+
+.tel-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 4px;
+}
+.tel-bar-row {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--haze);
+}
+.tel-bar-row .bar {
+  height: 8px;
+}
+.tel-bar-value {
+  text-align: right;
+  color: var(--flood);
+}
+.bar-rpm {
+  background: var(--flood);
+  opacity: 0.75;
+}
+
+.tel-trace {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: relative;
+  min-height: 0;
+}
+.tel-trace figcaption {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  color: var(--haze);
+}
+.tel-trace svg {
+  width: 100%;
+  height: 92px;
+  display: block;
+}
+.trace-key {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 4px;
+  background: var(--red);
+}
+.trace-grid {
+  stroke: var(--line);
+  stroke-dasharray: 2 4;
+}
+.trace-grid-label {
+  fill: var(--haze);
+  font-size: 11px;
+  text-anchor: end;
+}
+.trace-line {
+  fill: none;
+  stroke: var(--flood);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.trace-brake {
+  fill: var(--red);
+}
+.trace-note {
+  position: absolute;
+  left: 0;
+  bottom: 26px;
+  font-size: 13px;
+  color: var(--haze);
+}
+
+.tel-stats {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 10px;
+}
+.tel-stat {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.tel-stat dt {
+  font-size: 14px;
+  color: var(--haze);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tel-stat dd {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 600;
+}
+.tel-tyre {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 15px;
+  color: var(--haze);
+}

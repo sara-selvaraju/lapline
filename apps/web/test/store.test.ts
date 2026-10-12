@@ -226,3 +226,61 @@ describe('preferences', () => {
     }
   });
 });
+
+describe('selectByOffset', () => {
+  const field = (): Timing =>
+    timing({
+      rows: [
+        { n: 81, p: 1, gap: null, int: null, lap: 5, last: 92, best: 92, tyre: 'SOFT', age: 2, pit: false, lapFlag: 'fastest' },
+        { n: 4, p: 2, gap: 1.2, int: 1.2, lap: 5, last: 93, best: 92.5, tyre: 'HARD', age: 9, pit: false, lapFlag: null },
+        { n: 16, p: 3, gap: 2.4, int: 1.2, lap: 5, last: 94, best: 93.5, tyre: 'HARD', age: 9, pit: false, lapFlag: null },
+      ],
+    });
+
+  it('moves to the car behind', () => {
+    const s = useStore.getState();
+    s.applyTiming(field());
+    s.select(4);
+    useStore.getState().selectByOffset(1);
+    expect(useStore.getState().sel).toBe(16);
+  });
+
+  it('moves to the car ahead', () => {
+    const s = useStore.getState();
+    s.applyTiming(field());
+    s.select(4);
+    useStore.getState().selectByOffset(-1);
+    expect(useStore.getState().sel).toBe(81);
+  });
+
+  it('stops at the leader rather than wrapping to the back', () => {
+    const s = useStore.getState();
+    s.applyTiming(field());
+    s.select(81);
+    useStore.getState().selectByOffset(-1);
+    expect(useStore.getState().sel).toBe(81);
+  });
+
+  it('stops at the last car rather than wrapping to the front', () => {
+    const s = useStore.getState();
+    s.applyTiming(field());
+    s.select(16);
+    useStore.getState().selectByOffset(1);
+    expect(useStore.getState().sel).toBe(16);
+  });
+
+  it('clears the speed trace, which belonged to the other car', () => {
+    const s = useStore.getState();
+    s.applyTiming(field());
+    s.select(4);
+    useStore.setState({ history: [[1, 200, 50, 0]] });
+    useStore.getState().selectByOffset(1);
+    expect(useStore.getState().history).toEqual([]);
+  });
+
+  it('does nothing when there is no field yet', () => {
+    useStore.setState({ timing: null, sel: 4 });
+    useStore.getState().selectByOffset(1);
+    expect(useStore.getState().sel).toBe(4);
+  });
+});

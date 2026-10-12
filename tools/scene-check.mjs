@@ -181,6 +181,19 @@ await fetch(`${URLBASE}/api/control`, {
 });
 // The default view, which is what the acceptance check is about.
 await page.getByRole('button', { name: 'Tilt', exact: true }).click();
+// Wait for a settled frame rather than sampling blind. The sweep above leaves
+// the view mid-change, and measuring then once reported no car labels at all
+// on a session that plainly had them.
+await page
+  .waitForFunction(
+    () => {
+      const scene = window.__lapline?.scene;
+      if (!scene) return false;
+      return [...scene.cars.values()].some((c) => c.label.visible);
+    },
+    { timeout: 10_000 },
+  )
+  .catch(() => {});
 await page.waitForTimeout(2000);
 
 console.log('\ncircuit detail');

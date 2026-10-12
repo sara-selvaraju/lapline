@@ -38,6 +38,8 @@ export interface StoreState {
   showTurns: boolean;
   showSectors: boolean;
   showPitLane: boolean;
+  /** Whether the telemetry panel is open. */
+  expanded: boolean;
   follow: boolean;
   scrubbing: boolean;
   /** Driver numbers under the last ambiguous tap, or null when closed. */
@@ -53,6 +55,9 @@ export interface StoreState {
   applyTick: (t: Tick) => void;
   applyTiming: (t: Timing) => void;
   select: (n: number, persist?: boolean) => void;
+  /** Moves the selection down (+1) or up (-1) the running order. */
+  selectByOffset: (delta: number) => void;
+  setExpanded: (expanded: boolean) => void;
   setGapMode: (m: GapMode) => void;
   setZx: (zx: number) => void;
   setAllLabels: (on: boolean) => void;
@@ -77,6 +82,7 @@ const persist = (s: StoreState): void => {
     showTurns: s.showTurns,
     showSectors: s.showSectors,
     showPitLane: s.showPitLane,
+    expanded: s.expanded,
   } satisfies Prefs);
 };
 
@@ -103,6 +109,7 @@ export const useStore = create<StoreState>((set, get) => ({
   showTurns: prefs.showTurns,
   showSectors: prefs.showSectors,
   showPitLane: prefs.showPitLane,
+  expanded: prefs.expanded,
   follow: false,
   scrubbing: false,
   picker: null,
@@ -167,6 +174,33 @@ export const useStore = create<StoreState>((set, get) => ({
       // Nothing chosen yet: start on the leader rather than an empty panel.
       const sel = s.sel == null && timing.rows[0]?.p ? timing.rows[0].n : s.sel;
       return { timing, timingByN, sel };
+    }),
+
+  setExpanded: (expanded) =>
+    set((s) => {
+      persist({ ...s, expanded });
+      return { expanded };
+    }),
+
+  /**
+   * Selects the car ahead or behind in the running order.
+   *
+   * Resolved against the tower's own ordering rather than by arithmetic on
+   * position numbers, because positions go missing: a car without one sits at
+   * the bottom, and the order is what the viewer is looking at anyway. Stops
+   * at the ends rather than wrapping, since walking off the back of the field
+   * and reappearing at the front is disorienting on a phone.
+   */
+  selectByOffset: (delta) =>
+    set((s) => {
+      const rows = s.timing?.rows ?? [];
+      if (rows.length === 0) return {};
+      const at = rows.findIndex((r) => r.n === s.sel);
+      const next = rows[at < 0 ? 0 : Math.min(rows.length - 1, Math.max(0, at + delta))];
+      if (!next || next.n === s.sel) return {};
+      const patch = { sel: next.n, history: [] as StoreState['history'], picker: null };
+      persist({ ...s, ...patch });
+      return patch;
     }),
 
   select: (n, persistPref = true) =>

@@ -58,6 +58,8 @@
   --h-flag-label: 28px;
   --h-header: 56px;
   --h-track: 290px;
+  /* DriverDetail.dc.html: the track gives up this much to the open panel. */
+  --h-track-expanded: 236px;
   --h-strip: 88px;
   --h-tower-head: 30px;
   --h-tower-row: 36px;
