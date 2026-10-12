@@ -153,3 +153,57 @@ describe('fixed obstacles', () => {
     expect(spans[1]!.top).toBeGreaterThanOrEqual(spans[0]!.bottom - 0.001);
   });
 });
+
+describe('resolveCollisions, keeping positions between frames', () => {
+  const box = (n: number, y: number, priority = 2): LabelBox => ({
+    n,
+    x: 100,
+    y,
+    width: 40,
+    height: 16,
+    priority,
+  });
+
+  it('places a blocked label just above its blocker, not past it', () => {
+    // Two labels dead on top of each other. The one that gives way should end
+    // up resting on the other, not flung a whole box-height clear of it.
+    const offsets = resolveCollisions([box(1, 100, 0), box(2, 100, 2)], 2);
+    expect(offsets.get(1)).toBe(0);
+    // Its bottom (100 + 8 + dy) should sit a 2px gap above the other's top (92).
+    expect(offsets.get(2)).toBeCloseTo(92 - 2 - 108);
+  });
+
+  it('keeps a held position that is still clear', () => {
+    const held = new Map([[2, -40]]);
+    const offsets = resolveCollisions([box(1, 100, 0), box(2, 100, 2)], 2, [], held);
+    expect(offsets.get(2)).toBe(-40);
+  });
+
+  it('re-solves a held position that has stopped working', () => {
+    // Something has moved into where this label was sitting.
+    const held = new Map([[2, -40]]);
+    const offsets = resolveCollisions([box(1, 60, 0), box(2, 100, 2)], 2, [], held);
+    expect(offsets.get(2)).not.toBe(-40);
+  });
+
+  it('comes home once there is comfortable room', () => {
+    // Nothing in the way at all, so a displaced label returns to its car.
+    const held = new Map([[1, -40]]);
+    const offsets = resolveCollisions([box(1, 100, 2)], 2, [], held);
+    expect(offsets.get(1)).toBe(0);
+  });
+
+  it('does not come home into a tight gap it would only be pushed out of', () => {
+    // Clear at dead-on, but only barely: homing needs a margin, or the label
+    // would return and be displaced again on the next frame.
+    const held = new Map([[2, -40]]);
+    const offsets = resolveCollisions([box(1, 118, 0), box(2, 100, 2)], 2, [], held);
+    expect(offsets.get(2)).toBe(-40);
+  });
+
+  it('behaves as before when no held positions are given', () => {
+    const withNone = resolveCollisions([box(1, 100, 0), box(2, 100, 2)], 2);
+    const withEmpty = resolveCollisions([box(1, 100, 0), box(2, 100, 2)], 2, [], new Map());
+    expect([...withEmpty]).toEqual([...withNone]);
+  });
+});

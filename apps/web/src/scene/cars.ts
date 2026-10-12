@@ -44,11 +44,16 @@ export interface Car {
   t0: number;
   stale: boolean;
   /**
-   * The label's current collision offset in screen pixels, eased towards
-   * whatever the resolver last asked for. Held per car because the resolver's
-   * answer can change abruptly and the label must not.
+   * Where the label is drawn, in screen pixels off its natural place, eased
+   * towards the target below. Held per car because the resolver's answer can
+   * still change abruptly and the label must not.
    */
   labelDy: number;
+  /**
+   * The offset the resolver last settled on. Fed back to it each frame so a
+   * label that is not in anyone's way keeps the place it already has.
+   */
+  labelDyTarget: number;
 }
 
 function roundRect(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
@@ -146,6 +151,7 @@ export function makeCar(n: number, code: string, colour: string): Car {
     t0: 0,
     stale: false,
     labelDy: 0,
+    labelDyTarget: 0,
   };
 }
 
