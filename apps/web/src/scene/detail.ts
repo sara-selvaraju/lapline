@@ -397,6 +397,7 @@ export function buildPitLane(
   );
   line.renderOrder = 6;
 
+  // Relabelled to "Pit lane open" by the scene when a safety car is out.
   const tex = textTexture('Pit lane', 11, '#8c9ab5');
   const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
   const hPx = tex.userData.heightPx as number;
@@ -418,6 +419,54 @@ export function buildPitLane(
   label.position.copy(nearestTo(a) >= nearestTo(b) ? a : b).setY(mid.y + 1.2);
   label.renderOrder = 8;
   return { line, label };
+}
+
+/** docs/DESIGN.md: a yellow diamond with an "SC" chip, ahead of the leader. */
+const SC_PX = 12;
+/** How far ahead of the leader it sits, as a fraction of the lap. */
+const SC_LEAD = 0.01;
+
+/**
+ * The safety car marker.
+ *
+ * Placed just ahead of the leader rather than from its own telemetry, because
+ * OpenF1 publishes no safety car position — which is why docs/DESIGN.md
+ * specifies it that way. It is a marker saying "the field is behind a safety
+ * car here", not a claim about where the car actually is.
+ */
+export function buildSafetyCar(points: readonly THREE.Vector3[], leader: THREE.Vector3): THREE.Object3D[] {
+  if (points.length < 2) return [];
+
+  // The outline point nearest the leader, then a step further round the lap.
+  let at = 0;
+  let best = Infinity;
+  for (let i = 0; i < points.length; i++) {
+    const d = points[i]!.distanceToSquared(leader);
+    if (d < best) {
+      best = d;
+      at = i;
+    }
+  }
+  const ahead = points[(at + Math.max(1, Math.round(points.length * SC_LEAD))) % points.length]!;
+
+  const size = SC_PX * PX;
+  const diamond = new THREE.Mesh(
+    new THREE.PlaneGeometry(size, size),
+    new THREE.MeshBasicMaterial({ color: COLORS.yellow, side: THREE.DoubleSide, depthTest: false }),
+  );
+  diamond.position.copy(ahead).setY(ahead.y + 0.6);
+  diamond.rotation.x = -Math.PI / 2;
+  diamond.rotation.z = Math.PI / 4;
+  diamond.renderOrder = 10;
+
+  const tex = chipTexture('SC');
+  const chip = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+  const hPx = tex.userData.heightPx as number;
+  chip.scale.set(hPx * PX * (tex.userData.aspect as number), hPx * PX, 1);
+  chip.position.copy(ahead).setY(ahead.y + 2.4);
+  chip.renderOrder = 11;
+
+  return [diamond, chip];
 }
 
 export { textTexture };

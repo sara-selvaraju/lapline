@@ -63,6 +63,23 @@ button {
 
 .flag-band[data-labelled='true'] {
   height: var(--h-flag-label);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.flag-icon {
+  flex: none;
+}
+
+/* Finished.dc.html flanks the label with two chequer swatches. */
+.chequer {
+  flex: none;
+  width: 44px;
+  height: 14px;
+  background:
+    conic-gradient(var(--night) 25%, var(--flood) 0 50%, var(--night) 0 75%, var(--flood) 0) 0 0 / 14px 14px;
 }
 
 .flag-yellow,
@@ -72,6 +89,8 @@ button {
 }
 .flag-red {
   background: var(--red);
+  color: var(--white);
+  font-weight: 700;
 }
 .flag-chequered {
   background: var(--flood);
@@ -599,6 +618,19 @@ button {
   color: var(--text-2);
 }
 
+/* ---- tower state variants (docs/DESIGN.md:116) ---- */
+
+/* RedFlag.dc.html drops the lap-time column and widens the gap for its
+   longer header; the other states keep Main's six. */
+.tower-red .tower-head,
+.tower-red .tower-row {
+  grid-template-columns: 26px 4px 1fr 90px 52px;
+}
+
+.tower-red .col-gap {
+  text-align: right;
+}
+
 /* ---- telemetry panel (DriverDetail.dc.html) ---- */
 
 /* The track gives up height rather than the panel covering it: the viewer is
@@ -799,4 +831,251 @@ button {
   gap: 4px;
   font-size: 15px;
   color: var(--haze);
+}
+
+/* ---- finished (Finished.dc.html) ---- */
+
+.podium {
+  flex: none;
+  height: var(--h-podium);
+  box-sizing: border-box;
+  padding: 0 var(--gutter) 16px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.podium-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: 8px;
+  width: 100%;
+}
+
+.step {
+  box-sizing: border-box;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 2px;
+  min-width: 0;
+}
+/* The artboard's unequal heights: the winner stands tallest. */
+.step-second {
+  height: 118px;
+}
+.step-first {
+  height: 146px;
+  background: var(--flood);
+  color: var(--night);
+  border-color: var(--flood);
+}
+.step-third {
+  height: 104px;
+}
+
+.step-title {
+  font-size: 14px;
+  color: var(--haze);
+}
+.step-first .step-title {
+  color: var(--night);
+  opacity: 0.7;
+}
+.step-code {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.1;
+  border-bottom: 3px solid transparent;
+  align-self: flex-start;
+}
+.step-first .step-code {
+  font-size: 30px;
+}
+.step-gap {
+  font-size: 15px;
+  color: var(--text-2);
+}
+.step-first .step-gap {
+  color: var(--night);
+}
+
+.fastest-line {
+  flex: none;
+  margin: 0;
+  padding: 0 var(--gutter) 10px;
+  font-size: 15px;
+  color: var(--haze);
+}
+.fastest-line b {
+  color: var(--purple);
+  font-weight: 600;
+}
+
+.tower-finished {
+  border-top: 1px solid var(--line);
+}
+.tower-finished .tower-head,
+.tower-finished .tower-row {
+  grid-template-columns: 26px 4px 1fr 92px 46px;
+}
+.tower-finished .col-gap,
+.tower-finished .col-stops {
+  text-align: right;
+}
+.col-gap.is-out {
+  color: var(--haze);
+}
+
+.finished-bar {
+  flex: none;
+  box-sizing: border-box;
+  height: var(--h-controls);
+  padding: 0 var(--gutter);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+}
+.finished-bar button {
+  flex: 1;
+  height: 44px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.button-outline {
+  border: 1px solid var(--line);
+  background: var(--night);
+  color: var(--flood);
+}
+.button-primary {
+  border: 0;
+  background: var(--flood);
+  color: var(--night);
+}
+
+/* ---- session sheet ---- */
+
+.sheet-scrim {
+  position: fixed;
+  inset: 0;
+  background: var(--backdrop);
+  display: flex;
+  align-items: flex-end;
+  z-index: 20;
+}
+.sheet {
+  width: 100%;
+  max-height: 70vh;
+  box-sizing: border-box;
+  background: var(--panel);
+  border-radius: 20px 20px 0 0;
+  padding: 8px var(--gutter) max(16px, env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+}
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sheet-head h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+.session-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.session-row {
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: var(--flood);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+}
+.session-row.is-current {
+  color: var(--haze);
+}
+.session-label {
+  font-size: 17px;
+}
+.session-when {
+  font-size: 14px;
+  color: var(--haze);
+}
+
+.podium {
+  position: relative;
+}
+.podium-track {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.22;
+  pointer-events: none;
+}
+.podium-track path {
+  fill: none;
+  stroke: var(--flood);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.podium-steps {
+  position: relative;
+}
+.finished-note {
+  font-size: 16px;
+  color: var(--haze);
+  padding: 0 10px;
+}
+
+/* ---- red flag (RedFlag.dc.html) ---- */
+
+.red-card {
+  position: absolute;
+  left: var(--gutter);
+  top: 18px;
+  width: 224px;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(21, 33, 58, 0.94);
+  border: 1px solid var(--red);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+}
+.red-card-when {
+  font-size: 20px;
+  font-weight: 700;
+}
+.red-card-why {
+  font-size: 15px;
+  color: var(--text-2);
+}
+.red-card-frozen {
+  font-size: 14px;
+  color: var(--haze);
+}
+
+.camera-group.is-hidden {
+  display: none;
 }

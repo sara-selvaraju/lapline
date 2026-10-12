@@ -24,6 +24,30 @@ export function fmtBehind(v: number | string | null): string {
   return Math.abs(v).toFixed(3);
 }
 
+/**
+ * A race duration as h:mm:ss.mmm, which is how the winner's total reads.
+ * Lap times use `fmtLap`; this is for the hour-long figure beside it.
+ */
+export function fmtClock(seconds: number | null): string {
+  if (seconds == null) return '–';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  const ss = s.toFixed(3).padStart(6, '0');
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+}
+
+/**
+ * Race control shouts in capitals; docs/DESIGN.md asks for sentence case.
+ *
+ * Only the shape is changed, never the words: driver codes and car numbers
+ * stay as they came, so "CAR 18 (ORI)" keeps its meaning.
+ */
+export function sentenceCase(msg: string): string {
+  const lower = msg.toLowerCase();
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+}
+
 /** The compound's colour token, or haze when upstream sent something odd. */
 export function tyreVar(compound: string | null): string {
   const key = (compound ?? '').toLowerCase();

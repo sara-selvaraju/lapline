@@ -9,6 +9,7 @@ import {
   progress,
   pitLap,
   lapWobble,
+  suspendedBy,
   v,
   where,
   wallOffset,
@@ -43,6 +44,9 @@ export function rowsFor(ep: string, s: MockSession, from: number, to: number): R
         if (t < from || t >= lim) continue;
         const p = progress(s, d, t);
         const w = where(p);
+        // Stopped means stopped: the clock is suspended for the red flag, so
+        // the telemetry has to agree with the positions that are not moving.
+        const suspended = suspendedBy(t - s.start) > 0 && suspendedBy(t - s.start) < RED_MS;
         if (ep === 'location') {
           out.push({
             ...base,
@@ -53,7 +57,7 @@ export function rowsFor(ep: string, s: MockSession, from: number, to: number): R
             z: Math.round(w.z),
           });
         } else {
-          const moving = p > 0 && p < s.laps;
+          const moving = p > 0 && p < s.laps && !suspended;
           const kmh = moving ? Math.round((v[w.i]! / d.f) * 3.6) : 0;
           const dv = v[(w.i + 6) % N]! - v[w.i]!;
           const brake = moving && dv < -1.5 ? 100 : 0;

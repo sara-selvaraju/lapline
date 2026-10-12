@@ -24,6 +24,7 @@ The source of truth is the design canvas "Lapline redesign" (link in `design/REA
 | `green` | `#2BB673` | Track green, throttle |
 | `yellow` | `#F5B700` | Yellow, SC and VSC, reconnecting |
 | `red` | `#E5383B` | Red flag, brake, live dot |
+| `white` | `#FFFFFF` | Red flag band text only, where `RedFlag.dc.html` overrides `flood` |
 | `purple` | `#B794FF` | Fastest lap of the session |
 | `pb` | `#4CD08E` | Personal best lap |
 | `tyre-soft` | `#FF4D4F` | |
@@ -160,6 +161,25 @@ VSC, VSC ending, safety car ending and yellow use the safety car layout with the
 - Errors say what happened and what to do next, for example "No new data for 18 s. Showing the last known positions. Trying again every 3 s."
 
 ## Open design questions
+
+- **The "ending" bands have no artboard.** `SC ENDING` and `VSC ENDING` keep
+  the safety car's yellow ground and differ only by label, which is what the
+  states table above asks for, but no artboard draws them. Judge them on a
+  device during a race.
+- **The red flag card's reason line** is race control's own message, in
+  sentence case. `RedFlag.dc.html` writes "Barrier repair at turn 7. Restart
+  time to be confirmed.", which no feed publishes; inventing it would be worse
+  than quoting what was actually said.
+- **Cars under a red flag** are drawn where the data puts them. The artboard
+  queues them along the pit lane, which is where they really go, so real
+  positions should show that without being told to; a synthetic queue would be
+  inventing positions.
+- **The driver strip under a red flag** keeps its usual shape rather than the
+  artboard's "Stopped in the pit lane" restructure. A stopped car reads 0 km/h
+  and neutral already, which says the same thing with real numbers.
+- **The safety car marker** is placed just ahead of the leader, as the cars
+  section specifies, because OpenF1 publishes no safety car position. It marks
+  where the field is being held, not where the car is.
 
 - **Glance mode entry:** the artboard shows how to leave it, not how to enter it. Suggestion: a "Glance" option in landscape.
 - **Chase camera:** specified but not drawn. Build it and judge it on a device.

@@ -6,11 +6,28 @@
 // one correctly: a battle is about the interval whatever column is on show,
 // and a lap colour is about the lap just completed, which the view cannot see.
 
+import type { TrackFlag } from '@lapline/shared';
 import { useStore } from '../store/store.js';
 import { fmtGap, fmtLap, tyreVar, TYRE_LETTER } from './format.js';
 
+/**
+ * What the tower shows changes with the race state, per docs/DESIGN.md:116.
+ * Under a safety car the last lap gives way to a count of stops, because the
+ * field is circulating and nobody's lap time means anything; under a red flag
+ * the gaps are the ones the order was frozen at and there are no lap times at
+ * all.
+ */
+type TowerMode = 'racing' | 'neutralised' | 'red';
+
+function towerMode(flag: TrackFlag): TowerMode {
+  if (flag === 'RED') return 'red';
+  if (flag === 'SC' || flag === 'SC ENDING' || flag === 'VSC' || flag === 'VSC ENDING') return 'neutralised';
+  return 'racing';
+}
+
 export function TimingTower(): React.JSX.Element {
   const rows = useStore((s) => s.timing?.rows);
+  const flag = useStore((s) => s.timing?.flag ?? 'GREEN');
   const battling = useStore((s) => s.timing?.battles);
   const drivers = useStore((s) => s.drivers);
   const sel = useStore((s) => s.sel);
@@ -20,24 +37,33 @@ export function TimingTower(): React.JSX.Element {
 
   const list = rows ?? [];
   const inBattle = new Set(battling ?? []);
+  const mode = towerMode(flag);
 
   return (
-    <section className="tower" aria-label="Timing">
+    <section className={`tower tower-${mode}`} aria-label="Timing">
       <div className="tower-head">
         <span className="col-pos">Pos</span>
         <span />
         <span>Driver</span>
-        <button className="gap-toggle" onClick={() => setGapMode(gapMode === 'int' ? 'gap' : 'int')}>
-          {gapMode === 'int' ? 'Interval' : 'To leader'}
-        </button>
+        {mode === 'red' ? (
+          // Nothing is moving, so there is nothing to toggle between.
+          <span className="col-gap">Gap at red flag</span>
+        ) : (
+          <button className="gap-toggle" onClick={() => setGapMode(gapMode === 'int' ? 'gap' : 'int')}>
+            {gapMode === 'int' ? 'Interval' : 'To leader'}
+          </button>
+        )}
         <span>Tyre</span>
-        <span className="col-last">Last lap</span>
+        {mode === 'racing' && <span className="col-last">Last lap</span>}
+        {mode === 'neutralised' && <span className="col-last">Pits</span>}
       </div>
 
       <ol className="tower-rows">
         {list.map((r) => {
           const d = drivers.get(r.n);
-          const value = gapMode === 'int' ? r.int : r.gap;
+          // Under a red flag the order is frozen, and the gap to the leader
+          // is the only one that still means anything.
+          const value = mode === 'red' ? r.gap : gapMode === 'int' ? r.int : r.gap;
           return (
             <li
               key={r.n}
@@ -57,9 +83,12 @@ export function TimingTower(): React.JSX.Element {
                 </span>
                 {r.age ?? ''}
               </span>
-              <span className={`col-last${r.lapFlag ? (r.lapFlag === 'fastest' ? ' is-fastest' : ' is-pb') : ''}`}>
-                {fmtLap(r.last)}
-              </span>
+              {mode === 'racing' && (
+                <span className={`col-last${r.lapFlag ? (r.lapFlag === 'fastest' ? ' is-fastest' : ' is-pb') : ''}`}>
+                  {fmtLap(r.last)}
+                </span>
+              )}
+              {mode === 'neutralised' && <span className="col-last">{r.stops}</span>}
             </li>
           );
         })}

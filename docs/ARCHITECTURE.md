@@ -137,7 +137,7 @@ promised live data it could not deliver.
 | `status` | on change | level, text, mode, freshness (time of the newest upstream row), auth state, request count |
 | `circuit` | when the outline improves | same circuit block as in `hello` |
 
-`timing` carries `battles` and `marshalSectors`, both filled since M4 and M3, and `totalLaps`, which stays null because OpenF1 publishes no total-lap figure. Each tower row also carries `lapFlag`, the lap colour decided server-side: the rule is about the lap just completed, which the client cannot see from a row's values alone.
+`timing` also carries `flagSince` and `flagSinceLap`, which say when the standing flag began and on which lap, and each tower row carries a `stops` count. The final classification comes from OpenF1's `session_result`, fetched once when the chequered flag falls and sent on `hello` rather than on every timing frame. `timing` carries `battles` and `marshalSectors`, both filled since M4 and M3, and `totalLaps`, which stays null because OpenF1 publishes no total-lap figure. Each tower row also carries `lapFlag`, the lap colour decided server-side: the rule is about the lap just completed, which the client cannot see from a row's values alone.
 
 The prototype sent timing inside every fourth tick; v1 split it out. A positions tick is about 1 KB and a timing frame about 2 KB, so a two-hour race costs about 45 MB of mobile data.
 
