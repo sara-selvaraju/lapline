@@ -105,6 +105,22 @@ export function where(p: number): { i: number; x: number; y: number; z: number }
   return { i: lo, x: a[0] + (b[0] - a[0]) * f, y: a[1] + (b[1] - a[1]) * f, z: a[2] + (b[2] - a[2]) * f };
 }
 
+/**
+ * A deterministic wobble on a driver's lap time, in seconds.
+ *
+ * Without this every driver laps to the same thousandth all race, so the
+ * quickest car ties its own best every time round and the fastest lap of the
+ * session never moves. That makes M4's acceptance check — purple on exactly
+ * one row, only on the lap just completed — impossible to demonstrate.
+ *
+ * Deliberately deterministic, so the mock stays reproducible, and small
+ * enough not to reorder the field.
+ */
+export function lapWobble(driverNumber: number, lap: number): number {
+  const seed = Math.sin(driverNumber * 12.9898 + lap * 78.233) * 43758.5453;
+  return +((seed - Math.floor(seed)) * 0.8 - 0.4).toFixed(3);
+}
+
 /** The lap each driver pits on, spread across the field. */
 export function pitLap(d: MockDriver): number {
   return 6 + (d.n % 5);

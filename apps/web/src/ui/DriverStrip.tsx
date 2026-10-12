@@ -6,14 +6,7 @@
 
 import type { CarTuple } from '@lapline/shared';
 import { useStore } from '../store/store.js';
-import { fmtGap, TYRE_LETTER } from './format.js';
-
-const tyreVar = (compound: string | null): string => {
-  const key = (compound ?? '').toLowerCase();
-  if (key === 'intermediate') return 'var(--tyre-inter)';
-  if (key === 'soft' || key === 'medium' || key === 'hard' || key === 'wet') return `var(--tyre-${key})`;
-  return 'var(--haze)';
-};
+import { TYRE_LETTER, fmtGap, tyreVar } from './format.js';
 
 export function DriverStrip(): React.JSX.Element {
   const sel = useStore((s) => s.sel);
