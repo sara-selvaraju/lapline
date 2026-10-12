@@ -480,11 +480,19 @@ export class Scene {
     // Singapore, a label moved 41 world units between two frames. Easing keeps
     // the decision while losing the teleport — and since a badge yields to
     // whatever a label covers, a steady label is what stops badges blinking.
-    const labelOffsets = resolveCollisions(this.labelBoxes, 2, obstacles);
+    // Hand the resolver what each label settled on last frame, so one that is
+    // in nobody's way keeps the place it has instead of being re-decided.
+    const held = new Map<number, number>();
+    for (const box of this.labelBoxes) {
+      const car = this.cars.get(box.n);
+      if (car) held.set(box.n, car.labelDyTarget);
+    }
+    const labelOffsets = resolveCollisions(this.labelBoxes, 2, obstacles, held);
     const ease = Math.min(1, (dt / 1000) * LABEL_EASE_PER_S);
     for (const [n, dyPx] of labelOffsets) {
       const car = this.cars.get(n);
       if (!car) continue;
+      car.labelDyTarget = dyPx;
       car.labelDy += (dyPx - car.labelDy) * ease;
       const base = car.group.position.clone().setY(car.group.position.y + this.labelBase);
       car.label.position.set(0, this.labelBase + this.worldLiftForScreenOffset(base, car.labelDy, r.height), 0);
