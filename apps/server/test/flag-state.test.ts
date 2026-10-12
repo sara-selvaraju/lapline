@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { createBuffers, type Buffers } from '../src/feed/buffers.js';
-import { flagState, trackFlag } from '../src/derive/flags.js';
+import { flagPeriods, flagState, trackFlag } from '../src/derive/flags.js';
 import type { RaceControlRow } from '@lapline/shared';
 
 const T = 1_000_000;
@@ -132,5 +132,58 @@ describe('when the flag began', () => {
   it('gives no lap when none has started yet', () => {
     const b = rc([[900, flag('RED')]]);
     expect(flagState(b, T + 1_000_000)).toMatchObject({ flag: 'RED', sinceLap: null });
+  });
+});
+
+describe('flagPeriods, which the replay scrubber marks', () => {
+  it('opens and closes a safety car period', () => {
+    const b = rc([[0, flag('GREEN')], [60, sc('SAFETY CAR DEPLOYED')], [180, flag('GREEN')]]);
+    expect(flagPeriods(b)).toEqual([{ flag: 'SC', from: T + 60_000, to: T + 180_000 }]);
+  });
+
+  it('treats a safety car and its ending as one stretch, not two', () => {
+    const b = rc([
+      [0, flag('GREEN')],
+      [60, sc('SAFETY CAR DEPLOYED')],
+      [150, sc('SAFETY CAR IN THIS LAP')],
+      [180, flag('GREEN')],
+    ]);
+    const periods = flagPeriods(b);
+    expect(periods).toHaveLength(1);
+    expect(periods[0]).toMatchObject({ flag: 'SC', from: T + 60_000, to: T + 180_000 });
+  });
+
+  it('marks a virtual safety car separately from a real one', () => {
+    const b = rc([
+      [0, flag('GREEN')],
+      [60, sc('VSC DEPLOYED')],
+      [120, flag('CLEAR')],
+      [300, sc('SAFETY CAR DEPLOYED')],
+      [400, flag('GREEN')],
+    ]);
+    expect(flagPeriods(b).map((p) => p.flag)).toEqual(['VSC', 'SC']);
+  });
+
+  it('marks a red flag', () => {
+    const b = rc([[0, flag('GREEN')], [60, flag('RED')], [200, flag('GREEN')]]);
+    expect(flagPeriods(b)).toEqual([{ flag: 'RED', from: T + 60_000, to: T + 200_000 }]);
+  });
+
+  it('leaves a period still running open rather than inventing an end', () => {
+    const b = rc([[0, flag('GREEN')], [60, sc('SAFETY CAR DEPLOYED')]]);
+    expect(flagPeriods(b)[0]).toMatchObject({ flag: 'SC', to: null });
+  });
+
+  it('marks nothing for a session that stayed green', () => {
+    expect(flagPeriods(rc([[0, flag('GREEN')], [60, flag('CLEAR')]]))).toEqual([]);
+  });
+
+  it('does not mark the chequered flag, which is a moment and not a stretch', () => {
+    const b = rc([[0, flag('GREEN')], [600, flag('CHEQUERED')]]);
+    expect(flagPeriods(b)).toEqual([]);
+  });
+
+  it('ignores sector yellows, which belong to a marshal sector', () => {
+    expect(flagPeriods(rc([[0, flag('GREEN')], [60, flag('YELLOW', 'Sector')]]))).toEqual([]);
   });
 });

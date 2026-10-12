@@ -3,6 +3,8 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import type { Tick, Timing } from '@lapline/shared';
 import { OpenF1 } from '../src/openf1/client.js';
 import { Feed, type FeedListener } from '../src/feed/feed.js';
+import { crossings, delayFromTap } from '../src/derive/crossings.js';
+import { crossingsPayload, periodsPayload } from '../src/http/query.js';
 
 const PORT = 4201;
 const BASE = `http://localhost:${PORT}`;
@@ -260,6 +262,46 @@ describe('replaying the finished mock Sprint', () => {
       feed.stop();
     }
   }, 30_000);
+
+  // docs/BUILD-PLAN.md M6: "Seeking in replay refetches cleanly, with no stuck
+  // cars." The transport's own buttons are the cases that matter.
+  it('leaves no stuck cars after the transport’s own jumps', async () => {
+    const feed = freeFeed();
+    try {
+      await feed.loadSessionList();
+      await feed.selectSession(SPRINT);
+      const start = feed.sessStart as number;
+      const settle = async (): Promise<Tick> => {
+        // One step refills the window; a second lets the next one land.
+        await feed.fetchStep();
+        await feed.fetchStep();
+        return feed.tick() as Tick;
+      };
+
+      feed.setReplay({ at: start + 400_000, playing: false });
+      expect((await settle()).cars).toHaveLength(20);
+
+      // The ±10 s buttons, which are past the 5 s mark and so refetch.
+      for (const nudge of [10_000, -10_000]) {
+        const at = feed.clock() + nudge;
+        feed.setReplay({ at });
+        const after = await settle();
+        expect({ nudge, cars: after.cars.length }).toEqual({ nudge, cars: 20 });
+        for (const car of after.cars) expect({ nudge, stale: car[10] }).toEqual({ nudge, stale: 0 });
+      }
+
+      // And a small backwards drag of the scrubber, which stays inside the
+      // buffered window and so does not refetch. Pruning trims behind the
+      // clock, so this is where a stale car would show up if anywhere.
+      const back = feed.clock() - 4000;
+      feed.setReplay({ at: back });
+      const after = await settle();
+      expect(after.cars).toHaveLength(20);
+      for (const car of after.cars) expect(car[10]).toBe(0);
+    } finally {
+      feed.stop();
+    }
+  }, 40_000);
 
   it('extends the session end past the scheduled one when laps overran', async () => {
     const feed = freeFeed();
@@ -626,6 +668,91 @@ describe('the final classification', () => {
       const late = (feed.timing() as Timing).rows;
       expect(late.some((r) => r.stops > 0)).toBe(true);
       expect(late.every((r) => r.stops >= 0 && Number.isInteger(r.stops))).toBe(true);
+    } finally {
+      feed.stop();
+    }
+  }, 40_000);
+});
+
+describe('Sync with TV, against the live mock', () => {
+  // docs/BUILD-PLAN.md M6: "In live mock, marking a crossing sets the delay to
+  // within ±1 s of the injected broadcast delay."
+  //
+  // The injected delay stands in for the viewer's television being behind
+  // real time: they see the leader cross the line that many seconds late, and
+  // tap then. What comes back should be the delay we injected.
+  it('recovers the broadcast delay from a tap, to within a second', async () => {
+    const feed = sponsorFeed();
+    try {
+      await feed.loadSessionList();
+      await feed.selectSession(RACE);
+      expect(feed.mode).toBe('live');
+      // Enough steps for the leader to have completed laps to cross.
+      for (let i = 0; i < 6; i++) await feed.fetchStep();
+
+      const times = crossings(feed.buffersRef(), feed.clock());
+      expect(times.length).toBeGreaterThan(0);
+      const lastCrossing = times[times.length - 1]!;
+
+      for (const injected of [6, 10, 14, 25, 42]) {
+        // The viewer taps when their television shows the crossing.
+        const tappedAt = lastCrossing + injected * 1000;
+        const got = delayFromTap(times, tappedAt);
+        expect({ injected, got }).toEqual({ injected, got: expect.any(Number) });
+        expect(Math.abs((got as number) - injected)).toBeLessThanOrEqual(1);
+      }
+    } finally {
+      feed.stop();
+    }
+  }, 40_000);
+
+  it('serves the crossings and the leader’s progress over HTTP', async () => {
+    const feed = sponsorFeed();
+    try {
+      await feed.loadSessionList();
+      await feed.selectSession(RACE);
+      for (let i = 0; i < 6; i++) await feed.fetchStep();
+
+      const payload = crossingsPayload(feed, 0) as {
+        t: number;
+        lapMetres: number | null;
+        crossings: number[];
+        next: { n: number; at: number | null; metres: number | null } | null;
+      };
+      expect(payload.crossings.length).toBeGreaterThan(0);
+      // Every crossing is in the past, and they are in order.
+      for (const c of payload.crossings) expect(c).toBeLessThanOrEqual(payload.t);
+      expect(payload.crossings).toEqual([...payload.crossings].sort((a, b) => a - b));
+      // The mock's circuit is a real size, in metres.
+      expect(payload.lapMetres).toBeGreaterThan(1000);
+      expect(payload.next?.n).toBeGreaterThan(0);
+    } finally {
+      feed.stop();
+    }
+  }, 40_000);
+
+  it('serves the flag periods the replay scrubber marks', async () => {
+    const feed = freeFeed();
+    try {
+      await feed.loadSessionList();
+      await feed.selectSession(SPRINT);
+      feed.setReplay({ at: (feed.sessEnd as number) - 1000, playing: false });
+      await feed.fetchStep();
+
+      const payload = periodsPayload(feed) as {
+        start: number | null;
+        end: number | null;
+        periods: Array<{ flag: string; from: number; to: number | null }>;
+      };
+      expect(payload.start).toBeGreaterThan(0);
+      // The mock scripts a yellow, a VSC, a safety car and a red flag.
+      const flags = payload.periods.map((p) => p.flag);
+      expect(new Set(flags)).toEqual(new Set(['YELLOW', 'VSC', 'SC', 'RED']));
+      // Each one sits inside the session and ends after it starts.
+      for (const p of payload.periods) {
+        expect(p.from).toBeGreaterThanOrEqual(payload.start as number);
+        if (p.to != null) expect(p.to).toBeGreaterThan(p.from);
+      }
     } finally {
       feed.stop();
     }
