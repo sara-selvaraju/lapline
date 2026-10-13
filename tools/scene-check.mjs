@@ -249,6 +249,52 @@ if (!layout) {
   );
 }
 
+// ---- the scene gives back what it rebuilds (M9) ----
+// `setCircuit` runs on every nudge of the elevation slider and every layer
+// toggle, not only on a change of circuit. Detaching the old objects is not
+// enough: their GPU allocations live until the renderer is torn down, so a
+// viewer playing with the slider used to leak a set of track buffers per drag.
+// The renderer counts what it holds, so this is measurable rather than a
+// matter of opinion.
+console.log('\nscene memory across rebuilds');
+const mem = await page.evaluate(() => {
+  const scene = window.__lapline?.scene;
+  if (!scene) return null;
+  // Render between rebuilds. `renderer.info.memory` counts what the renderer
+  // has registered, and it registers a geometry or texture lazily, on first
+  // use — so rebuilding in a tight loop without drawing shows the old ones
+  // freed and the new ones not yet counted, which reads as steady whether the
+  // old ones were given back or not. Measured: without the disposal this grows
+  // by 7 geometries and 10 textures per rebuild.
+  const draw = () => {
+    scene.setCircuit(scene.circuit, scene.zx);
+    scene.renderer.render(scene.scene, scene.camera);
+  };
+  draw();
+  const before = { ...scene.renderer.info.memory, owned: scene.disposables.length };
+  for (let i = 0; i < 20; i++) draw();
+  return { before, after: { ...scene.renderer.info.memory, owned: scene.disposables.length }, rebuilds: 20 };
+});
+if (!mem) {
+  say('scene memory is readable', false, 'window.__lapline.scene missing');
+} else {
+  say(
+    'geometries steady across 20 rebuilds',
+    mem.after.geometries <= mem.before.geometries,
+    `${mem.before.geometries} -> ${mem.after.geometries}`,
+  );
+  say(
+    'textures steady across 20 rebuilds',
+    mem.after.textures <= mem.before.textures,
+    `${mem.before.textures} -> ${mem.after.textures}`,
+  );
+  say(
+    'owned objects steady across 20 rebuilds',
+    mem.after.owned <= mem.before.owned,
+    `${mem.before.owned} -> ${mem.after.owned}`,
+  );
+}
+
 // ---- camera presets ----
 console.log('\ncamera');
 for (const preset of ['Map', 'Chase', 'Tilt']) {

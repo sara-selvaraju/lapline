@@ -26,6 +26,19 @@ const outlineGeo = new THREE.SphereGeometry(OUTLINE_RADIUS, 16, 12);
 const ringGeo = new THREE.TorusGeometry(RING_RADIUS, (1.5 * PX) / 2, 8, 32);
 const hitGeo = new THREE.SphereGeometry(HIT_RADIUS, 8, 6);
 
+/**
+ * The four above are shared by every car, so disposing one would empty the
+ * field. `Scene.clearGroup` checks this before disposing anything it removes;
+ * cars do not live in any group it clears, but the cost of saying so is four
+ * lines and the cost of forgetting is every car vanishing at once.
+ */
+export const SHARED_GEOMETRY: ReadonlySet<THREE.BufferGeometry> = new Set([
+  dotGeo,
+  outlineGeo,
+  ringGeo,
+  hitGeo,
+]);
+
 export interface Car {
   n: number;
   code: string;

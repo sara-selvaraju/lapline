@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { Circuit, MarshalSectorFlag, Point3, Tick, Timing, Transform } from '@lapline/shared';
 import { storeState } from '../store/store.js';
-import { applyStale, makeCar, setLabelSelected, type Car } from './cars.js';
+import { applyStale, makeCar, setLabelSelected, SHARED_GEOMETRY, type Car } from './cars.js';
 import { COLORS, FRAME_MS } from './colours.js';
 import {
   buildMarshalTicks,
@@ -156,6 +156,12 @@ export class Scene {
 
   /** Rebuilds the track. `zx` is the elevation exaggeration, 1 to 12. */
   setCircuit(circuit: Circuit | null, zx: number, layers = { turns: true, sectors: true, pitLane: true }): void {
+    // Everything `own()`ed belongs to one circuit build, so a rebuild gives the
+    // last one back. Without this the array grew by a dozen entries per call —
+    // and `setCircuit` is called on every nudge of the elevation slider, not
+    // just on a change of circuit.
+    for (const d of this.disposables) d.dispose();
+    this.disposables = [];
     this.clearGroup(this.trackGroup);
     this.clearGroup(this.detailGroup);
     this.clearGroup(this.flagGroup);
@@ -790,7 +796,32 @@ export class Scene {
     group.add(obj);
   }
 
+  /**
+   * Empty a group and give back what it held.
+   *
+   * `group.clear()` alone only detaches: the geometries, materials and canvas
+   * textures keep their GPU allocations until the renderer is torn down. That
+   * matters because the groups cleared here are rebuilt *while the app runs* —
+   * the elevation slider and the layer toggles both call `setCircuit`, and the
+   * flag and safety-car groups are rebuilt whenever race control changes its
+   * mind — so a viewer playing with the elevation slider for a minute was
+   * leaking a full set of track buffers per drag.
+   *
+   * Only the four built groups are ever passed here. Cars are not: their
+   * geometry is shared across the field, which is what `SHARED_GEOMETRY`
+   * guards against.
+   */
   private clearGroup(group: THREE.Group): void {
+    group.traverse((o) => {
+      if (o === group) return;
+      const m = o as Partial<THREE.Mesh> & { material?: THREE.Material | THREE.Material[] };
+      if (m.geometry && !SHARED_GEOMETRY.has(m.geometry)) m.geometry.dispose();
+      for (const mat of m.material ? (Array.isArray(m.material) ? m.material : [m.material]) : []) {
+        const map = (mat as THREE.Material & { map?: THREE.Texture | null }).map;
+        if (map) map.dispose();
+        mat.dispose();
+      }
+    });
     group.clear();
   }
 }
