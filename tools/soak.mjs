@@ -29,7 +29,12 @@ const MINUTES = Number(flag('minutes', '180'));
 const EVERY_S = Number(flag('every', '30'));
 const URL_BASE = flag('url', 'http://localhost:3000').replace(/\/$/, '');
 const OUT = flag('out', null);
-const PID = Number(flag('pid', '0')) || findServer();
+// Only look for a local server when the URL is a local one. Pointed at
+// lapline.live without this, pgrep found whatever server happened to be
+// running on this machine and reported its memory as the deployed server's —
+// numbers that looked plausible and were about the wrong process.
+const LOCAL = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|$|\/)/.test(URL_BASE);
+const PID = Number(flag('pid', '0')) || (LOCAL ? findServer() : 0);
 
 /** The server process, so /proc can be read without the server reporting on itself. */
 function findServer() {
@@ -141,7 +146,13 @@ const events = [];
 void listen();
 
 console.log(`soak: ${MINUTES} min, sampling every ${EVERY_S} s, server pid ${PID || 'unknown'}`);
-if (!PID) console.log('  (no pid, so memory and file descriptors are not sampled — pass --pid)');
+if (!PID) {
+  console.log(
+    LOCAL
+      ? '  (no server process found, so memory and file descriptors are not sampled — pass --pid)'
+      : `  (${URL_BASE} is not this machine, so memory and file descriptors come from the host's own metrics, not here)`,
+  );
+}
 console.log(
   `\n  ${pad('elapsed', 9)}${pad('mode', 8)}${pad('rss MB', 9)}${pad('fds', 6)}${pad('req/min', 9)}${pad('B/s', 9)}${pad('tick/s', 8)}status`,
 );
