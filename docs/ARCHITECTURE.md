@@ -208,6 +208,15 @@ the code.
   own fields, which can carry a URL.
 - **The scene gives back what it rebuilds.** `setCircuit` runs on every nudge of
   the elevation slider, so clearing a group disposes what it held.
+- **Dedupe keys are held for the rows that are kept.** Four per retained row,
+  with a floor of 5,000, rather than a flat 200,000 — which at a live race's
+  4,400 keys a minute was 45 minutes of keys against 90 seconds of rows.
+- **`pos`, `ivl`, `laps`, `rc` and `pits` are kept for the session, on purpose.**
+  `lapColour` scans the whole lap history, `flagPeriods` the whole race control
+  feed, and `crossings` the leader's positions, so these are not caches to
+  trim. Measured against the mock race: `pos` and `ivl` grow about 300 rows a
+  minute each and a session's worth is a few MB. `loc` and `car` are the ones
+  that would not fit, and those are pruned to 90 seconds behind the clock.
 
 `npm run soak` is the instrument for all of this: run it for hours and read the
 curve, not the snapshot. A leak is a slope.
