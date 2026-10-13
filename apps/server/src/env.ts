@@ -8,6 +8,8 @@ import path from 'node:path';
 export interface Env {
   port: number;
   appPassword: string;
+  /** Signs the session cookie. Falls back to the password when unset. */
+  sessionSecret: string;
   openf1Username: string | undefined;
   openf1Password: string | undefined;
   openf1Base: string | undefined;
@@ -26,6 +28,7 @@ export function readEnv(e: NodeJS.ProcessEnv = process.env): Env {
   return {
     port: Number(e.PORT) || 3000,
     appPassword: e.APP_PASSWORD || '',
+    sessionSecret: e.SESSION_SECRET || '',
     openf1Username: e.OPENF1_USERNAME,
     openf1Password: e.OPENF1_PASSWORD,
     openf1Base: e.OPENF1_BASE,

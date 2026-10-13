@@ -8,6 +8,7 @@
 // (excluding the 3D view)", so this measures rather than eyeballs.
 
 import { chromium } from 'playwright';
+import { signIn } from './login.mjs';
 
 const args = process.argv.slice(2);
 const flag = (n, d) => {
@@ -15,6 +16,7 @@ const flag = (n, d) => {
   return i >= 0 && args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : d;
 };
 const URLBASE = flag('url', 'http://localhost:3000').replace(/\/$/, '');
+const session = await signIn(URLBASE);
 const SHOT = flag('shot', null);
 /** Seek here first, in ms from the session start, to reach a scripted state. */
 const SEEK = flag('seek', null);
@@ -43,7 +45,7 @@ const ctx = await browser.newContext({
   deviceScaleFactor: 2,
   isMobile: true,
   hasTouch: true,
-  ...(PASSWORD ? { httpCredentials: { username: 'any', password: PASSWORD } } : {}),
+    storageState: { cookies: session.cookies, origins: [] },
 });
 const page = await ctx.newPage();
 const errors = [];
@@ -53,7 +55,7 @@ page.on('console', (m) => {
 });
 
 if (SEEK) {
-  const headers = PASSWORD ? { Authorization: `Basic ${Buffer.from(`any:${PASSWORD}`).toString('base64')}` } : {};
+  const headers = session.headers;
   const state = await (await fetch(`${URLBASE}/api/state`, { headers })).json();
   await fetch(`${URLBASE}/api/control`, {
     method: 'POST',
@@ -154,9 +156,7 @@ await browser.close();
 
 let failed = false;
 const mode = await (async () => {
-  const auth = PASSWORD
-    ? { Authorization: `Basic ${Buffer.from(`any:${PASSWORD}`).toString('base64')}` }
-    : {};
+  const auth = session.headers;
   const st = await (await fetch(`${URLBASE}/api/state`, { headers: auth })).json();
   return st.mode;
 })();
