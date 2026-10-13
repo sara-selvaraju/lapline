@@ -19,7 +19,7 @@ on a phone with no manual intervention — needs a live session and a phone, and
 neither is here. See "Austin, 23 to 25 October" below for what to do that
 weekend.
 
-What M9 found and fixed is in two commits. On the server: a lock could not be
+What M9 found and fixed is in six commits. On the server: a lock could not be
 left, so a single 401 from a token refresh ended the session for good; pruning
 ran below the idle guard, so a sleeping phone left MQTT filling buffers that
 nothing trimmed; the fetch loop pushed a settled timer onto an array every
@@ -28,6 +28,24 @@ every listener after it in the set that frame. On the client: every rebuild of
 the track leaked 7 geometries and 10 textures, and `setCircuit` runs on each
 nudge of the elevation slider, not just on a change of circuit. Six new server
 tests and three new scene checks cover these, and most fail without their fix.
+Dedupe keys were also capped at a flat 200,000, which was 45 minutes of keys
+against buffers holding 90 seconds of rows; the cap now scales to what is
+retained, and the clear gave back 10.7 MB of heap.
+
+**The mock soak ran for 2.8 hours and is the number to beat at Austin.** One
+listener held open throughout: no reconnects, no errors, 4.0 ticks a second
+from start to finish, and a worst gap between ticks of 0.3 s against a 0.25 s
+cadence. Resident memory rose 92.5 to 132.5 MB through the live session as it
+filled with history and then went flat; the replay afterwards peaked at 152.5
+and gave it back, ending at 102.6 with the final hour at -1.0 MB an hour. File
+descriptors stayed between 24 and 26. **The live-to-replay handover survived**
+— the transition that caused M1's 422 — with requests dropping from 46 a minute
+to 4 and the stream never breaking stride.
+
+Frame size, which M9 asks for and nothing had measured: against the deployed
+site replaying Singapore with 22 cars, 7.7 kB/s all up — tick 1,090 B at 4 Hz,
+timing 3,349 B at 1 Hz, hello 14,979 B once. A two-hour race is about 56 MB of
+mobile data. All of it is in `docs/ARCHITECTURE.md` under "Measured".
 
 MQTT against OpenF1's real broker, M9's first bullet, was already met during
 the Singapore race on 11 October — see `docs/OPENF1.md`. The line that used to
