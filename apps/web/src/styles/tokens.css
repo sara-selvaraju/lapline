@@ -48,7 +48,7 @@
   --fs-badge: 10px;     /* turn badges, tyre letters */
 
   /* ---- shape and spacing ---- */
-  --gutter: 16px;          /* 12px in landscape */
+  --gutter: 16px;          /* 12px in landscape, set in the media query */
   --tap: 44px;             /* minimum touch target */
   --r-chip: 4px;           /* car labels and chips */
   --r-button: 12px;        /* buttons and the camera group (9 to 12) */
@@ -69,6 +69,20 @@
   --h-tower-row: 36px;
   --h-controls: 68px;      /* live */
   --h-controls-replay: 90px;
+
+  /* ---- landscape, from LiveLandscape.dc.html ---- */
+  --w-track-landscape: 470px;
+  --h-strip-landscape: 74px;
+
+  /* Glance mode, from Glance.dc.html. Read from across a room, so the type is
+     its own scale rather than the one the rest of the app uses. */
+  --h-glance-row: 54px;
+  --fs-glance-code: 40px;
+  --fs-glance-gap: 34px;
+  --fs-glance-pos: 30px;
+  --fs-glance-lap: 44px;
+  --fs-glance-of: 26px;
+  --fs-glance-note: 22px;
 
   /* The flag band grows and changes colour over 200-300ms. Nothing else moves. */
   --flag-transition: 240ms;

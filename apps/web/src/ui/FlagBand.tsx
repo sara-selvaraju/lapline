@@ -45,6 +45,7 @@ function RedFlagMark(): React.JSX.Element {
 
 export function FlagBand(): React.JSX.Element {
   const flag = useStore((s) => s.timing?.flag ?? 'GREEN');
+  const glance = useStore((s) => s.glance);
   const sinceLap = useStore((s) => s.timing?.flagSinceLap ?? null);
 
   // The safety car band names the lap it came out on, which is the one piece
@@ -58,7 +59,7 @@ export function FlagBand(): React.JSX.Element {
 
   return (
     <div
-      className={`flag-band flag-${base}`}
+      className={`flag-band flag-${base}${glance ? ' glance-band' : ''}`}
       data-labelled={label ? 'true' : 'false'}
       role="status"
       aria-label={label ?? 'Track green'}

@@ -39,9 +39,11 @@ const EXPECTED = {
 const REPLAY_CONTROLS = 90;
 const TOLERANCE = 2;
 
+const LANDSCAPE = args.includes('--landscape');
+
 const browser = await chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL ?? 'chrome' });
 const ctx = await browser.newContext({
-  viewport: { width: 390, height: 844 },
+  viewport: LANDSCAPE ? { width: 844, height: 390 } : { width: 390, height: 844 },
   deviceScaleFactor: 2,
   isMobile: true,
   hasTouch: true,
@@ -125,6 +127,26 @@ const m = await page.evaluate(() => {
   };
 });
 
+m.landscape = await page.evaluate(() => {
+  const box = (sel) => {
+    const el = document.querySelector(sel);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) };
+  };
+  const controls = document.querySelector('.controls');
+  return {
+    track: box('.track') ?? { x: -1, w: -1, h: -1 },
+    strip: box('.strip') ?? { x: -1, w: -1, h: -1 },
+    rowsVisible: [...document.querySelectorAll('.tower-row')].filter(
+      (r) => r.getBoundingClientRect().bottom <= window.innerHeight + 1,
+    ).length,
+    controls: controls ? getComputedStyle(controls).display : 'absent',
+    towerHead: box('.tower-head'),
+    scroll: document.documentElement.scrollHeight,
+  };
+});
+
 if (SHOT) await page.screenshot({ path: SHOT });
 
 // The expanded state has its own artboard, DriverDetail.dc.html: the panel
@@ -160,6 +182,34 @@ const mode = await (async () => {
   const st = await (await fetch(`${URLBASE}/api/state`, { headers: auth })).json();
   return st.mode;
 })();
+
+if (LANDSCAPE) {
+  // LiveLandscape.dc.html: the track on the left at 470, the rest on the right.
+  const l = m.landscape;
+  console.log('\nregions, against LiveLandscape.dc.html');
+  const check = (label, ok, detail) => {
+    if (!ok) failed = true;
+    console.log(`  ${label.padEnd(24)} ${ok ? 'ok  ' : 'DRIFT'}  ${detail}`);
+  };
+  check('track width', Math.abs(l.track.w - 470) <= TOLERANCE, `${l.track.w}, want 470`);
+  check('track is on the left', l.track.x <= 2, `x ${l.track.x}`);
+  check('strip is beside it', l.strip.x >= 468, `x ${l.strip.x}`);
+  check('strip height', Math.abs(l.strip.h - 74) <= TOLERANCE, `${l.strip.h}, want 74`);
+  check('tower is on screen', l.rowsVisible >= 6, `${l.rowsVisible} rows visible`);
+  check('controls are hidden', l.controls === 'none', l.controls);
+  // A hidden element still has a box, so its height is what says it is gone.
+  check('tower header is hidden', (l.towerHead?.h ?? 0) === 0, `${l.towerHead?.h ?? 0}px tall`);
+  check('no vertical overflow', l.scroll <= 392, `${l.scroll}`);
+  console.log(`\nerrors: ${errors.length ? errors.join('; ') : 'none'}`);
+  if (errors.length) failed = true;
+  if (failed) {
+    console.error('\nlandscape does not match the artboard');
+    process.exitCode = 1;
+  } else {
+    console.log('\nlandscape matches the artboard');
+  }
+  process.exit(process.exitCode ?? 0);
+}
 
 console.log(`\nregion heights, against ${mode === 'replay' ? 'Replay' : 'Main'}.dc.html`);
 for (const [k, base] of Object.entries(EXPECTED)) {

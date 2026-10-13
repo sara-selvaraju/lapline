@@ -76,6 +76,12 @@ export interface StoreState {
   stalled: boolean;
   /** Whether the settings page is open. */
   settingsOpen: boolean;
+  /**
+   * Glance mode, which is a posture rather than a preference: propping the
+   * phone up for a while. Deliberately not persisted — a mode that survives a
+   * reload is a puzzle to get out of.
+   */
+  glance: boolean;
   history: HistorySample[];
   /** Bumps whenever the circuit's transform changes, so the scene can rebuild. */
   circuitEpoch: number;
@@ -107,6 +113,7 @@ export interface StoreState {
   noteEvent: (at: number) => void;
   setStalled: (stalled: boolean) => void;
   openSettings: () => void;
+  setGlance: (on: boolean) => void;
   setFollowLive: (on: boolean) => void;
   setKeepAwake: (on: boolean) => void;
   closeSettings: () => void;
@@ -173,6 +180,7 @@ export const useStore = create<StoreState>((set, get) => ({
   lastEventAt: null,
   stalled: false,
   settingsOpen: false,
+  glance: false,
   history: [],
   circuitEpoch: 0,
 
@@ -320,6 +328,7 @@ export const useStore = create<StoreState>((set, get) => ({
   noteEvent: (lastEventAt) => set({ lastEventAt }),
   setStalled: (stalled) => set({ stalled }),
   openSettings: () => set({ settingsOpen: true }),
+  setGlance: (glance) => set({ glance }),
 
   setFollowLive: (followLive) =>
     set((s) => {

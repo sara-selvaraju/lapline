@@ -1646,3 +1646,279 @@ button {
   line-height: 1.45;
   color: var(--haze);
 }
+
+/* ---- landscape (LiveLandscape.dc.html) ---- */
+
+/*
+ * A reflow, not a second layout. Every region stays mounted and in the same
+ * place in the tree — the grid moves them, and what there is no room for is
+ * hidden rather than unmounted. That is what keeps the WebGL context, the
+ * cars and the stream alive across a rotation, which is M8's whole acceptance
+ * criterion.
+ *
+ * Any window wider than tall gets this, a laptop included: a wide window is
+ * better served by the track beside the tower than by one tall column with
+ * everything below the fold.
+ */
+@media (orientation: landscape) {
+  :root {
+    --gutter: 12px;
+  }
+
+  #root {
+    display: grid;
+    grid-template-columns: var(--w-track-landscape) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+      'band band'
+      'track side';
+  }
+
+  .flag-band {
+    grid-area: band;
+  }
+
+  .track {
+    grid-area: track;
+    height: auto;
+    min-height: 0;
+    border-right: 1px solid var(--line);
+  }
+
+  /* The circuit name and lap sit over the track; there is no header band. */
+  .header {
+    position: absolute;
+    left: var(--gutter);
+    top: 8px;
+    z-index: 2;
+    height: auto;
+    padding: 0;
+    background: none;
+    border: 0;
+    pointer-events: none;
+  }
+  .header-title {
+    pointer-events: auto;
+  }
+  /* The pill, Sync and settings move to the top of the right column. */
+  .header-right {
+    position: fixed;
+    top: calc(env(safe-area-inset-top) + var(--h-flag));
+    right: 4px;
+    height: 46px;
+    align-items: center;
+    pointer-events: auto;
+    z-index: 3;
+  }
+  .flag-band[data-labelled='true'] ~ .header .header-right {
+    top: calc(env(safe-area-inset-top) + var(--h-flag-label));
+  }
+
+  .camera-group {
+    top: auto;
+    right: auto;
+    bottom: 10px;
+    left: 12px;
+  }
+
+  /* The right column: a gap for the pill row, then the strip, then the tower. */
+  .strip,
+  .telemetry {
+    grid-area: side;
+    align-self: start;
+    margin-top: 46px;
+    height: var(--h-strip-landscape);
+    padding: 8px 12px;
+    gap: 10px;
+  }
+  .tower {
+    grid-area: side;
+    align-self: stretch;
+    margin-top: calc(46px + var(--h-strip-landscape));
+    min-height: 0;
+  }
+  .telemetry {
+    height: auto;
+    align-self: stretch;
+    border-radius: 0;
+  }
+
+  /* No room, and nothing lost: the readings are all on the track or the tower. */
+  .strip-gap,
+  .strip-tyre,
+  .strip .icon-button,
+  .tower-head,
+  .race-control,
+  .controls {
+    display: none;
+  }
+
+  .strip-who {
+    width: 56px;
+  }
+  .strip-speed-value,
+  .strip-gear-value {
+    font-size: 34px;
+  }
+  .strip-unit {
+    font-size: 12px;
+  }
+
+  .tower-row {
+    grid-template-columns: 22px 4px 1fr 72px 46px 68px;
+    gap: 8px;
+    padding: 0 12px;
+  }
+
+  /* The sheets and state screens span the whole window rather than a column. */
+  .settings,
+  .sheet-scrim {
+    grid-area: band / band / side / side;
+  }
+  .loading,
+  .locked,
+  .podium,
+  .fastest-line,
+  .tower-finished,
+  .finished-bar,
+  .stale-banner {
+    grid-column: 1 / -1;
+  }
+  .sheet {
+    max-height: 100%;
+  }
+}
+
+/* ---- glance mode (Glance.dc.html) ---- */
+
+/* The entry control belongs to landscape, where glance mode lives. */
+.glance-enter {
+  display: none;
+}
+@media (orientation: landscape) {
+  .glance-enter {
+    display: grid;
+  }
+}
+
+/* Glance.dc.html gives the band two more pixels: from across a room, four is
+   not enough to read as a colour. */
+.glance-band {
+  height: 6px;
+}
+
+.glance {
+  grid-area: track / track / side / side;
+  grid-column: 1 / -1;
+  min-height: 0;
+  display: flex;
+  gap: 8px;
+  padding: 14px 20px 14px 24px;
+  overflow: hidden;
+}
+
+.glance-order {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.glance-lap {
+  margin: 0 0 6px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: var(--fs-glance-lap);
+  font-weight: 700;
+  line-height: 1;
+}
+.glance-of {
+  font-size: var(--fs-glance-of);
+  font-weight: 400;
+  color: var(--haze);
+}
+.glance-order ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.glance-order li {
+  height: var(--h-glance-row);
+  display: grid;
+  grid-template-columns: 34px 6px 1fr 130px;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid rgb(40 56 87 / 0.6);
+}
+.glance-order li.is-selected {
+  background: var(--panel);
+}
+.glance-pos {
+  font-size: var(--fs-glance-pos);
+  color: var(--haze);
+  text-align: right;
+}
+.glance-swatch {
+  width: 6px;
+  height: 34px;
+  border-radius: 3px;
+}
+.glance-code {
+  font-size: var(--fs-glance-code);
+  font-weight: 700;
+  line-height: 1;
+}
+.glance-gap {
+  font-size: var(--fs-glance-gap);
+  text-align: right;
+}
+.glance-gap.is-leader {
+  color: var(--haze);
+}
+
+.glance-map {
+  width: 340px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 0;
+}
+.glance-top {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.glance-live {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 18px;
+}
+.glance-map svg {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+.glance-track {
+  fill: none;
+  stroke: var(--flood);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+  opacity: 0.55;
+  vector-effect: non-scaling-stroke;
+}
+.glance-following {
+  margin: 0;
+  font-size: var(--fs-glance-note);
+  text-align: right;
+  color: var(--haze);
+}
+.glance-following b {
+  color: var(--flood);
+  font-weight: 700;
+  border-bottom: 3px solid transparent;
+}

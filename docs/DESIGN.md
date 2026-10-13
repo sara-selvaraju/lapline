@@ -45,6 +45,11 @@ Barlow Semi Condensed, weights 400, 500, 600 and 700, with tabular figures every
 |---|---|
 | 60 | Speed and gear, telemetry panel |
 | 44 | Lap number, glance mode |
+| 40 | Driver code, glance mode |
+| 34 | Interval, glance mode |
+| 30 | Position, glance mode |
+| 26 | "of 62", glance mode |
+| 22 | "Following EMI", glance mode |
 | 36 | Speed and gear, driver strip |
 | 24 | Driver code in the strip, sheet titles, state headings |
 | 21 | Circuit name in the header |
@@ -162,6 +167,12 @@ VSC, VSC ending, safety car ending and yellow use the safety car layout with the
 
 ## Open design questions
 
+- **The glance type sizes were missing from the table above** until M8. The
+  artboard has always used 40, 34, 30, 26 and 22, and this file's prose named
+  the 40; the table simply had not caught up. Added rather than argued with,
+  per the rule at the top: where this file and an artboard disagree, the
+  artboard wins.
+
 - **The detail-layer toggles live in settings' Track view card**, which
   `Settings.dc.html` does not draw. Turns, sectors and the pit lane have been
   stored and persisted since M3 with nothing able to change them, and this
@@ -188,7 +199,7 @@ VSC, VSC ending, safety car ending and yellow use the safety car layout with the
   section specifies, because OpenF1 publishes no safety car position. It marks
   where the field is being held, not where the car is.
 
-- **Glance mode entry:** the artboard shows how to leave it, not how to enter it. Suggestion: a "Glance" option in landscape.
+- ~~**Glance mode entry**~~ **Answered at M8:** a Glance button in the landscape pill row, carrying the expand icon that mirrors the contract icon the artboard already uses to leave. Glance is transient — rotating back to portrait leaves it — so there is nothing to be stuck in.
 - **Chase camera:** specified but not drawn. Build it and judge it on a device.
 - **Grid size:** mock-ups show 20 cars; the 2026 grid is 22. Check tower density with 22.
 - **Daytime races:** the palette is designed for night. Check contrast outdoors before adding a light theme.
