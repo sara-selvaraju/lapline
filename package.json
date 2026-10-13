@@ -27,7 +27,8 @@
     "scene": "node tools/scene-check.mjs",
     "circuits": "node tools/circuit-check.mjs",
     "states": "node tools/state-check.mjs",
-    "stale": "node tools/stale-check.mjs"
+    "stale": "node tools/stale-check.mjs",
+    "rotate": "node tools/rotate-check.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

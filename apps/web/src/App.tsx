@@ -11,6 +11,7 @@ import { FlagBand } from './ui/FlagBand.js';
 import { Header } from './ui/Header.js';
 import { Finished } from './ui/Finished.js';
 import { Overlay } from './ui/Overlay.js';
+import { Glance } from './ui/Glance.js';
 import { Loading } from './ui/Loading.js';
 import { Locked } from './ui/Locked.js';
 import { Reconnecting } from './ui/Reconnecting.js';
@@ -40,7 +41,14 @@ export function App(): React.JSX.Element {
     (s) => (s.circuit?.points.length ?? 0) === 0 && (s.tick?.cars.length ?? 0) === 0,
   );
 
-  const showTrack = !locked && !finished;
+  // Glance replaces everything but the band while it is on, and that includes
+  // letting the scene go. It draws its own flat map, so holding a WebGL
+  // context open behind it would burn battery on a phone propped up for an
+  // hour to show nothing. Rotation never crosses this branch, so the camera
+  // and the cars still survive what the milestone asks about.
+  const glance = useStore((s) => s.glance);
+
+  const showTrack = !locked && !finished && !glance;
 
   return (
     <>
@@ -49,7 +57,9 @@ export function App(): React.JSX.Element {
       {showTrack && <Reconnecting />}
       {showTrack && <TrackArea />}
 
-      {locked ? (
+      {glance ? (
+        <Glance />
+      ) : locked ? (
         <Locked />
       ) : finished ? (
         <Finished />

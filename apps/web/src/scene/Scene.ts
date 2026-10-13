@@ -50,6 +50,9 @@ export type CameraPreset = 'map' | 'tilt' | 'chase';
  * counting down from a large negative one — distinct, and recognisable on the
  * way back out.
  */
+/** How much the view's shape must change before the circuit is refitted. */
+const ASPECT_STEP = 0.15;
+
 const BADGE_KEY = -1000;
 
 /** How quickly a turn badge fades back in once a car label has passed. */
@@ -341,13 +344,18 @@ export class Scene {
 
   /** Fits the 100-unit circuit into whichever view angle is narrower. */
   resetView(): void {
-    const { dir, fit } = PRESETS[this.preset];
-    const vfov = THREE.MathUtils.degToRad(this.camera.fov);
-    const hfov = 2 * Math.atan(Math.tan(vfov / 2) * this.camera.aspect);
-    const dist = (54 / Math.tan(Math.min(vfov, hfov) / 2)) * fit;
-    this.camera.position.copy(dir.clone().multiplyScalar(dist));
+    const { dir } = PRESETS[this.preset];
+    this.camera.position.copy(dir.clone().multiplyScalar(this.fitDistance()));
     this.controls.target.set(0, 0, 0);
     this.controls.update();
+  }
+
+  /** The camera distance that frames the circuit at the current aspect. */
+  private fitDistance(): number {
+    const { fit } = PRESETS[this.preset];
+    const vfov = THREE.MathUtils.degToRad(this.camera.fov);
+    const hfov = 2 * Math.atan(Math.tan(vfov / 2) * this.camera.aspect);
+    return (54 / Math.tan(Math.min(vfov, hfov) / 2)) * fit;
   }
 
   private resize(): void {
@@ -355,11 +363,28 @@ export class Scene {
     const r = parent ? parent.getBoundingClientRect() : this.canvas.getBoundingClientRect();
     if (r.width === 0) return;
     this.renderer.setSize(r.width, r.height, false);
+
+    const before = this.camera.aspect;
     this.camera.aspect = r.width / Math.max(r.height, 1);
     this.camera.updateProjectionMatrix();
+
     if (!this.viewFitted) {
       this.resetView();
       this.viewFitted = true;
+      return;
+    }
+
+    // A rotation changes the shape of the view, and the distance that framed
+    // the circuit in the old one does not frame it in the new. Only the
+    // distance is re-derived: the direction is left exactly as it is, so a
+    // hand-orbited view keeps its angle and a camera preset keeps its own.
+    if (Math.abs(this.camera.aspect - before) > ASPECT_STEP) {
+      const to = this.controls.target;
+      const away = this.camera.position.clone().sub(to);
+      if (away.lengthSq() > 0) {
+        this.camera.position.copy(to).add(away.setLength(this.fitDistance()));
+        this.controls.update();
+      }
     }
   }
 

@@ -88,6 +88,11 @@ describe('type scale', () => {
     const sizes = ['60px', '44px', '36px', '24px', '21px', '18px', '17px', '16px', '15px', '14px', '13px', '12px', '10px'];
     for (const s of sizes) expect(css).toContain(s);
   });
+
+  it('covers the glance sizes, which read from across a room', () => {
+    // Glance.dc.html has always used these; the spec's table caught up at M8.
+    for (const s of ['40px', '34px', '30px', '26px', '22px']) expect(css).toContain(s);
+  });
 });
 
 describe('the font is self-hosted', () => {
@@ -114,5 +119,32 @@ describe('motion', () => {
   it('animates only the flag band, and not at all under reduced motion', () => {
     expect(token('flag-transition')).toBe('240ms');
     expect(css).toContain('prefers-reduced-motion: reduce');
+  });
+});
+
+describe('landscape layout tokens match LiveLandscape.dc.html', () => {
+  const landscape = (name: string): string | null => {
+    const m = new RegExp(`--${name}:\\s*([^;]+);`).exec(css);
+    return m ? m[1]!.trim() : null;
+  };
+
+  it('puts the track at 470px and the strip at 74', () => {
+    expect(landscape('w-track-landscape')).toBe('470px');
+    expect(landscape('h-strip-landscape')).toBe('74px');
+  });
+
+  it('turns the layout over only when a window is wider than tall', () => {
+    // Agreed in planning: a laptop gets it too, so there is no height bound.
+    const style = readFileSync(fileURLToPath(new URL('../src/style.css', import.meta.url)), 'utf8');
+    expect(style.replace(/\s+/g, ' ')).toContain('@media (orientation: landscape)');
+    expect(style).not.toMatch(/orientation: landscape\)\s*and\s*\(max-height/);
+  });
+
+  it('leaves about seven tower rows at 844 x 390', () => {
+    const px = (n: string): number => Number((landscape(n) ?? '0').replace('px', ''));
+    // Band, then the pill row, then the strip; the tower takes the rest.
+    const rows = (390 - px('h-flag') - 46 - px('h-strip-landscape')) / px('h-tower-row');
+    expect(rows).toBeGreaterThan(6.5);
+    expect(rows).toBeLessThan(8);
   });
 });

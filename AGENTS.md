@@ -13,23 +13,21 @@ A personal, non-commercial, phone-first second screen for F1 sessions: a 3D circ
 
 ## Status
 
-M7 done, with one check that needs a phone. Basic auth is gone: a password
-page sets a signed cookie for 180 days, revocable by changing `APP_PASSWORD`,
-with a delay and a per-address cap on wrong answers. The loading, connection
-lost, locked and settings screens are all built, and settings has absorbed
-M5's session picker. Protocol is v6. Next is M8 in `docs/BUILD-PLAN.md`.
+M8 done. Landscape is a reflow of the same tree rather than a second layout —
+the track on the left at 470 px with the tower beside it — and glance mode
+shows the top five in large type beside a flat map, entered from a button in
+the landscape pill row and left by rotating back. Any window wider than tall
+gets landscape, a laptop included. Next is M9 in `docs/BUILD-PLAN.md`.
 
-Two of the three acceptance checks are automated. `npm run stale` starts a
-server, kills it, and asserts the banner appears within six seconds naming the
-silence, that the last known positions stay, and that the screen recovers with
-no reload and no tap. The locked screen's free-replay time is covered on both
-sides: the server sends `sessEnd + 30 min` on every path into locked mode —
-until M7 two of the three sent nothing — and the client renders it as the
-viewer's own weekday and local time.
+The acceptance check is automated as `npm run rotate`: it rotates one live
+page rather than loading two, and asserts the same `Scene` object survives,
+the cars are not rebuilt, the selection and camera preset are kept, and no new
+`EventSource` is ever opened. `npm run layout --landscape` measures the two
+columns against `LiveLandscape.dc.html`.
 
-The third, "the password survives the iOS home-screen app relaunching", passes
-as far as a browser can show it: signing in, discarding the page and reopening
-with the same cookie jar asks for nothing. The iPhone half needs your phone.
+Landscape was not merely plain before this — it was broken. The fixed regions
+totalled 506 px against 390 of height with nothing allowed to shrink, so the
+tower collapsed to nothing and the controls bar was clipped off the screen.
 
 **Unverified:** "60 fps on the target iPhone", carried over from M2, and the home-screen half of M7's password check. There is
 no device here, so it is measured in headless Chrome instead — a steady 60 fps
@@ -63,8 +61,8 @@ for what the failures look like and how a trace is judged.
 `npm run layout` measures the rendered screen against the artboard,
 `npm run scene` runs the scene checks, `npm run states` checks every race
 state against its artboard, `npm run stale` kills a server and watches the
-screen recover, and `npm run circuits` checks the pipeline against real
-circuits. Run them for any
+screen recover, `npm run rotate` rotates a live page, and `npm run circuits`
+checks the pipeline against real circuits. Run them for any
 change to the layout or the 3D view.
 
 Live at https://lapline.live, behind the password. `www.lapline.live` serves the
