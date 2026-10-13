@@ -6,6 +6,25 @@ import { Feed } from './feed/feed.js';
 import { OpenF1 } from './openf1/client.js';
 import { createServer } from './http/server.js';
 
+// Nobody is watching the logs on a race night, so say what happened and make
+// the right choice without help.
+//
+// A stray rejection — a background fetch, an MQTT restart that lost its catch —
+// is not a reason to drop everyone's stream, and under Node 22 an unhandled one
+// ends the process. So log it and carry on. An uncaught exception is different:
+// state may be inconsistent, and `railway.json` sets ON_FAILURE with ten
+// retries, so exiting gets a clean process back in about twenty seconds.
+//
+// Only the message is logged. A thrown OpenF1 error can carry a URL, and
+// nothing containing a credential goes to the log.
+process.on('unhandledRejection', (e: unknown) => {
+  console.error('unhandled rejection:', e instanceof Error ? e.message : String(e));
+});
+process.on('uncaughtException', (e: unknown) => {
+  console.error('uncaught exception, exiting for a restart:', e instanceof Error ? e.message : String(e));
+  process.exit(1);
+});
+
 const env = readEnv();
 
 const api = new OpenF1({

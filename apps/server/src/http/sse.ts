@@ -17,6 +17,11 @@ export const SSE_HEADERS = {
 export function openStream(res: ServerResponse, feed: Feed, onClose: (fn: () => void) => void): void {
   res.writeHead(200, SSE_HEADERS);
   res.write('retry: 3000\n\n');
+  // A socket that fails between frames emits 'error' on the response, and an
+  // unhandled 'error' on a stream ends the process. One phone losing its
+  // connection on the way through a tunnel must not take the stream down for
+  // everyone else, so handle it and let it go.
+  res.on('error', () => feed.removeListener(res));
   feed.addListener(res);
   onClose(() => feed.removeListener(res));
 }

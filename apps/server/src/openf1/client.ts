@@ -93,10 +93,14 @@ export class OpenF1 {
       body,
     });
     if (!res.ok) {
-      // Remember this: the caller logs and carries on unauthenticated, so
-      // without recording it nothing downstream can tell a working credential
-      // from a refused one.
-      this.tokenRejected = true;
+      // Remember a *refusal*: the caller logs and carries on unauthenticated,
+      // so without recording it nothing downstream can tell a working
+      // credential from a refused one. Only the 4xx answers say anything about
+      // the credential, though — a 500 or a 503 from the token endpoint says
+      // OpenF1 is having a minute, and reporting "rejected" for that told the
+      // viewer their sponsorship had lapsed when the next attempt would have
+      // worked.
+      if (res.status >= 400 && res.status < 500) this.tokenRejected = true;
       throw new Error(`OpenF1 token request failed: ${res.status} ${await res.text()}`);
     }
     const data = (await res.json()) as TokenResponse;
