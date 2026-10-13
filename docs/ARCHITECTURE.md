@@ -177,6 +177,11 @@ the frames — so nothing in the running code changes to be measured.
 | **The whole stream** | **7.7 kB/s, 28 MB an hour** | Same run, so a two-hour race is about 56 MB of mobile data |
 | Worst gap between ticks | 0.5 s over the internet, 0.3 s locally | Against a 0.25 s cadence |
 | Scene rebuild | 0 geometries, 0 textures leaked | M9, `npm run scene`. Was 7 and 10 per rebuild, and `setCircuit` runs on every nudge of the elevation slider |
+| Soak, 2.8 hours | memory flat, 0 reconnects, 0 errors | M9, `npm run soak` against the mock Race live over REST, one listener held open throughout. See below |
+| Resident memory over that run | 92.5 -> 132.5 MB live, peak 152.5, back to 102.6 | Rose while the session filled its history, flat for the last ten minutes of live, and the replay peak was given back. Final hour: -1.0 MB/hour |
+| File descriptors | 24 to 26, ended at 24 | Same run |
+| Live to replay handover | survived, no reconnect | Same run, at 62 minutes. Requests dropped 46/min to 4-6/min and the stream held 4.0 ticks/s through it |
+| Worst gap between ticks over 2.8 h | 0.3 s | Same run, against a 0.25 s cadence |
 
 The `intervals` figure is the one to watch: a real race replay moves about
 3.7 MB over its eight session-open requests, which puts 25 to 30 seconds between
@@ -220,6 +225,14 @@ the code.
 
 `npm run soak` is the instrument for all of this: run it for hours and read the
 curve, not the snapshot. A leak is a slope.
+
+What a 2.8 hour run against the mock showed, and what to compare Austin's
+against: resident memory rises through a live session as `laps`, `pos`, `ivl`
+and `rc` fill with history — 40 MB over an hour here — and then stops. It does
+not keep going. The replay afterwards peaked 20 MB above that and gave it back,
+and the final hour was flat to slightly down. So a run whose memory is still
+climbing an hour after the chequered flag has something wrong with it; one that
+rises during the session does not.
 
 ## Non-functional targets
 
