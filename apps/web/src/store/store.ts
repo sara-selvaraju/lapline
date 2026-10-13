@@ -229,7 +229,12 @@ export const useStore = create<StoreState>((set, get) => ({
       // The trace follows the selected car only, over the last 30 s of session time.
       if (s.sel != null) {
         const car = tick.cars.find((c) => c[0] === s.sel);
-        if (car) {
+        // A paused replay still ticks four times a second, with the clock
+        // frozen. Appending those grew the trace without bound — the 30 s
+        // window below trims by `tick.t`, which is not moving — and every
+        // sample was a repeat of the one before it, so there was nothing to
+        // draw either. Ignore a tick that has not advanced the clock.
+        if (car && tick.t !== s.history.at(-1)?.[0]) {
           const history = [...s.history, [tick.t, car[4], car[7], car[8]] as HistorySample];
           while (history.length && tick.t - history[0]![0] > 30_000) history.shift();
           // A seek can move the clock backwards; a trace spanning it would be a lie.
