@@ -170,12 +170,12 @@ the frames — so nothing in the running code changes to be measured.
 | Built web bundle | 502 KB, 129 KB gzipped at M0; 597 KB, 156 KB with React | Vite, three.js included |
 | Self-hosted font | 91 KB, four weights | Barlow Semi Condensed, latin subset, SIL OFL |
 | Portrait layout | every region exact against `Main.dc.html` | Measured by `npm run layout`, not eyeballed |
-| Frame size, `tick` | 886 B at 4 Hz = 3.5 kB/s | M9, `npm run soak`, mock Race live over REST, 20 cars |
-| Frame size, `timing` | 3,105 B at 1 Hz = 3.1 kB/s | Same run. The tower is the expensive half of the stream |
-| Frame size, `hello` | 7,882 B once | Includes the circuit outline and the driver list |
+| Frame size, `tick` | 1,090 B at 4 Hz = 4.3 kB/s | M9, `npm run soak` against lapline.live, Singapore race replay, 22 cars. 886 B with the mock's 20 |
+| Frame size, `timing` | 3,349 B at 1 Hz = 3.3 kB/s | Same run. The tower is nearly half the stream |
+| Frame size, `hello` | 14,979 B once | The circuit outline and the driver list. 7,882 B at the mock's 306-point outline against Singapore's 360 |
 | Frame size, `ping` | 39 B every 15 s | Keeps the connection from being reaped |
-| **The whole stream** | **6.7 kB/s, 24 MB an hour** | Same run. A two-hour race is about 48 MB of mobile data. A real field is 22 cars, so read this as a floor |
-| Worst gap between ticks | 0.3 s | Same run, against a 0.25 s cadence |
+| **The whole stream** | **7.7 kB/s, 28 MB an hour** | Same run, so a two-hour race is about 56 MB of mobile data |
+| Worst gap between ticks | 0.5 s over the internet, 0.3 s locally | Against a 0.25 s cadence |
 | Scene rebuild | 0 geometries, 0 textures leaked | M9, `npm run scene`. Was 7 and 10 per rebuild, and `setCircuit` runs on every nudge of the elevation slider |
 
 The `intervals` figure is the one to watch: a real race replay moves about
