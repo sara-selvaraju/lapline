@@ -2,7 +2,7 @@
 // M5's acceptance check: the mock's scripted race control events step through
 // every state in replay, with the matching band and layout.
 //
-//   node tools/state-check.mjs [--url http://localhost:3130] [--shots design/screens]
+//   node tools/state-check.mjs [--url http://localhost:3000] [--shots design/screens]
 //
 // Drives a replay to each scripted moment and reads what the client actually
 // draws: the band's colour class, height and label, and the tower's columns.
@@ -15,7 +15,7 @@ const flag = (n, d) => {
   const i = args.indexOf(`--${n}`);
   return i >= 0 && args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : d;
 };
-const URLBASE = flag('url', 'http://localhost:3130').replace(/\/$/, '');
+const URLBASE = flag('url', 'http://localhost:3000').replace(/\/$/, '');
 const session = await signIn(URLBASE);
 const SHOTS = flag('shots', null);
 const PASSWORD = process.env.APP_PASSWORD;

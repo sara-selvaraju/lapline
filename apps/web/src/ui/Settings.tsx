@@ -10,7 +10,7 @@
 // and they have been stored and persisted since M3 with nothing able to
 // change them. A preference nobody can reach is not a preference.
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { SessionListEntry } from '@lapline/shared';
 import { useStore } from '../store/store.js';
 import { fmtWhen } from './format.js';
@@ -31,6 +31,42 @@ export function byWeekend(sessions: readonly SessionListEntry[]): Array<{
   return [...groups.values()];
 }
 
+/**
+ * Frames a second, sampled only while the settings page is open.
+ *
+ * "60 fps on the target iPhone" has been unverified since M2 because there is
+ * no device here, and headless Chrome says nothing about Safari on A-series
+ * hardware. This puts the real number where it can be read off the phone
+ * itself. It is a second's average, published once a second — per-frame data
+ * does not go through React state.
+ *
+ * Not in the artboard; recorded under open design questions in docs/DESIGN.md.
+ */
+function useFps(active: boolean): number | null {
+  const [fps, setFps] = useState<number | null>(null);
+  const raf = useRef(0);
+  useEffect(() => {
+    if (!active) {
+      setFps(null);
+      return;
+    }
+    let frames = 0;
+    let since = performance.now();
+    const tick = (now: number): void => {
+      frames++;
+      if (now - since >= 1000) {
+        setFps(Math.round((frames * 1000) / (now - since)));
+        frames = 0;
+        since = now;
+      }
+      raf.current = requestAnimationFrame(tick);
+    };
+    raf.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf.current);
+  }, [active]);
+  return fps;
+}
+
 export function Settings(): React.JSX.Element | null {
   const open = useStore((s) => s.settingsOpen);
   const close = useStore((s) => s.closeSettings);
@@ -38,6 +74,7 @@ export function Settings(): React.JSX.Element | null {
   const current = useStore((s) => s.session?.key ?? null);
   const chooseSession = useStore((s) => s.chooseSession);
   const replayFromStart = useStore((s) => s.replayFromStart);
+  const fps = useFps(open);
   const status = useStore((s) => s.status);
   const mode = useStore((s) => s.mode);
   const stalled = useStore((s) => s.stalled);
@@ -155,7 +192,10 @@ export function Settings(): React.JSX.Element | null {
           Replay this session from the start
         </button>
 
-        <p className="settings-diag">{diagnostics(status, mode, stalled)}</p>
+        <p className="settings-diag">
+          {diagnostics(status, mode, stalled)}
+          {fps != null && ` Drawing at ${fps} fps.`}
+        </p>
       </div>
     </div>
   );
