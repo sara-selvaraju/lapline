@@ -274,17 +274,40 @@ describe('prune', () => {
     expect(b.rc).toHaveLength(1);
   });
 
-  it('clears a seen set once it passes 200,000 keys', () => {
-    const b = createBuffers();
-    for (let i = 0; i < 200_001; i++) b.seen.location.add(`k${i}`);
-    prune(b, 0);
-    expect(b.seen.location.size).toBe(0);
-  });
-
   it('keeps a seen set that is still small', () => {
     const b = createBuffers();
     b.seen.location.add('k');
     prune(b, 0);
     expect(b.seen.location.size).toBe(1);
+  });
+
+  it('clears a seen set holding far more keys than there are rows to dedupe', () => {
+    // A key for a row that has already been pruned cannot dedupe anything. The
+    // cap used to be a flat 200,000, which at a live race's 4,400 rows a minute
+    // was 45 minutes of keys against 90 seconds of rows.
+    const b = createBuffers();
+    for (let i = 0; i < 40_000; i++) b.seen.location.add(`k${i}`);
+    prune(b, 0);
+    expect(b.seen.location.size).toBe(0);
+  });
+
+  it('scales the cap to what is retained, rather than to a constant', () => {
+    const b = createBuffers();
+    // 5,000 rows held, so 20,000 keys is within the allowance and 25,000 is not.
+    b.loc.set(1, Array.from({ length: 5_000 }, (_, i) => [i, 0, 0, 0]));
+    for (let i = 0; i < 20_000; i++) b.seen.location.add(`k${i}`);
+    prune(b, 0);
+    expect(b.seen.location.size).toBe(20_000);
+
+    for (let i = 20_000; i < 25_000; i++) b.seen.location.add(`k${i}`);
+    prune(b, 0);
+    expect(b.seen.location.size).toBe(0);
+  });
+
+  it('keeps a floor, so an empty buffer does not clear a set every second', () => {
+    const b = createBuffers();
+    for (let i = 0; i < 4_999; i++) b.seen.location.add(`k${i}`);
+    prune(b, 0);
+    expect(b.seen.location.size).toBe(4_999);
   });
 });

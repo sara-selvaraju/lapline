@@ -147,6 +147,21 @@ export function num(v: unknown): number | null {
 }
 
 /**
+ * How many dedupe keys to hold per retained row, and the floor below which the
+ * question does not arise.
+ *
+ * A flat cap of 200,000 was 45 minutes of keys at a live race's 4,400 rows a
+ * minute per endpoint, against buffers that keep 90 seconds of rows — measured
+ * against the mock, 21,774 keys after four minutes and still climbing. A key
+ * for a row that was pruned long ago cannot dedupe anything, because the row it
+ * would have matched is no longer held. Scaling to what is retained keeps the
+ * sawtooth small and self-adjusting: a bigger field or a faster sample rate
+ * raises both sides together, where a constant would have to be guessed again.
+ */
+const SEEN_PER_ROW = 4;
+const MIN_SEEN = 5_000;
+
+/**
  * Drop location and car samples that have fallen behind the clock. The seen sets
  * are cleared once they get large: the overlap window is short, so a reset only
  * risks re-admitting a few duplicates, which the search invariant tolerates.
@@ -158,11 +173,13 @@ export function prune(buffers: Buffers, clockMs: number): void {
     [buffers.car as unknown as Map<number, TimedRow[]>, buffers.seen.car_data],
   ];
   for (const [map, seen] of pairs) {
+    let kept = 0;
     for (const arr of map.values()) {
       let i = 0;
       while (i < arr.length && arr[i]![0] < cutoff) i++;
       if (i > 0) arr.splice(0, i);
+      kept += arr.length;
     }
-    if (seen.size > 200_000) seen.clear();
+    if (seen.size > Math.max(MIN_SEEN, kept * SEEN_PER_ROW)) seen.clear();
   }
 }
