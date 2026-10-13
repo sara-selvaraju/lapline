@@ -13,22 +13,25 @@ A personal, non-commercial, phone-first second screen for F1 sessions: a 3D circ
 
 ## Status
 
-M6 done, with one check that cannot be run here. The replay transport has its
-two-row bar with ±10 s and a scrubber marked with safety car, VSC and red-flag
-periods; "Sync with TV" works out the broadcast delay from a single tap; and
-each phone remembers its delay per session. Protocol is still v5 — the
-scrubber's markings come from `GET /api/periods` and the sync flow from
-`GET /api/crossings`, neither of which belongs in a frame sent every second.
-Next is M7 in `docs/BUILD-PLAN.md`.
+M7 done, with one check that needs a phone. Basic auth is gone: a password
+page sets a signed cookie for 180 days, revocable by changing `APP_PASSWORD`,
+with a delay and a per-address cap on wrong answers. The loading, connection
+lost, locked and settings screens are all built, and settings has absorbed
+M5's session picker. Protocol is v6. Next is M8 in `docs/BUILD-PLAN.md`.
 
-Both acceptance checks are automated. Seeking leaves no stuck cars after a
-±10 s jump or a small backwards drag — that second case was a real bug, found
-by writing the check: a refilled buffer begins at the seek point with nothing
-behind it, so dragging the scrubber slightly left landed before any data and
-every car vanished. And against the live mock, a tap recovers an injected
-broadcast delay to within a second across five values.
+Two of the three acceptance checks are automated. `npm run stale` starts a
+server, kills it, and asserts the banner appears within six seconds naming the
+silence, that the last known positions stay, and that the screen recovers with
+no reload and no tap. The locked screen's free-replay time is covered on both
+sides: the server sends `sessEnd + 30 min` on every path into locked mode —
+until M7 two of the three sent nothing — and the client renders it as the
+viewer's own weekday and local time.
 
-**Unverified:** "60 fps on the target iPhone", carried over from M2. There is
+The third, "the password survives the iOS home-screen app relaunching", passes
+as far as a browser can show it: signing in, discarding the page and reopening
+with the same cookie jar asks for nothing. The iPhone half needs your phone.
+
+**Unverified:** "60 fps on the target iPhone", carried over from M2, and the home-screen half of M7's password check. There is
 no device here, so it is measured in headless Chrome instead — a steady 60 fps
 with a full field, which shows the scene is fast enough algorithmically but
 says nothing about Safari on A-series hardware. Run it on a phone before
@@ -59,8 +62,9 @@ for what the failures look like and how a trace is judged.
 
 `npm run layout` measures the rendered screen against the artboard,
 `npm run scene` runs the scene checks, `npm run states` checks every race
-state against its artboard and `npm run circuits` checks the pipeline against
-real circuits; the first three fail on drift. Run them for any
+state against its artboard, `npm run stale` kills a server and watches the
+screen recover, and `npm run circuits` checks the pipeline against real
+circuits. Run them for any
 change to the layout or the 3D view.
 
 Live at https://lapline.live, behind the password. `www.lapline.live` serves the

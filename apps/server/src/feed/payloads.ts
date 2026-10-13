@@ -93,6 +93,16 @@ export function helloPayload(i: HelloInput): Hello {
   const sessions: SessionListEntry[] = i.sessions.map((x) => ({
     key: x.session_key as number,
     label: sessionLabel(x),
+    // Kept apart as well as combined: the settings page groups by weekend and
+    // names the session on its own, where the overlay wants one short line.
+    //
+    // The weekend is named from the circuit, not from `meetings.meeting_name`,
+    // which the sessions endpoint does not carry. Fetching the real name would
+    // cost a request per weekend in the list to gain "Grand Prix" on the end
+    // of something the viewer already recognises.
+    name: String(x.session_name || 'Session'),
+    meeting: String(x.circuit_short_name || x.country_name || x.location || 'Race weekend'),
+    meetingKey: typeof x.meeting_key === 'number' ? x.meeting_key : null,
     start: x.date_start as string,
     live: isLiveWindow(x, now),
   }));

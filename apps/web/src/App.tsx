@@ -1,4 +1,9 @@
 // The main screen, in the order docs/DESIGN.md lays out for portrait.
+//
+// One tree rather than a return per state, deliberately: the track is a WebGL
+// context with a scene in it, and swapping between separate trees unmounts
+// and rebuilds it. Opening a session — loading, then running — is the common
+// path, and it should not throw the circuit away halfway through.
 
 import { ControlsBar } from './ui/ControlsBar.js';
 import { DriverStrip } from './ui/DriverStrip.js';
@@ -6,7 +11,11 @@ import { FlagBand } from './ui/FlagBand.js';
 import { Header } from './ui/Header.js';
 import { Finished } from './ui/Finished.js';
 import { Overlay } from './ui/Overlay.js';
-import { SessionPicker } from './ui/SessionPicker.js';
+import { Loading } from './ui/Loading.js';
+import { Locked } from './ui/Locked.js';
+import { Reconnecting } from './ui/Reconnecting.js';
+import { Settings } from './ui/Settings.js';
+import { WakeLock } from './ui/WakeLock.js';
 import { SyncSheet } from './ui/SyncSheet.js';
 import { TelemetryPanel } from './ui/TelemetryPanel.js';
 import { TimingTower } from './ui/TimingTower.js';
@@ -23,36 +32,47 @@ export function App(): React.JSX.Element {
   // classification. Only once the result is actually in: a chequered flag with
   // nothing to show would be a worse screen than the one it replaces.
   const finished = useStore((s) => s.timing?.flag === 'CHEQUERED' && s.result != null);
+  const locked = useStore((s) => s.mode === 'locked');
+  // Nothing has arrived yet: no outline and no cars. Once either lands the
+  // ordinary screen has something to show, so the staged list gets out of the
+  // way rather than waiting for everything.
+  const loading = useStore(
+    (s) => (s.circuit?.points.length ?? 0) === 0 && (s.tick?.cars.length ?? 0) === 0,
+  );
 
-  if (finished) {
-    return (
-      <>
-        <FlagBand />
-        <Header />
-        <Finished />
-        <SessionPicker />
-        <Overlay />
-      </>
-    );
-  }
+  const showTrack = !locked && !finished;
 
   return (
     <>
       <FlagBand />
       <Header />
-      <TrackArea />
-      {expanded ? (
-        <TelemetryPanel />
+      {showTrack && <Reconnecting />}
+      {showTrack && <TrackArea />}
+
+      {locked ? (
+        <Locked />
+      ) : finished ? (
+        <Finished />
+      ) : loading ? (
+        <Loading />
       ) : (
         <>
-          <DriverStrip />
-          <TimingTower />
+          {expanded ? (
+            <TelemetryPanel />
+          ) : (
+            <>
+              <DriverStrip />
+              <TimingTower />
+            </>
+          )}
+          <ControlsBar />
         </>
       )}
-      <ControlsBar />
+
       <SyncSheet />
-      <SessionPicker />
+      <Settings />
       <Overlay />
+      <WakeLock />
     </>
   );
 }

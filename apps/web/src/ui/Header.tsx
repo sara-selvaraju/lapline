@@ -35,6 +35,7 @@ function LivePill(): React.JSX.Element | null {
 
 export function Header(): React.JSX.Element {
   const session = useStore((s) => s.session);
+  const openSettings = useStore((s) => s.openSettings);
   const lap = useStore((s) => s.timing?.lap ?? null);
   const finished = useStore((s) => s.timing?.flag === 'CHEQUERED' && s.result != null);
   // OpenF1 publishes no total-lap figure, so the artboard's "23/62" shows as
@@ -60,7 +61,7 @@ export function Header(): React.JSX.Element {
       </div>
       <div className="header-right">
         <LivePill />
-        <button className="icon-button" aria-label="Settings">
+        <button className="icon-button" aria-label="Settings" onClick={openSettings}>
           <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
           </svg>

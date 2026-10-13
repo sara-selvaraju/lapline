@@ -56,6 +56,20 @@ export function fmtDuration(seconds: number): string {
   return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+/**
+ * When a locked session becomes free, as a weekday and a local time.
+ *
+ * docs/BUILD-PLAN.md M7 asks for "the correct local time for free replay", so
+ * it is deliberately the viewer's own clock and their own weekday — the
+ * server sends an instant and the phone decides what that means where it is.
+ */
+export function fmtFreeAt(iso: string | undefined): string {
+  if (!iso) return 'later today';
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return 'later today';
+  return at.toLocaleString('en-AU', { weekday: 'long', hour: 'numeric', minute: '2-digit' });
+}
+
 /** The compound's colour token, or haze when upstream sent something odd. */
 export function tyreVar(compound: string | null): string {
   const key = (compound ?? '').toLowerCase();

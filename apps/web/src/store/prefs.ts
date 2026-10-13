@@ -20,6 +20,10 @@ export interface Prefs {
   showPitLane: boolean;
   /** Whether the telemetry panel is open, kept across sessions. */
   expanded: boolean;
+  /** Switch to a session when it goes live. */
+  followLive: boolean;
+  /** Hold a wake lock while the app is in front. */
+  keepAwake: boolean;
   /**
    * The sync delay, in seconds, remembered per session key.
    *
@@ -43,6 +47,8 @@ export const DEFAULT_PREFS: Prefs = {
   showSectors: true,
   showPitLane: true,
   expanded: false,
+  followLive: true,
+  keepAwake: false,
   delays: {},
 };
 
@@ -62,6 +68,8 @@ export function loadPrefs(): Prefs {
       showSectors: typeof raw.showSectors === 'boolean' ? raw.showSectors : DEFAULT_PREFS.showSectors,
       showPitLane: typeof raw.showPitLane === 'boolean' ? raw.showPitLane : DEFAULT_PREFS.showPitLane,
       expanded: typeof raw.expanded === 'boolean' ? raw.expanded : DEFAULT_PREFS.expanded,
+      followLive: typeof raw.followLive === 'boolean' ? raw.followLive : DEFAULT_PREFS.followLive,
+      keepAwake: typeof raw.keepAwake === 'boolean' ? raw.keepAwake : DEFAULT_PREFS.keepAwake,
       delays: readDelays(raw.delays),
     };
   } catch {

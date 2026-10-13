@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { esc, fmtGap, fmtLap, tyreHtml, TYRE_LETTER, fmtBehind } from '../src/ui/format.js';
+import { esc, fmtGap, fmtLap, tyreHtml, TYRE_LETTER, fmtBehind, fmtFreeAt } from '../src/ui/format.js';
 
 describe('fmtLap', () => {
   it('formats as m:ss.mmm with a padded seconds field', () => {
@@ -101,5 +101,29 @@ describe('fmtBehind', () => {
 
   it('shows a dash when there is nothing', () => {
     expect(fmtBehind(null)).toBe('–');
+  });
+});
+
+describe('fmtFreeAt', () => {
+  // docs/BUILD-PLAN.md M7: "The locked screen shows the correct local time for
+  // free replay." The server sends an instant; the phone decides what that
+  // means where it is.
+  it('names the weekday and the local time', () => {
+    const at = new Date('2026-10-12T01:30:00+11:00');
+    const shown = fmtFreeAt(at.toISOString());
+    // Whatever zone the test runs in, it must agree with the platform.
+    const want = at.toLocaleString('en-AU', { weekday: 'long', hour: 'numeric', minute: '2-digit' });
+    expect(shown).toBe(want);
+  });
+
+  it('is a weekday, not a date', () => {
+    expect(fmtFreeAt('2026-10-12T01:30:00Z')).toMatch(
+      /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/,
+    );
+  });
+
+  it('says something sensible when there is no time to show', () => {
+    expect(fmtFreeAt(undefined)).toBe('later today');
+    expect(fmtFreeAt('not a date')).toBe('later today');
   });
 });

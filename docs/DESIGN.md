@@ -162,6 +162,13 @@ VSC, VSC ending, safety car ending and yellow use the safety car layout with the
 
 ## Open design questions
 
+- **The detail-layer toggles live in settings' Track view card**, which
+  `Settings.dc.html` does not draw. Turns, sectors and the pit lane have been
+  stored and persisted since M3 with nothing able to change them, and this
+  file calls each one a viewer preference. A preference nobody can reach is
+  not a preference, so they are in the card that already covers how the track
+  is drawn.
+
 - **The "ending" bands have no artboard.** `SC ENDING` and `VSC ENDING` keep
   the safety car's yellow ground and differ only by label, which is what the
   states table above asks for, but no artboard draws them. Judge them on a
