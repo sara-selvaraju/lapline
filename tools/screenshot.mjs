@@ -9,6 +9,7 @@
 // successful screenshot.
 
 import { chromium, devices } from 'playwright';
+import { signIn } from './login.mjs';
 import { mkdir } from 'node:fs/promises';
 
 const args = process.argv.slice(2);
@@ -20,6 +21,7 @@ const flag = (name, fallback) => {
 const OUT = flag('out', 'design/screens');
 const NAME = flag('name', 'prototype-parity');
 const URLBASE = flag('url', 'http://localhost:3000').replace(/\/$/, '');
+const session = await signIn(URLBASE);
 const PASSWORD = process.env.APP_PASSWORD;
 
 const SIZES = [
@@ -42,7 +44,7 @@ for (const [label, viewport] of SIZES) {
     deviceScaleFactor: 2,
     isMobile: true,
     hasTouch: true,
-    ...(PASSWORD ? { httpCredentials: { username: 'any', password: PASSWORD } } : {}),
+    storageState: { cookies: session.cookies, origins: [] },
   });
   const page = await ctx.newPage();
   const errors = [];

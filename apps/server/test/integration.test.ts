@@ -13,7 +13,20 @@ const SRV_PORT = 3301;
 const ROOT = new URL('../../..', import.meta.url).pathname;
 const BASE = `http://localhost:${SRV_PORT}`;
 const PASSWORD = 'parity-test';
-const auth = { Authorization: `Basic ${Buffer.from(`any:${PASSWORD}`).toString('base64')}` };
+/** Filled in by signing in once the server is up; sent with every request. */
+let auth: Record<string, string> = {};
+
+/** Posts the password and keeps the cookie, as a browser would. */
+async function signIn(password: string): Promise<Record<string, string>> {
+  const res = await fetch(`${BASE}/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ password }).toString(),
+    redirect: 'manual',
+  });
+  const cookie = res.headers.get('set-cookie')?.split(';')[0] ?? '';
+  return cookie ? { Cookie: cookie } : {};
+}
 
 let mock: ChildProcess;
 let srv: ChildProcess;
@@ -69,6 +82,7 @@ beforeAll(async () => {
     stdio: 'ignore',
   });
   await waitFor(`${BASE}/healthz`);
+  auth = await signIn(PASSWORD);
   // Let the session finish opening: drivers, then the six static endpoints.
   await new Promise((r) => setTimeout(r, 3500));
 }, 60_000);
@@ -92,24 +106,58 @@ describe('/healthz', () => {
 });
 
 describe('the password gate', () => {
-  it('401s every path but health without credentials', async () => {
+  it('turns a browser away from every path but health', async () => {
     for (const p of ['/', '/events', '/api/state']) {
-      expect((await fetch(`${BASE}${p}`)).status).toBe(401);
+      const r = await fetch(`${BASE}${p}`, { redirect: 'manual' });
+      expect({ p, ok: r.status === 401 || r.status === 302 }).toEqual({ p, ok: true });
     }
   });
 
-  it('offers a Basic challenge so the browser prompts', async () => {
-    const r = await fetch(`${BASE}/`);
-    expect(r.headers.get('www-authenticate')).toContain('Basic realm="Lapline"');
+  it('sends a page request to the sign-in page rather than a bare 401', async () => {
+    const r = await fetch(`${BASE}/`, { headers: { Accept: 'text/html' }, redirect: 'manual' });
+    expect(r.status).toBe(302);
+    expect(r.headers.get('location')).toBe('/login');
   });
 
-  it('401s a wrong password', async () => {
-    const bad = { Authorization: `Basic ${Buffer.from('any:wrong').toString('base64')}` };
-    expect((await fetch(`${BASE}/api/state`, { headers: bad })).status).toBe(401);
+  it('401s a fetch, so a stale tab does not parse HTML as JSON', async () => {
+    const r = await fetch(`${BASE}/api/state`, { headers: { Accept: 'application/json' } });
+    expect(r.status).toBe(401);
+    expect(r.headers.get('content-type')).toContain('text/plain');
   });
 
-  it('accepts the right password with any username', async () => {
-    expect((await fetch(`${BASE}/api/state`, { headers: auth })).status).toBe(200);
+  it('serves the sign-in page without a password', async () => {
+    const r = await fetch(`${BASE}/login`);
+    expect(r.status).toBe(200);
+    expect(await r.text()).toContain('name="password"');
+  });
+
+  it('sets no cookie for a wrong password', async () => {
+    const r = await fetch(`${BASE}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ password: 'wrong' }).toString(),
+      redirect: 'manual',
+    });
+    expect(r.status).toBe(401);
+    expect(r.headers.get('set-cookie')).toBeNull();
+  });
+
+  it('sets a cookie for the right one, and that cookie opens the door', async () => {
+    const headers = await signIn(PASSWORD);
+    expect(headers.Cookie).toMatch(/^lapline=/);
+    expect((await fetch(`${BASE}/api/state`, { headers })).status).toBe(200);
+  });
+
+  it('keeps the cookie out of reach of scripts, which is the point of it', async () => {
+    const r = await fetch(`${BASE}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ password: PASSWORD }).toString(),
+      redirect: 'manual',
+    });
+    const set = r.headers.get('set-cookie') ?? '';
+    expect(set).toContain('HttpOnly');
+    expect(set).toContain('SameSite=Lax');
   });
 });
 

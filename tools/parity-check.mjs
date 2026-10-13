@@ -7,6 +7,7 @@
 // been connected for a minute. With --rate it also samples /api/state at both
 // ends of the window and reports the request rate per minute.
 
+import { signIn } from './login.mjs';
 const args = process.argv.slice(2);
 const flag = (name, fallback) => {
   const i = args.indexOf(`--${name}`);
@@ -18,10 +19,7 @@ const SECONDS = Number(flag('seconds', '30'));
 const URL_BASE = flag('url', 'http://localhost:3000').replace(/\/$/, '');
 const WANT_RATE = has('rate');
 
-const headers = {};
-if (process.env.APP_PASSWORD) {
-  headers.Authorization = `Basic ${Buffer.from(`any:${process.env.APP_PASSWORD}`).toString('base64')}`;
-}
+const { headers } = await signIn(URL_BASE);
 
 const state = async () => {
   const r = await fetch(`${URL_BASE}/api/state`, { headers });

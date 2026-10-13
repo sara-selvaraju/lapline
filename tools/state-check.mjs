@@ -8,6 +8,7 @@
 // draws: the band's colour class, height and label, and the tower's columns.
 
 import { chromium } from 'playwright';
+import { signIn } from './login.mjs';
 
 const args = process.argv.slice(2);
 const flag = (n, d) => {
@@ -15,9 +16,10 @@ const flag = (n, d) => {
   return i >= 0 && args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : d;
 };
 const URLBASE = flag('url', 'http://localhost:3130').replace(/\/$/, '');
+const session = await signIn(URLBASE);
 const SHOTS = flag('shots', null);
 const PASSWORD = process.env.APP_PASSWORD;
-const headers = PASSWORD ? { Authorization: `Basic ${Buffer.from(`any:${PASSWORD}`).toString('base64')}` } : {};
+const headers = session.headers;
 
 /** Each scripted moment, and what the band and tower should become. */
 const STATES = [
@@ -71,7 +73,7 @@ for (const s of STATES) {
     deviceScaleFactor: 2,
     isMobile: true,
     hasTouch: true,
-    ...(PASSWORD ? { httpCredentials: { username: 'any', password: PASSWORD } } : {}),
+    storageState: { cookies: session.cookies, origins: [] },
   });
   const page = await ctx.newPage();
   const errors = [];

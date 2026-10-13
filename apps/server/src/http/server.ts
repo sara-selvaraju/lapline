@@ -5,7 +5,17 @@
 
 import http, { type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { Feed } from '../feed/feed.js';
-import { authorised, CHALLENGE } from './auth.js';
+import {
+  Attempts,
+  authorised,
+  loginPage,
+  mintCookie,
+  readForm,
+  safeEqual,
+  setCookieHeader,
+  signingKey,
+  WRONG_DELAY_MS,
+} from './auth.js';
 import { control, readBody } from './control.js';
 import { crossingsPayload, periodsPayload } from './query.js';
 import { serveStatic } from './static.js';
@@ -14,8 +24,16 @@ import { openStream } from './sse.js';
 export interface ServerOptions {
   feed: Feed;
   appPassword: string;
+  /** Signs the session cookie; falls back to the password when unset. */
+  sessionSecret: string;
   /** Directory holding the built web app. */
   publicDir: string;
+}
+
+/** Whether the connection reaching the browser is https, proxy included. */
+function isSecure(req: IncomingMessage): boolean {
+  const proto = (req.headers['x-forwarded-proto'] as string | undefined) ?? '';
+  return proto.split(',')[0]?.trim() === 'https';
 }
 
 function json(res: ServerResponse, code: number, body: unknown): void {
@@ -23,7 +41,10 @@ function json(res: ServerResponse, code: number, body: unknown): void {
   res.end(JSON.stringify(body));
 }
 
-export function createServer({ feed, appPassword, publicDir }: ServerOptions): Server {
+export function createServer({ feed, appPassword, sessionSecret, publicDir }: ServerOptions): Server {
+  const key = signingKey(sessionSecret, appPassword);
+  const attempts = new Attempts();
+
   return http.createServer((req: IncomingMessage, res: ServerResponse) => {
     void (async () => {
       const url = new URL(req.url ?? '/', 'http://x');
@@ -31,8 +52,54 @@ export function createServer({ feed, appPassword, publicDir }: ServerOptions): S
       // Health sits outside the password, so Railway can reach it.
       if (url.pathname === '/healthz') return json(res, 200, { ok: true, mode: feed.mode });
 
-      if (!authorised(req.headers.authorization, appPassword)) {
-        res.writeHead(401, CHALLENGE);
+      // The way in has to sit outside the gate, or there is no way in.
+      if (url.pathname === '/login') {
+        if (!appPassword) {
+          res.writeHead(302, { Location: '/' });
+          return res.end();
+        }
+        // Behind Railway's proxy the socket address is the proxy, so the
+        // forwarded address is what distinguishes one phone from another.
+        const who =
+          (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() ||
+          req.socket.remoteAddress ||
+          'unknown';
+
+        if (req.method === 'POST') {
+          const locked = attempts.lockedFor(who);
+          if (locked != null) {
+            res.writeHead(429, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+            return res.end(loginPage(`Too many attempts. Try again in ${Math.ceil(locked / 60_000)} minutes.`));
+          }
+
+          const given = new URLSearchParams(await readForm(req)).get('password') ?? '';
+          if (safeEqual(given, appPassword)) {
+            attempts.right(who);
+            res.writeHead(302, {
+              Location: '/',
+              'Set-Cookie': setCookieHeader(mintCookie(key), isSecure(req)),
+            });
+            return res.end();
+          }
+
+          attempts.wrong(who);
+          await new Promise((r) => setTimeout(r, WRONG_DELAY_MS));
+          res.writeHead(401, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+          return res.end(loginPage('That password was not right.'));
+        }
+
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+        return res.end(loginPage());
+      }
+
+      if (!authorised(req.headers.cookie, appPassword, key)) {
+        // A page request gets the form; anything else gets a plain 401, so a
+        // stale tab's fetch does not quietly render HTML into a JSON parser.
+        if (req.method === 'GET' && (req.headers.accept ?? '').includes('text/html')) {
+          res.writeHead(302, { Location: '/login' });
+          return res.end();
+        }
+        res.writeHead(401, { 'Content-Type': 'text/plain' });
         return res.end('Password required');
       }
 

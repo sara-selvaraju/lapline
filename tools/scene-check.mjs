@@ -7,6 +7,7 @@
 //   node tools/scene-check.mjs [--url ...] [--seek ms]
 
 import { chromium } from 'playwright';
+import { signIn } from './login.mjs';
 
 const args = process.argv.slice(2);
 const flag = (n, d) => {
@@ -14,9 +15,10 @@ const flag = (n, d) => {
   return i >= 0 && args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : d;
 };
 const URLBASE = flag('url', 'http://localhost:3000').replace(/\/$/, '');
+const session = await signIn(URLBASE);
 const SEEK = flag('seek', null);
 const PASSWORD = process.env.APP_PASSWORD;
-const headers = PASSWORD ? { Authorization: `Basic ${Buffer.from(`any:${PASSWORD}`).toString('base64')}` } : {};
+const headers = session.headers;
 
 if (SEEK) {
   const st = await (await fetch(`${URLBASE}/api/state`, { headers })).json();
@@ -34,7 +36,7 @@ const ctx = await browser.newContext({
   deviceScaleFactor: 2,
   isMobile: true,
   hasTouch: true,
-  ...(PASSWORD ? { httpCredentials: { username: 'any', password: PASSWORD } } : {}),
+    storageState: { cookies: session.cookies, origins: [] },
 });
 const page = await ctx.newPage();
 const errors = [];

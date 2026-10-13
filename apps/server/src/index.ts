@@ -15,7 +15,12 @@ const api = new OpenF1({
 });
 const feed = new Feed(api, { liveDelayS: env.liveDelayS, liveTransport: env.liveTransport });
 
-const server = createServer({ feed, appPassword: env.appPassword, publicDir: env.publicDir });
+const server = createServer({
+  feed,
+  appPassword: env.appPassword,
+  sessionSecret: env.sessionSecret,
+  publicDir: env.publicDir,
+});
 
 server.listen(env.port, () => {
   console.log(`Lapline on :${env.port} (OpenF1 ${api.hasCredentials ? 'sponsor' : 'free'} tier)`);
