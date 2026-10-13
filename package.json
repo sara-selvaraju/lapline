@@ -28,6 +28,7 @@
     "circuits": "node tools/circuit-check.mjs",
     "states": "node tools/state-check.mjs",
     "stale": "node tools/stale-check.mjs",
+    "soak": "node tools/soak.mjs",
     "rotate": "node tools/rotate-check.mjs"
   },
   "devDependencies": {

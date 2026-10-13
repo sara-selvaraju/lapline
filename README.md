@@ -15,5 +15,7 @@ Lapline is unofficial and not affiliated with Formula 1. F1 and related marks ar
 
 ## Status
 
-M8 is done and deployed at https://lapline.live (password protected).
-Next is M9. See `docs/BUILD-PLAN.md`.
+M9 is built and deployed at https://lapline.live (password protected). It is
+complete only after the Austin weekend, 23 to 25 October: the acceptance check
+is a full live session watched on a phone, which needs a live session and a
+phone. See the Austin checklist in `AGENTS.md`.

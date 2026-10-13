@@ -173,6 +173,14 @@ VSC, VSC ending, safety car ending and yellow use the safety car layout with the
   per the rule at the top: where this file and an artboard disagree, the
   artboard wins.
 
+- **The frame rate is appended to settings' data status line**, which
+  `Settings.dc.html` does not draw. "60 fps on a recent iPhone" has been a
+  non-functional target since M2 and unverified ever since, because there is
+  no iPhone here and headless Chrome says nothing about Safari on A-series
+  hardware. One more sentence on a line that already reports the stream's
+  health puts the real number where it can be read off the phone itself. It
+  samples only while the settings page is open.
+
 - **The detail-layer toggles live in settings' Track view card**, which
   `Settings.dc.html` does not draw. Turns, sectors and the pit lane have been
   stored and persisted since M3 with nothing able to change them, and this

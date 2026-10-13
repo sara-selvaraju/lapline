@@ -13,6 +13,27 @@ A personal, non-commercial, phone-first second screen for F1 sessions: a 3D circ
 
 ## Status
 
+M9 built, and complete only after the Austin weekend. The hardening and the
+instruments are in; the acceptance check itself — a full live session watched
+on a phone with no manual intervention — needs a live session and a phone, and
+neither is here. See "Austin, 23 to 25 October" below for what to do that
+weekend.
+
+What M9 found and fixed is in two commits. On the server: a lock could not be
+left, so a single 401 from a token refresh ended the session for good; pruning
+ran below the idle guard, so a sleeping phone left MQTT filling buffers that
+nothing trimmed; the fetch loop pushed a settled timer onto an array every
+second; MQTT's first connection had no retry; and one listener throwing cost
+every listener after it in the set that frame. On the client: every rebuild of
+the track leaked 7 geometries and 10 textures, and `setCircuit` runs on each
+nudge of the elevation slider, not just on a change of circuit. Six new server
+tests and three new scene checks cover these, and most fail without their fix.
+
+MQTT against OpenF1's real broker, M9's first bullet, was already met during
+the Singapore race on 11 October — see `docs/OPENF1.md`. The line that used to
+say this project could not close that check locally was out of date and is
+gone.
+
 M8 done. Landscape is a reflow of the same tree rather than a second layout —
 the track on the left at 470 px with the tower beside it — and glance mode
 shows the top five in large type beside a flat map, entered from a button in
@@ -33,8 +54,8 @@ tower collapsed to nothing and the controls bar was clipped off the screen.
 no device here, so it is measured in headless Chrome instead — a steady 60 fps
 with a full field, which shows the scene is fast enough algorithmically but
 says nothing about Safari on A-series hardware. Run it on a phone before
-trusting it. This is the second check the project cannot close locally, after
-MQTT against OpenF1's real broker.
+trusting it. `npm run soak` and the settings page now report the frame rate,
+so at Austin it can be read off the phone.
 
 **Flaky, and not M3's doing:** `npm run scene`'s "the picker offers four or
 more" check depends on the field happening to bunch where it sweeps. It passes
@@ -58,12 +79,47 @@ no usable positions. Austin, the next race, is clean on its 2025 data — all 20
 corners placed, worst 0.51% of span, pit lane derived. See `docs/OPENF1.md`
 for what the failures look like and how a trace is judged.
 
+### Austin, 23 to 25 October
+
+M9's acceptance check needs a live session and a phone. Three things close it,
+and until they are done this milestone is built but not complete.
+
+1. **Watch a full session on the phone, start to finish, without touching it.**
+   Practice is the cheap one to get wrong on; the race is the one that counts.
+   What to watch for: the tower still filling, the cars still moving, no stale
+   banner that does not clear, and the screen awake if "keep awake" is on.
+2. **Read the frame rate off the settings page** during the busiest part — a
+   full field, Tilt view, all three detail layers on. That number is the last
+   thing standing between this project and "60 fps on a recent iPhone", which
+   has been an unverified target since M2. Write it down, with the phone.
+3. **Run the soak against the real feed**, from a machine that can stay up:
+
+   ```
+   npm run soak -- --url https://lapline.live --minutes 240 --out austin.ndjson
+   ```
+
+   It samples from outside the server, so it changes nothing about what the
+   phone sees. Without `--pid` it cannot read memory or file descriptors —
+   those come from Railway's own metrics instead. What it is for: the request
+   rate against the sponsor budget, the frame size on the wire, the worst gap
+   between ticks, how many times the stream reconnected, and whether the feed
+   survived the chequered flag and the handover from live to replay.
+
+Then record the numbers in `docs/ARCHITECTURE.md` under "Measured" and update
+the status above.
+
 `npm run layout` measures the rendered screen against the artboard,
 `npm run scene` runs the scene checks, `npm run states` checks every race
 state against its artboard, `npm run stale` kills a server and watches the
-screen recover, `npm run rotate` rotates a live page, and `npm run circuits`
-checks the pipeline against real circuits. Run them for any
-change to the layout or the 3D view.
+screen recover, `npm run rotate` rotates a live page, `npm run circuits`
+checks the pipeline against real circuits, and `npm run soak` watches a long
+run from outside and reports the curve. Run the first five for any change to
+the layout or the 3D view, and the soak for anything that touches how long the
+server stays up.
+
+They all point at `http://localhost:3000`, which is where `npm run dev` puts
+the server; pass `--url` for anywhere else. `npm run stale` is the exception —
+it starts and kills its own server, because that is the thing it is testing.
 
 Live at https://lapline.live, behind the password. `www.lapline.live` serves the
 same app. DNS is Cloudflare, registration GoDaddy, hosting Railway.

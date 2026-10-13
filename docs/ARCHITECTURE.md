@@ -109,7 +109,7 @@ Builds everything the track drawing needs, once per session, and caches it per m
 - `POST /api/control`: select session, play or pause, speed, seek, live delay, follow-live-sessions.
 - `GET /api/crossings?since=`: the leader's recent line-crossing times, for the sync flow, with the lap's length in metres and where the leader is in it.
 - `GET /api/periods`: the stretches the track was not green, for the replay scrubber's markings. A query rather than a protocol field: it is asked for once, by one screen, and the scrubber only exists in replay.
-- `GET /api/state`: a debug snapshot. `GET /healthz`: liveness, outside the password.
+- `GET /api/state`: a debug snapshot. `GET /healthz`: liveness, outside the password. Nothing in either echoes an environment value.
 - Auth: `GET /login` serves a self-contained page and `POST /login` sets a signed cookie, or the site is open when `APP_PASSWORD` is unset. A page request without one is redirected to the form; a fetch gets a plain 401, so a stale tab cannot feed HTML to a JSON parser.
 - Static: the built web app, with long cache headers for hashed assets.
 
@@ -153,8 +153,11 @@ The live delay is one value on the feed, shared by everyone connected, and each 
 
 ## Measured
 
-Numbers taken during M0, against `tools/mock-openf1` and against real OpenF1
-data. Re-measure on a device and during a live session in M9.
+Numbers taken during M0 unless a row says otherwise, against
+`tools/mock-openf1` and against real OpenF1 data. The M9 rows come from
+`npm run soak`, which samples the process from outside — `/proc` for memory
+and descriptors, `/api/state` for the feed, one held-open SSE connection for
+the frames — so nothing in the running code changes to be measured.
 
 | Measurement | Value | How |
 |---|---|---|
@@ -167,11 +170,47 @@ data. Re-measure on a device and during a live session in M9.
 | Built web bundle | 502 KB, 129 KB gzipped at M0; 597 KB, 156 KB with React | Vite, three.js included |
 | Self-hosted font | 91 KB, four weights | Barlow Semi Condensed, latin subset, SIL OFL |
 | Portrait layout | every region exact against `Main.dc.html` | Measured by `npm run layout`, not eyeballed |
+| Frame size, `tick` | 886 B at 4 Hz = 3.5 kB/s | M9, `npm run soak`, mock Race live over REST, 20 cars |
+| Frame size, `timing` | 3,105 B at 1 Hz = 3.1 kB/s | Same run. The tower is the expensive half of the stream |
+| Frame size, `hello` | 7,882 B once | Includes the circuit outline and the driver list |
+| Frame size, `ping` | 39 B every 15 s | Keeps the connection from being reaped |
+| **The whole stream** | **6.7 kB/s, 24 MB an hour** | Same run. A two-hour race is about 48 MB of mobile data. A real field is 22 cars, so read this as a floor |
+| Worst gap between ticks | 0.3 s | Same run, against a 0.25 s cadence |
+| Scene rebuild | 0 geometries, 0 textures leaked | M9, `npm run scene`. Was 7 and 10 per rebuild, and `setCircuit` runs on every nudge of the elevation slider |
 
 The `intervals` figure is the one to watch: a real race replay moves about
 3.7 MB over its eight session-open requests, which puts 25 to 30 seconds between
 opening a session and the tower filling. That is a `feed/` problem, not a UI one,
 and it sits against the first-useful-paint target below.
+
+## Surviving a long unattended run
+
+M9's acceptance is a full live session watched on a phone with nobody there to
+work around anything, so these are deliberate choices rather than accidents of
+the code.
+
+- **A lock is a wait, not an ending.** A 401 inside the live window means
+  locked, but the cause may be a token endpoint having a bad minute rather than
+  a lapsed sponsorship. `feed/` records what it was doing, retries from 30 s
+  out to 5 minutes, and only a lock with no credentials behind it stays put.
+  Equally, `tokenRejected` latches only on a 4xx: a 503 is OpenF1 having a
+  moment, not an answer about the credential.
+- **Pruning runs even when fetching does not.** Nobody connected pauses the
+  fetch plan, but MQTT keeps pushing rows in, so `prune` sits above the idle
+  guard.
+- **One listener cannot take the stream down.** Each SSE write stands alone and
+  a failing listener is dropped, and the response carries an `error` handler,
+  because an unhandled `error` on a stream ends the process.
+- **An unhandled rejection is logged, not fatal; an uncaught exception exits.**
+  A stray rejection is no reason to drop everyone's stream. A corrupt state is,
+  and `railway.json` restarts ON_FAILURE with ten retries, so a clean process
+  is back in about twenty seconds. Only the message is logged, never the error's
+  own fields, which can carry a URL.
+- **The scene gives back what it rebuilds.** `setCircuit` runs on every nudge of
+  the elevation slider, so clearing a group disposes what it held.
+
+`npm run soak` is the instrument for all of this: run it for hours and read the
+curve, not the snapshot. A leak is a slope.
 
 ## Non-functional targets
 

@@ -2,7 +2,7 @@
 // M8's acceptance check: "Rotating mid-session keeps the selection, camera and
 // stream without a reconnect."
 //
-//   node tools/rotate-check.mjs [--url http://localhost:3160]
+//   node tools/rotate-check.mjs [--url http://localhost:3000]
 //
 // Rotates one live page rather than loading two, which is the only way to tell
 // a reflow from a rebuild. tools/screenshot.mjs captures both orientations but
@@ -16,7 +16,7 @@ const flag = (n, d) => {
   const i = args.indexOf(`--${n}`);
   return i >= 0 && args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : d;
 };
-const URLBASE = flag('url', 'http://localhost:3160').replace(/\/$/, '');
+const URLBASE = flag('url', 'http://localhost:3000').replace(/\/$/, '');
 const session = await signIn(URLBASE);
 
 const PORTRAIT = { width: 390, height: 844 };
@@ -44,7 +44,16 @@ page.on('console', (m) => {
 });
 
 await page.goto(URLBASE, { waitUntil: 'domcontentloaded' });
-await page.waitForFunction(() => (window.__lapline?.scene?.cars?.size ?? 0) > 0, { timeout: 60_000 });
+await page
+  .waitForFunction(() => (window.__lapline?.scene?.cars?.size ?? 0) > 0, { timeout: 60_000 })
+  .catch(() => {
+    // A raw TimeoutError here reads as a broken check. It usually means the
+    // replay is parked past the chequered flag, where there are no positions
+    // to draw, which is a state of the server rather than a fault in the app.
+    console.error('rotate-check: no cars in the scene after 60 s.');
+    console.error('  Is the replay parked past the end of the session? Seek back into it and try again.');
+    process.exit(1);
+  });
 
 // Count how many EventSources the page ever opens, so a reconnect cannot hide.
 await page.evaluate(() => {
