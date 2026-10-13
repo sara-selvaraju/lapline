@@ -59,11 +59,32 @@ function parse<E extends SseEvent>(event: E, raw: string): unknown | null {
   return result.data;
 }
 
+/**
+ * How long without a word before the stream counts as stalled.
+ *
+ * docs/ARCHITECTURE.md asks for "a visible freshness signal within 6 s of the
+ * stream stalling", and that six seconds is the whole budget — detection
+ * included. A five second silence judged twice a second shows the banner by
+ * about five and a half, where judging six seconds once a second missed it.
+ */
+export const STALL_MS = 5000;
+
+/** How often the staleness is re-judged, which also drives the banner's counter. */
+const WATCH_MS = 500;
+
+let watch: ReturnType<typeof setInterval> | null = null;
+
+/** Any event at all, ping included, means the stream is alive. */
+function heard(): void {
+  useStore.getState().noteEvent(Date.now());
+}
+
 export function connect(): void {
   if (es) es.close();
   es = new EventSource('/events');
   const on = <E extends SseEvent>(event: E, handle: (d: never) => void): void => {
     es!.addEventListener(event, (e) => {
+      heard();
       const d = parse(event, (e as MessageEvent<string>).data);
       if (d !== null) handle(d as never);
     });
@@ -73,9 +94,30 @@ export function connect(): void {
   on('status', onStatus);
   on('tick', onTick);
   on('timing', onTiming);
+  // The server has pinged every 15 s since M0 and nothing listened. It is the
+  // only thing that still arrives when a session is idle, so it is what keeps
+  // the stall detector honest between frames.
+  on('ping', () => {});
+
+  es.onopen = heard;
   es.onerror = () => {
     if (es?.readyState === EventSource.CLOSED) setTimeout(connect, 3000);
   };
+
+  if (!watch) {
+    watch = setInterval(() => {
+      const { lastEventAt, stalled, setStalled } = useStore.getState();
+      const quiet = lastEventAt == null ? false : Date.now() - lastEventAt > STALL_MS;
+      if (quiet !== stalled) setStalled(quiet);
+      // A browser that has closed the stream will not reopen it on its own.
+      if (quiet && es?.readyState === EventSource.CLOSED) connect();
+    }, WATCH_MS);
+  }
+}
+
+/** Reconnect now, for the banner's "Retry now". */
+export function retryNow(): void {
+  connect();
 }
 
 export function onHello(d: Hello): void {

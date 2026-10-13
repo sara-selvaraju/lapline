@@ -10,7 +10,7 @@
 import { z } from 'zod';
 
 /** Bump on any incompatible change to the messages below. */
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 
 export const SSE_EVENTS = ['hello', 'tick', 'timing', 'status', 'circuit', 'ping'] as const;
 export type SseEvent = (typeof SSE_EVENTS)[number];
@@ -117,6 +117,11 @@ export type SessionSummary = z.infer<typeof SessionSummarySchema>;
 export const SessionListEntrySchema = z.object({
   key: z.number().int(),
   label: z.string(),
+  /** The session on its own: 'Race', 'Qualifying'. */
+  name: z.string(),
+  /** The weekend it belongs to, so settings can group by it. */
+  meeting: z.string(),
+  meetingKey: z.number().int().nullable(),
   start: z.string(),
   live: z.boolean(),
 });

@@ -1326,3 +1326,323 @@ button {
   color: var(--flood);
   font-size: 17px;
 }
+
+/* ---- loading (Loading.dc.html) ---- */
+
+.loading {
+  flex: 1;
+  min-height: 0;
+  box-sizing: border-box;
+  padding: 8px 24px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow-y: auto;
+}
+.loading h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+.stages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.stages li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 18px;
+}
+.stage-mark {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--night);
+}
+.is-done .stage-mark {
+  border-color: var(--flood);
+  background: var(--flood);
+}
+.is-now .stage-mark {
+  border-color: var(--flood);
+}
+.is-next {
+  color: var(--haze);
+}
+.stage-label {
+  flex: 1;
+}
+.stage-state {
+  font-size: 15px;
+  color: var(--haze);
+}
+.loading-note {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.45;
+  color: var(--haze);
+}
+
+/* ---- reconnecting (Reconnecting.dc.html) ---- */
+
+.stale-banner {
+  flex: none;
+  margin: 0 12px 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid var(--yellow);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.stale-words {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.stale-head {
+  font-size: 17px;
+  font-weight: 600;
+}
+.stale-note {
+  font-size: 15px;
+  color: var(--text-2);
+}
+.stale-retry {
+  flex: none;
+  height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--yellow);
+  color: var(--night);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* ---- locked (Locked.dc.html) ---- */
+
+.locked {
+  flex: 1;
+  min-height: 0;
+  box-sizing: border-box;
+  padding: 20px 24px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+}
+.locked-badge {
+  width: 64px;
+  height: 64px;
+  align-self: center;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  color: var(--flood);
+}
+.locked h2 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.locked-copy {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+.locked-copy b {
+  color: var(--flood);
+}
+.locked-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 6px;
+}
+.locked-actions button {
+  height: 52px;
+  border-radius: 14px;
+  font-size: 18px;
+  font-weight: 600;
+}
+.locked-how {
+  font-size: 16px;
+  color: var(--haze);
+}
+.locked-how summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--flood);
+  cursor: pointer;
+}
+.locked-how p {
+  margin: 0;
+  line-height: 1.45;
+}
+
+/* ---- settings (Settings.dc.html) ---- */
+
+.settings {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: var(--night);
+  display: flex;
+  flex-direction: column;
+}
+.settings-head {
+  flex: none;
+  height: 60px;
+  padding: 0 8px 0 var(--gutter);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.settings-head h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+.settings-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px var(--gutter) max(24px, env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+/* A flex column shrinks its children to fit by default, which squashed every
+   card and clipped the last row out of each one. The page scrolls instead. */
+.settings-body > * {
+  flex: none;
+}
+
+.settings-heading {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--haze);
+}
+.card {
+  border-radius: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.card-padded {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.card-row {
+  min-height: 56px;
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 18px;
+  border-bottom: 1px solid var(--line);
+}
+.card-row:last-child {
+  border-bottom: 0;
+}
+.card-row.is-flat {
+  min-height: 48px;
+  padding-left: 0;
+  padding-right: 0;
+}
+.card-row input[type='radio'],
+.card-row input[type='checkbox'] {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  accent-color: var(--green);
+}
+.card-row input[type='radio'] {
+  accent-color: var(--flood);
+  order: -1;
+}
+.row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.row-note {
+  font-size: 14px;
+  color: var(--haze);
+}
+.row-meta {
+  font-size: 15px;
+  color: var(--haze);
+}
+.row-meta.is-live {
+  color: var(--red);
+}
+.settings-more {
+  align-self: flex-start;
+  min-height: 44px;
+  border: 0;
+  background: none;
+  color: var(--flood);
+  font-size: 16px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.slider-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 18px;
+}
+.card-padded input[type='range'] {
+  height: 28px;
+  accent-color: var(--flood);
+}
+.settings-help {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--haze);
+}
+.layer-toggles {
+  border-top: 1px solid var(--line);
+  margin-top: 4px;
+}
+.settings-replay {
+  height: 50px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--flood);
+  font-size: 18px;
+}
+.settings-diag {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--haze);
+}

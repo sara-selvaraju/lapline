@@ -264,7 +264,7 @@ export class Feed {
       if (gen !== this.generation) return;
       if (e instanceof LockedError) {
         this.mode = 'locked';
-        this.setStatus('warn', e.message);
+        this.setStatus('warn', e.message, this.freeAtExtra());
       } else {
         this.setStatus('error', message(e));
       }
@@ -545,6 +545,18 @@ export class Feed {
       if (rows.length > 0 && rows[0]![0] <= t) return true;
     }
     return false;
+  }
+
+  /**
+   * When this session becomes free to replay, where that is knowable.
+   *
+   * The locked screen's whole point is this time, and until M7 only the
+   * pre-emptive path set it: a LockedError arriving from upstream left the
+   * screen saying a session was locked with no idea when it would not be.
+   */
+  private freeAtExtra(): { freeAt?: string } {
+    if (this.sessEnd == null) return {};
+    return { freeAt: new Date(this.sessEnd + LIVE_POST_MS).toISOString() };
   }
 
   circuitPayload(): Circuit | null {

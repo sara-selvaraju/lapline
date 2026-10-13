@@ -27,7 +27,17 @@ const hello = {
   mode: 'live',
   userPicked: false,
   drivers: [{ n: 4, code: 'NOR', name: 'Lando NORRIS', team: 'McLaren', colour: '#F47600' }],
-  sessions: [{ key: 1002, label: 'Singapore race', start: '2026-10-11T12:00:00+00:00', live: true }],
+  sessions: [
+    {
+      key: 1002,
+      label: 'Singapore race',
+      name: 'Race',
+      meeting: 'Singapore',
+      meetingKey: 1296,
+      start: '2026-10-11T12:00:00+00:00',
+      live: true,
+    },
+  ],
   circuit: {
     points: [[1, 2, 3]],
     transform: { cx: 0, cy: 0, cz: 0, scale: 1 },
@@ -66,8 +76,8 @@ const timing = {
 };
 
 describe('the protocol surface', () => {
-  it('is version 5', () => {
-    expect(PROTOCOL_VERSION).toBe(5);
+  it('is version 6', () => {
+    expect(PROTOCOL_VERSION).toBe(6);
   });
 
   it('names six events, and has a schema for each', () => {

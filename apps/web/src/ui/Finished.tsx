@@ -18,7 +18,7 @@ const STEPS: Array<{ position: number; title: string; className: string }> = [
 export function Finished(): React.JSX.Element | null {
   const result = useStore((s) => s.result);
   const drivers = useStore((s) => s.drivers);
-  const openPicker = useStore((s) => s.openSessions);
+  const openPicker = useStore((s) => s.openSettings);
   const replay = useStore((s) => s.replayFromStart);
 
   if (!result) return null;

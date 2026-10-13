@@ -758,3 +758,40 @@ describe('Sync with TV, against the live mock', () => {
     }
   }, 40_000);
 });
+
+describe('the locked screen’s free-replay time', () => {
+  // docs/BUILD-PLAN.md M7: "The locked screen shows the correct local time for
+  // free replay." The server's half is sending the right instant on every
+  // path into locked mode — until M7 only one of the three did.
+  it('is thirty minutes after the session ends', async () => {
+    const feed = freeFeed();
+    try {
+      await feed.loadSessionList();
+      await feed.selectSession(RACE);
+      expect(feed.mode).toBe('locked');
+
+      const freeAt = feed.status.freeAt;
+      expect(freeAt).toBeDefined();
+      expect(Date.parse(freeAt as string)).toBe((feed.sessEnd as number) + 30 * 60_000);
+    } finally {
+      feed.stop();
+    }
+  }, 30_000);
+
+  it('reaches the client on the status it broadcasts', async () => {
+    const feed = freeFeed();
+    const seen = new Collector();
+    try {
+      await feed.loadSessionList();
+      feed.addListener(seen);
+      await feed.selectSession(RACE);
+
+      const status = seen.last('status') as { mode: string; freeAt?: string } | undefined;
+      expect(status?.mode).toBe('locked');
+      expect(status?.freeAt).toBeDefined();
+      feed.removeListener(seen);
+    } finally {
+      feed.stop();
+    }
+  }, 30_000);
+});

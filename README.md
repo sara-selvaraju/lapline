@@ -15,5 +15,5 @@ Lapline is unofficial and not affiliated with Formula 1. F1 and related marks ar
 
 ## Status
 
-M6 is done and deployed at https://lapline.live (password protected).
-Next is M7. See `docs/BUILD-PLAN.md`.
+M7 is done and deployed at https://lapline.live (password protected).
+Next is M8. See `docs/BUILD-PLAN.md`.

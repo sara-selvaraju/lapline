@@ -110,7 +110,7 @@ Builds everything the track drawing needs, once per session, and caches it per m
 - `GET /api/crossings?since=`: the leader's recent line-crossing times, for the sync flow, with the lap's length in metres and where the leader is in it.
 - `GET /api/periods`: the stretches the track was not green, for the replay scrubber's markings. A query rather than a protocol field: it is asked for once, by one screen, and the scrubber only exists in replay.
 - `GET /api/state`: a debug snapshot. `GET /healthz`: liveness, outside the password.
-- Auth: a password page sets a signed cookie, or the site is open when `APP_PASSWORD` is unset.
+- Auth: `GET /login` serves a self-contained page and `POST /login` sets a signed cookie, or the site is open when `APP_PASSWORD` is unset. A page request without one is redirected to the form; a fetch gets a plain 401, so a stale tab cannot feed HTML to a JSON parser.
 - Static: the built web app, with long cache headers for hashed assets.
 
 ## Protocol v2 (SSE)

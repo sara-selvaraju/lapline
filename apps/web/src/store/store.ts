@@ -58,6 +58,8 @@ export interface StoreState {
   expanded: boolean;
   /** Delays remembered per session key, from prefs. */
   delays: Record<string, number>;
+  followLive: boolean;
+  keepAwake: boolean;
   follow: boolean;
   scrubbing: boolean;
   /** Driver numbers under the last ambiguous tap, or null when closed. */
@@ -68,6 +70,12 @@ export interface StoreState {
   syncOpen: boolean;
   /** Flag periods for the replay scrubber, fetched once per session. */
   periods: FlagPeriod[] | null;
+  /** When the stream last said anything, ping included. */
+  lastEventAt: number | null;
+  /** Whether the stream has gone quiet for longer than it should. */
+  stalled: boolean;
+  /** Whether the settings page is open. */
+  settingsOpen: boolean;
   history: HistorySample[];
   /** Bumps whenever the circuit's transform changes, so the scene can rebuild. */
   circuitEpoch: number;
@@ -96,6 +104,12 @@ export interface StoreState {
   /** Sets the delay and remembers it for this session on this phone. */
   setDelay: (delayS: number) => void;
   setPeriods: (periods: FlagPeriod[]) => void;
+  noteEvent: (at: number) => void;
+  setStalled: (stalled: boolean) => void;
+  openSettings: () => void;
+  setFollowLive: (on: boolean) => void;
+  setKeepAwake: (on: boolean) => void;
+  closeSettings: () => void;
   closeSessions: () => void;
   chooseSession: (key: number) => void;
   replayFromStart: () => void;
@@ -117,6 +131,8 @@ const persist = (s: StoreState): void => {
     showPitLane: s.showPitLane,
     expanded: s.expanded,
     delays: s.delays,
+    followLive: s.followLive,
+    keepAwake: s.keepAwake,
   } satisfies Prefs);
 };
 
@@ -145,6 +161,8 @@ export const useStore = create<StoreState>((set, get) => ({
   showSectors: prefs.showSectors,
   showPitLane: prefs.showPitLane,
   delays: prefs.delays,
+  followLive: prefs.followLive,
+  keepAwake: prefs.keepAwake,
   expanded: prefs.expanded,
   follow: false,
   scrubbing: false,
@@ -152,6 +170,9 @@ export const useStore = create<StoreState>((set, get) => ({
   sessionsOpen: false,
   syncOpen: false,
   periods: null,
+  lastEventAt: null,
+  stalled: false,
+  settingsOpen: false,
   history: [],
   circuitEpoch: 0,
 
@@ -294,6 +315,26 @@ export const useStore = create<StoreState>((set, get) => ({
   openSync: () => set({ syncOpen: true }),
   closeSync: () => set({ syncOpen: false }),
   setPeriods: (periods) => set({ periods }),
+  // Written on every event, so it stays out of any selector a component uses
+  // per frame: only the stall watcher reads it.
+  noteEvent: (lastEventAt) => set({ lastEventAt }),
+  setStalled: (stalled) => set({ stalled }),
+  openSettings: () => set({ settingsOpen: true }),
+
+  setFollowLive: (followLive) =>
+    set((s) => {
+      persist({ ...s, followLive });
+      // The server does the switching, so it has to be told as well.
+      if (followLive) void post({ follow: 'auto' });
+      return { followLive };
+    }),
+
+  setKeepAwake: (keepAwake) =>
+    set((s) => {
+      persist({ ...s, keepAwake });
+      return { keepAwake };
+    }),
+  closeSettings: () => set({ settingsOpen: false }),
 
   setDelay: (delayS) =>
     set((s) => {
