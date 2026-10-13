@@ -6,8 +6,9 @@
 // any disconnect. Reconnects are handled here rather than by the library, so
 // every attempt gets a new token.
 //
-// Unverified against OpenF1's real broker — see docs/OPENF1.md. Only tested
-// against a local broker. If it misbehaves, set LIVE_TRANSPORT=rest.
+// Verified against OpenF1's real broker during the Singapore race on 11
+// October 2026: 22 cars at 4 Hz with a 2 s data age — see docs/OPENF1.md. If it
+// misbehaves, set LIVE_TRANSPORT=rest.
 //
 // Ported from reference/prototype/lib/live-mqtt.js.
 
@@ -98,6 +99,17 @@ export class LiveMqtt {
 
     clearTimeout(this.rotateTimer);
     this.rotateTimer = setTimeout(() => this.restart(), ROTATE_MS);
+  }
+
+  /**
+   * Try again later, for a caller that owns the first `start()`. Without this
+   * a token refused on the very first attempt — the broker down, the network
+   * not up yet — meant no MQTT for the rest of the session, because only
+   * `restart()` knew how to retry.
+   */
+  retryLater(ms = 15_000): void {
+    if (this.stopped) return;
+    this.scheduleRestart(ms);
   }
 
   private scheduleRestart(ms: number): void {

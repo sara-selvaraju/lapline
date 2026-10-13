@@ -70,6 +70,8 @@ export interface FeedListener {
 export interface FeedOptions {
   liveDelayS?: string | number | undefined;
   liveTransport?: string | undefined;
+  /** First retry after a lock. Tests shorten it; production uses the default. */
+  lockRetryMs?: number | undefined;
 }
 
 /** Stop fetching once nobody has been connected this long. */
@@ -82,6 +84,9 @@ const MAX_PIT_LANE_ATTEMPTS = 4;
 const MAX_EMPTY_TRACK_ATTEMPTS = 3;
 /** A session whose result never appears will not start producing one. */
 const MAX_RESULT_ATTEMPTS = 4;
+/** First retry after a lock, then doubling up to the cap. */
+const LOCK_RETRY_MS = 30_000;
+const LOCK_RETRY_MAX_MS = 300_000;
 const NO_POSITIONS_TEXT =
   'No usable car positions for this session, so the track and cars cannot be drawn.';
 
@@ -120,12 +125,19 @@ export class Feed {
   private pitLaneAttempts = 0;
   private mqttLastMsg = 0;
   private timers: NodeJS.Timeout[] = [];
+  private fetchTimer: NodeJS.Timeout | null = null;
+  /** What we were doing before a lock, so a lock can be left again. */
+  private lockedFrom: 'live' | 'replay' | null = null;
+  private lockedRetryAt = 0;
+  private readonly lockRetryMs: number;
+  private lockedTries = 0;
   private stopped = false;
 
   constructor(api: OpenF1, opts: FeedOptions = {}) {
     this.api = api;
     this.liveTransport = opts.liveTransport || 'mqtt';
     this.liveDelayMs = (Number(opts.liveDelayS) || 10) * 1000;
+    this.lockRetryMs = opts.lockRetryMs ?? LOCK_RETRY_MS;
   }
 
   // ---------- state ----------
@@ -237,6 +249,8 @@ export class Feed {
     this.stopMqtt();
     this.session = s;
     this.resetBuffers();
+    this.lockedFrom = null;
+    this.lockedTries = 0;
 
     const live = this.isLiveWindow(s);
     this.mode = mode || (live ? 'live' : 'replay');
@@ -247,6 +261,7 @@ export class Feed {
     // Inside the live window with no credentials, there is nothing to fetch.
     if (live && !this.api.hasCredentials) {
       this.mode = 'locked';
+      this.lockedFrom = null; // nothing to retry with, so this lock does stay
       const free = new Date(this.sessEnd + LIVE_POST_MS);
       this.setStatus('warn', 'Live data needs OpenF1 sponsor credentials', { freeAt: free.toISOString() });
       this.broadcastHello();
@@ -263,8 +278,7 @@ export class Feed {
     } catch (e) {
       if (gen !== this.generation) return;
       if (e instanceof LockedError) {
-        this.mode = 'locked';
-        this.setStatus('warn', e.message, this.freeAtExtra());
+        this.lock(e.message);
       } else {
         this.setStatus('error', message(e));
       }
@@ -559,6 +573,37 @@ export class Feed {
     return { freeAt: new Date(this.sessEnd + LIVE_POST_MS).toISOString() };
   }
 
+  /**
+   * Lock, but not for good.
+   *
+   * A 401 inside the live window is "locked", not an error — but it is not
+   * necessarily permanent either. The token endpoint having a bad minute, or
+   * one request going out unauthenticated while a refresh was in flight, both
+   * surface here as a 401 with perfectly good credentials. Before this,
+   * `mode` went to 'locked' and `fetchStep` returned early on it for ever, so
+   * a single bad minute ended the race: the screen said locked and nothing
+   * ever asked again.
+   *
+   * So remember what we were doing and when to try it again, backing off from
+   * 30 s to 5 minutes so a genuinely unsponsored session is not hammered.
+   */
+  private lock(text: string): void {
+    if (this.mode === 'live' || this.mode === 'replay') this.lockedFrom = this.mode;
+    this.mode = 'locked';
+    this.lockedTries++;
+    this.lockedRetryAt = Date.now() + Math.min(this.lockRetryMs * 2 ** (this.lockedTries - 1), LOCK_RETRY_MAX_MS);
+    this.setStatus('warn', text, this.freeAtExtra());
+  }
+
+  /** True if the lock was lifted, so the caller can carry on fetching. */
+  private maybeUnlock(): boolean {
+    if (this.mode !== 'locked' || !this.lockedFrom) return false;
+    if (Date.now() < this.lockedRetryAt) return false;
+    this.mode = this.lockedFrom;
+    this.broadcastHello();
+    return true;
+  }
+
   circuitPayload(): Circuit | null {
     return circuitPayload(this.track, this.provisional);
   }
@@ -621,17 +666,22 @@ export class Feed {
     const tickFetch = async (): Promise<void> => {
       try {
         await this.fetchStep();
+        // A step that got through means any earlier lock is behind us, so the
+        // next one starts its backoff from 30 s rather than carrying on from
+        // wherever the last run of failures reached.
+        this.lockedTries = 0;
       } catch (e) {
         if (e instanceof LockedError) {
-          this.mode = 'locked';
-          this.setStatus('warn', e.message);
+          this.lock(e.message);
           this.broadcastHello();
         } else {
           console.error('fetch', message(e));
           this.setStatus('error', `Fetch problem: ${message(e)}`);
         }
       }
-      if (!this.stopped) this.timers.push(setTimeout(() => void tickFetch(), 1000));
+      // One handle, replaced each second. Pushing onto `timers` kept every
+      // settled Timeout alive: two hours is 7,200 of them, a weekend far more.
+      if (!this.stopped) this.fetchTimer = setTimeout(() => void tickFetch(), 1000);
     };
     void tickFetch();
 
@@ -661,6 +711,8 @@ export class Feed {
       clearInterval(t);
     }
     this.timers = [];
+    if (this.fetchTimer) clearTimeout(this.fetchTimer);
+    this.fetchTimer = null;
     this.stopMqtt();
   }
 
@@ -674,8 +726,19 @@ export class Feed {
   }
 
   async fetchStep(): Promise<void> {
-    if (!this.session || (this.mode !== 'replay' && this.mode !== 'live')) return;
-    if (this.idle()) return;
+    if (!this.session) return;
+    if (this.mode === 'locked') this.maybeUnlock();
+    if (this.mode !== 'replay' && this.mode !== 'live') return;
+    if (this.idle()) {
+      // Idle stops us *fetching*, but MQTT is not stopped and keeps pushing
+      // positions and telemetry in at about 160 rows a second. Pruning lives
+      // further down this method, so without this an unattended phone that
+      // went to sleep would leave the buffers growing with nothing trimming
+      // them — hours of that is the clearest way to run the server out of
+      // memory overnight.
+      prune(this.buffers, this.clock());
+      return;
+    }
 
     // A session that has left its live window is finished, and live fetching
     // will only ask OpenF1 for data that will never arrive. The periodic
@@ -754,7 +817,13 @@ export class Feed {
       this.mqttLastMsg = Date.now();
       this.ingest(topic, [row]);
     });
-    void this.mqtt.start().catch((e: unknown) => console.error('mqtt', message(e)));
+    // A rejection here used to mean MQTT was dead for the session and we ran
+    // the full REST plan all race with only a log line saying why. The client
+    // knows how to retry; it just was not asked to on the first attempt.
+    void this.mqtt.start().catch((e: unknown) => {
+      console.error('mqtt', message(e));
+      this.mqtt?.retryLater();
+    });
   }
 
   private stopMqtt(): void {
@@ -864,7 +933,17 @@ export class Feed {
 
   broadcast(event: string, data: unknown): void {
     const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-    for (const res of this.listeners) res.write(msg);
+    // Each write stands alone. One phone whose socket has gone should never
+    // cost another phone a frame, and a throw part-way through used to mean
+    // every listener after it in the set missed that frame — and the next,
+    // since the same bad one comes first every time.
+    for (const res of this.listeners) {
+      try {
+        res.write(msg);
+      } catch {
+        this.listeners.delete(res);
+      }
+    }
   }
 
   addListener(res: FeedListener): void {
