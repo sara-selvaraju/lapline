@@ -611,7 +611,7 @@ export class Scene {
       const car = this.cars.get(box.n);
       if (car) held.set(box.n, car.labelDyTarget);
     }
-    const labelOffsets = resolveCollisions(this.labelBoxes, 2, obstacles, held);
+    const labelOffsets = resolveCollisions(this.labelBoxes, 2, obstacles, held, { top: 0, bottom: r.height });
     const ease = Math.min(1, (dt / 1000) * LABEL_EASE_PER_S);
     for (const [n, dyPx] of labelOffsets) {
       const car = this.cars.get(n);
