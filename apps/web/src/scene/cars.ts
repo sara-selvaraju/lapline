@@ -178,6 +178,9 @@ export function setLabelSelected(car: Car, selected: boolean): void {
   mat.map = tex;
   mat.needsUpdate = true;
   fitToTexture(car.label, tex);
+  // Drawn over the others: labels skip the depth test, so without this the
+  // selected one could sit underneath a neighbour's.
+  car.label.renderOrder = selected ? 11 : 10;
 }
 
 const GREY = new THREE.Color(COLORS.haze);
