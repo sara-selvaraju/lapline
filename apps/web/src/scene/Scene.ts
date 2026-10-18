@@ -13,7 +13,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { Circuit, MarshalSectorFlag, Point3, Tick, Timing, Transform } from '@lapline/shared';
 import { storeState } from '../store/store.js';
-import { applyStale, makeCar, setLabelSelected, SHARED_GEOMETRY, type Car } from './cars.js';
+import { applyStale, DOT_RADIUS, makeCar, setLabelSelected, SHARED_GEOMETRY, type Car } from './cars.js';
+import { applyPixelSizes, fitToTexture, liftPx, pixelSize, setLiftPx } from './sprites.js';
 import { COLORS, FRAME_MS } from './colours.js';
 import {
   buildMarshalTicks,
@@ -34,7 +35,6 @@ import {
 } from './labels.js';
 import {
   GLOW_HALF_WIDTH,
-  PX,
   groundLineGeometry,
   postsGeometry,
   RIBBON_HALF_WIDTH,
@@ -69,6 +69,9 @@ const BADGE_UNBLOCK_PAD = 2;
 
 /** How quickly a car label slides to the position the resolver chose. */
 const LABEL_EASE_PER_S = 10;
+
+/** Clear space between the top of a car's dot and the bottom of its label. */
+const LABEL_GAP_PX = 3;
 
 /** How long a badge must stay clear before it starts coming back, in ms. */
 const BADGE_RETURN_MS = 400;
@@ -503,8 +506,7 @@ export class Scene {
       this.pitLaneLabel.material.map = tex;
       this.pitLaneLabel.material.needsUpdate = true;
       old?.dispose();
-      const hPx = tex.userData.heightPx as number;
-      this.pitLaneLabel.scale.set(hPx * PX * (tex.userData.aspect as number), hPx * PX, 1);
+      fitToTexture(this.pitLaneLabel, tex);
     }
 
     this.clearGroup(this.scGroup);
@@ -531,6 +533,7 @@ export class Scene {
       if (car.label.visible) setLabelSelected(car, n === sel);
     }
 
+    applyPixelSizes(this.scene, this.camera, this.canvas.clientHeight);
     this.layOutLabels(sel, rows, now, dt);
 
     // Follow, and the chase camera, both track the selected car.
@@ -571,20 +574,27 @@ export class Scene {
     // Car labels first, as M2 placed them: they hold the positions, and the
     // selected car holds its place ahead of the leader, ahead of the rest.
     this.labelBoxes.length = 0;
+    this.labelLift.clear();
     for (const [n, car] of this.cars) {
       if (!car.label.visible) continue;
-      this.projected.copy(car.group.position).add(this.labelOffset).project(this.camera);
+      this.projected.copy(car.group.position).project(this.camera);
       // Behind the camera: nothing sensible to lay out.
       if (this.projected.z > 1) {
         car.label.visible = false;
         continue;
       }
+      const size = pixelSize(car.label)!;
+      // Sat just clear of the dot. The dot is world-sized, so how far that is
+      // depends on depth: a car close under the chase camera has a large dot.
+      const dotPx = DOT_RADIUS / this.worldPerPixelAt(car.group.position, r.height);
+      const lift = dotPx + LABEL_GAP_PX + size.height / 2;
+      this.labelLift.set(n, lift);
       this.labelBoxes.push({
         n,
         x: ((this.projected.x + 1) / 2) * r.width,
-        y: ((1 - this.projected.y) / 2) * r.height,
-        width: car.label.scale.x / PX,
-        height: car.label.scale.y / PX,
+        y: ((1 - this.projected.y) / 2) * r.height - lift,
+        width: size.width,
+        height: size.height,
         priority: n === sel ? 0 : n === leader ? 1 : 2,
       });
     }
@@ -608,8 +618,9 @@ export class Scene {
       if (!car) continue;
       car.labelDyTarget = dyPx;
       car.labelDy += (dyPx - car.labelDy) * ease;
-      const base = car.group.position.clone().setY(car.group.position.y + this.labelBase);
-      car.label.position.set(0, this.labelBase + this.worldLiftForScreenOffset(base, car.labelDy, r.height), 0);
+      // Offsets are screen pixels, and so is the lift, so the label lands
+      // exactly where the resolver put it whatever the camera is doing.
+      setLiftPx(car.label, (this.labelLift.get(n) ?? 0) - car.labelDy);
     }
     // Where the labels ended up, not where they started: a badge has to clear
     // the label's resolved position, which is the one the viewer sees.
@@ -631,8 +642,8 @@ export class Scene {
         n: BADGE_KEY - i,
         x: ((this.projected.x + 1) / 2) * r.width,
         y: ((1 - this.projected.y) / 2) * r.height,
-        width: b.sprite.scale.x / PX,
-        height: b.sprite.scale.y / PX,
+        width: pixelSize(b.sprite)!.width,
+        height: pixelSize(b.sprite)!.height,
         priority: 3,
       });
     }
@@ -690,36 +701,6 @@ export class Scene {
   }
 
   /**
-   * The world-space lift that moves a point a given number of pixels up the
-   * screen.
-   *
-   * The collision pass works in screen pixels, but sprites are positioned in
-   * world units, and under a tilted camera a world-space lift is neither
-   * purely vertical on screen nor worth the same number of pixels at every
-   * depth. A single estimate therefore falls short, which is how a badge ends
-   * up still sitting under the car label it was meant to clear. Measuring
-   * what the estimate actually achieved and correcting makes the nudge land.
-   */
-  private worldLiftForScreenOffset(base: THREE.Vector3, dyPx: number, heightPx: number): number {
-    if (dyPx === 0) return 0;
-    const at = new THREE.Vector3();
-    const screenY = (x: number, y: number, z: number): number =>
-      ((1 - at.set(x, y, z).project(this.camera).y) / 2) * heightPx;
-
-    const from = screenY(base.x, base.y, base.z);
-    const want = from + dyPx;
-    let lift = -dyPx * this.worldPerPixelAt(base, heightPx);
-    for (let i = 0; i < 3; i++) {
-      const got = screenY(base.x, base.y + lift, base.z);
-      if (Math.abs(want - got) < 0.5) break;
-      const achieved = got - from;
-      if (Math.abs(achieved) < 1e-6) break;
-      lift *= dyPx / achieved;
-    }
-    return lift;
-  }
-
-  /**
    * Where the badges and car labels actually ended up, in canvas pixels.
    *
    * Read back from the sprites themselves rather than recomputed, so what the
@@ -737,15 +718,17 @@ export class Scene {
     const at = new THREE.Vector3();
     const push = (kind: 'badge' | 'label', key: number, sprite: THREE.Sprite): void => {
       if (!sprite.visible) return;
+      const size = pixelSize(sprite);
+      if (!size) return;
       sprite.getWorldPosition(at).project(this.camera);
       if (at.z > 1) return;
       boxes.push({
         kind,
         key,
         x: ((at.x + 1) / 2) * r.width,
-        y: ((1 - at.y) / 2) * r.height,
-        width: sprite.scale.x / PX,
-        height: sprite.scale.y / PX,
+        y: ((1 - at.y) / 2) * r.height - liftPx(sprite),
+        width: size.width,
+        height: size.height,
       });
     };
     for (let i = 0; i < this.badges.length; i++) push('badge', this.badges[i]!.number, this.badges[i]!.sprite);
@@ -773,8 +756,8 @@ export class Scene {
     ];
   }
 
-  private readonly labelOffset = new THREE.Vector3(0, 2.4, 0);
-  private readonly labelBase = 2.4;
+  /** Each laid-out label's lift off its car this frame, in pixels. */
+  private readonly labelLift = new Map<number, number>();
   private readonly camWorld = new THREE.Vector3();
 
   /** World units per screen pixel at a point, for turning offsets back. */
