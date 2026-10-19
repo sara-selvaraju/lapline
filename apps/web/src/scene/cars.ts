@@ -9,9 +9,10 @@
 import * as THREE from 'three';
 import { COLORS } from './colours.js';
 import { PX } from './geometry.js';
+import { fitToTexture } from './sprites.js';
 
 /** docs/DESIGN.md: 10px dot, 1.5px night outline, 16px ring when selected. */
-const DOT_RADIUS = (10 * PX) / 2;
+export const DOT_RADIUS = (10 * PX) / 2;
 const OUTLINE_RADIUS = DOT_RADIUS + 1.5 * PX;
 const RING_RADIUS = (16 * PX) / 2;
 /** Far larger than the dot: a thumb on a phone is not a mouse. */
@@ -142,9 +143,8 @@ export function makeCar(n: number, code: string, colour: string): Car {
 
   const tex = labelTexture(code, colour, false);
   const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
-  const hPx = tex.userData.heightPx as number;
-  label.scale.set(hPx * PX * (tex.userData.aspect as number), hPx * PX, 1);
-  label.position.set(0, 2.4, 0);
+  fitToTexture(label, tex);
+  // On the car itself: the scene lifts it clear of the dot in screen pixels.
   label.renderOrder = 10;
 
   group.add(outline, dot, ring, hit, label);
@@ -177,8 +177,10 @@ export function setLabelSelected(car: Car, selected: boolean): void {
   const tex = labelTexture(car.code, car.colourHex, selected);
   mat.map = tex;
   mat.needsUpdate = true;
-  const hPx = tex.userData.heightPx as number;
-  car.label.scale.set(hPx * PX * (tex.userData.aspect as number), hPx * PX, 1);
+  fitToTexture(car.label, tex);
+  // Drawn over the others: labels skip the depth test, so without this the
+  // selected one could sit underneath a neighbour's.
+  car.label.renderOrder = selected ? 11 : 10;
 }
 
 const GREY = new THREE.Color(COLORS.haze);

@@ -210,6 +210,41 @@ describe('resolveCollisions, keeping positions between frames', () => {
   });
 });
 
+describe('resolveCollisions, inside the canvas', () => {
+  const box = (n: number, x: number, y: number, priority = 2): LabelBox => ({ n, x, y, width: 40, height: 16, priority });
+  const canvas = { top: 0, bottom: 290 };
+
+  it('pushes a label down rather than off the top of the canvas', () => {
+    // The first sits at 4 to 20; going up from 12 would put the second above 0.
+    const out = resolveCollisions([box(1, 100, 12, 0), box(2, 100, 14)], 2, [], undefined, canvas);
+    const top = 14 - 8 + out.get(2)!;
+    expect(out.get(2)).toBeGreaterThan(0);
+    expect(top).toBeGreaterThanOrEqual(20);
+  });
+
+  it('still prefers up when there is room above', () => {
+    const out = resolveCollisions([box(1, 100, 100, 0), box(2, 100, 104)], 2, [], undefined, canvas);
+    expect(out.get(2)).toBeLessThan(0);
+  });
+
+  it('leaves alone a label whose car is itself past the edge', () => {
+    // Nothing to collide with, so its natural place stands even though it is
+    // partly above the canvas: the car is up there too.
+    expect(resolveCollisions([box(1, 100, 2)], 2, [], undefined, canvas).get(1)).toBe(0);
+  });
+
+  it('gives up a held position that has gone off the canvas', () => {
+    const held = new Map([[2, -20]]);
+    const out = resolveCollisions([box(1, 100, 12, 0), box(2, 100, 14)], 2, [], held, canvas);
+    expect(14 - 8 + out.get(2)!).toBeGreaterThanOrEqual(0);
+  });
+
+  it('behaves as before when no bounds are given', () => {
+    const out = resolveCollisions([box(1, 100, 12, 0), box(2, 100, 14)]);
+    expect(out.get(2)).toBeLessThan(0);
+  });
+});
+
 describe('visibleBadges', () => {
   const badge = (n: number, y: number, x = 100): LabelBox => ({
     n,

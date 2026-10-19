@@ -77,11 +77,18 @@ export interface Obstacle {
  */
 const HOMING_MARGIN = 6;
 
+/** The visible band a label must stay inside, top and bottom in pixels. */
+export interface Bounds {
+  top: number;
+  bottom: number;
+}
+
 export function resolveCollisions(
   boxes: readonly LabelBox[],
   gap = 2,
   obstacles: readonly Obstacle[] = [],
   current?: ReadonlyMap<number, number>,
+  bounds?: Bounds,
 ): Map<number, number> {
   const offsets = new Map<number, number>();
   // Fixed furniture the labels must avoid, such as the camera group.
@@ -95,6 +102,29 @@ export function resolveCollisions(
   });
   const hit = (r: Obstacle): Obstacle | undefined =>
     placed.find((p) => r.right > p.left && r.left < p.right && r.bottom > p.top && r.top < p.bottom);
+  // A label that starts outside the band is left to it: its car is off the
+  // edge too. One pushed out of it is not, which is what `fits` judges.
+  const fits = (r: Obstacle, natural: Obstacle): boolean =>
+    !bounds ||
+    ((r.top >= bounds.top || r.top >= natural.top) && (r.bottom <= bounds.bottom || r.bottom <= natural.bottom));
+
+  // Walks one way until the box clears everything already placed, stopping
+  // just past each blocker rather than clearing its whole height. The
+  // overshoot that caused threw labels much further than they needed to go.
+  // Only ever the one way, so the walk cannot circle between two blockers.
+  const walk = (b: LabelBox, dir: -1 | 1): number => {
+    let dy = 0;
+    for (let guard = 0; guard < 24; guard++) {
+      const blocker = hit(rect(b, dy));
+      if (!blocker) break;
+      const next =
+        dir < 0 ? blocker.top - gap - (b.y + b.height / 2) : blocker.bottom + gap - (b.y - b.height / 2);
+      if (dir < 0 ? next >= dy : next <= dy) break;
+      dy = next;
+    }
+    return dy;
+  };
+  const works = (b: LabelBox, dy: number): boolean => !hit(rect(b, dy)) && fits(rect(b, dy), rect(b, 0));
 
   for (const b of [...boxes].sort((a, c) => a.priority - c.priority || a.y - c.y)) {
     // Where this label sat last frame, when the caller is tracking that.
@@ -115,29 +145,23 @@ export function resolveCollisions(
         offsets.set(b.n, 0);
         continue;
       }
-      if (!hit(rect(b, held))) {
+      if (works(b, held)) {
         placed.push(rect(b, held));
         offsets.set(b.n, held);
         continue;
       }
     }
 
-    let dy = 0;
-    // Walk upwards until this box clears everything already placed, stopping
-    // just above each blocker rather than clearing its whole height. The
-    // overshoot that caused threw labels much further than they needed to go.
-    for (let guard = 0; guard < 24; guard++) {
-      const r = rect(b, dy);
-      const blocker = hit(r);
-      if (!blocker) {
-        placed.push(r);
-        break;
-      }
-      const next = blocker.top - gap - (b.y + b.height / 2);
-      // Only ever upwards, so the walk cannot circle between two blockers.
-      if (next >= dy) break;
-      dy = next;
+    // Upwards by preference, as labels sit above their cars. Downwards only
+    // when up would leave the canvas: near the top edge, walking up was
+    // throwing labels clean off it, 52px above the top in the Map view.
+    // With nowhere that works, it keeps the upward answer, as it always has.
+    let dy = walk(b, -1);
+    if (!works(b, dy)) {
+      const down = walk(b, 1);
+      if (works(b, down)) dy = down;
     }
+    if (!hit(rect(b, dy))) placed.push(rect(b, dy));
     offsets.set(b.n, dy);
   }
   return offsets;

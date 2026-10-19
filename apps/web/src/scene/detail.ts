@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import type { MarshalSectorFlag, SectorBoundary, TrackMarker } from '@lapline/shared';
 import { COLORS } from './colours.js';
 import { PX, ribbonGeometry } from './geometry.js';
+import { fitToTexture, setPixelSize } from './sprites.js';
 
 /** docs/DESIGN.md: 17px badge, 14px out from the apex. */
 const BADGE_PX = 17;
@@ -152,7 +153,7 @@ export function buildTurnBadges(points: readonly THREE.Vector3[], turns: readonl
     const base = at.clone().addScaledVector(normal, BADGE_OFFSET_PX * PX);
     const tex = badgeTexture(String(t.number));
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
-    sprite.scale.set(BADGE_PX * PX, BADGE_PX * PX, 1);
+    setPixelSize(sprite, BADGE_PX, BADGE_PX);
     sprite.position.copy(base);
     sprite.renderOrder = 8;
     out.push({ sprite, base, number: t.number, fade: 1, clearSince: 0 });
@@ -193,8 +194,7 @@ export function buildSectorTicks(points: readonly THREE.Vector3[], sectors: read
 
     const tex = textTexture(s.label, 12, '#C9D1DE');
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
-    const hPx = tex.userData.heightPx as number;
-    sprite.scale.set(hPx * PX * (tex.userData.aspect as number), hPx * PX, 1);
+    fitToTexture(sprite, tex);
     const normal = outwardNormal(points, s.index, centre);
     sprite.position.copy(at.clone().addScaledVector(normal, 2.4));
     sprite.renderOrder = 8;
@@ -281,8 +281,7 @@ export function buildYellowOverlays(
     const label = flag.flag === 'DOUBLE YELLOW' ? 'Double yellow' : 'Yellow';
     const tex = chipTexture(label);
     const chip = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
-    const hPx = tex.userData.heightPx as number;
-    chip.scale.set(hPx * PX * (tex.userData.aspect as number), hPx * PX, 1);
+    fitToTexture(chip, tex);
     const mid = span[Math.floor(span.length / 2)]!;
     chip.position.copy(mid).setY(mid.y + 2.2);
     chip.renderOrder = 9;
@@ -400,8 +399,7 @@ export function buildPitLane(
   // Relabelled to "Pit lane open" by the scene when a safety car is out.
   const tex = textTexture('Pit lane', 11, '#8c9ab5');
   const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
-  const hPx = tex.userData.heightPx as number;
-  label.scale.set(hPx * PX * (tex.userData.aspect as number), hPx * PX, 1);
+  fitToTexture(label, tex);
   const at = Math.floor(points.length / 2);
   const mid = points[at]!;
   const ahead = points[Math.min(at + 1, points.length - 1)]!;
@@ -411,7 +409,9 @@ export function buildPitLane(
     dir.lengthSq() > 0
       ? new THREE.Vector3(-dir.z, 0, dir.x).normalize()
       : new THREE.Vector3(1, 0, 0);
-  const reach = PIT_LABEL_OFFSET_PX * PX + (hPx * PX) / 2;
+  // Placed off the lane in world units, which is the Tilt view's pixels; the
+  // label itself is drawn at a fixed size, so this is about where, not how big.
+  const reach = (PIT_LABEL_OFFSET_PX + (tex.userData.heightPx as number) / 2) * PX;
   const nearestTo = (p: THREE.Vector3): number =>
     track.length === 0 ? 0 : Math.min(...track.map((q) => p.distanceToSquared(q)));
   const a = mid.clone().addScaledVector(normal, reach);
@@ -461,8 +461,7 @@ export function buildSafetyCar(points: readonly THREE.Vector3[], leader: THREE.V
 
   const tex = chipTexture('SC');
   const chip = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
-  const hPx = tex.userData.heightPx as number;
-  chip.scale.set(hPx * PX * (tex.userData.aspect as number), hPx * PX, 1);
+  fitToTexture(chip, tex);
   chip.position.copy(ahead).setY(ahead.y + 2.4);
   chip.renderOrder = 11;
 
