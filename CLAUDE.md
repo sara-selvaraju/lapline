@@ -27,6 +27,8 @@
 
 ### Rules
 - Never push to `main` directly or attempt to bypass branch protection.
-- Never deploy with `railway up`. Deploys happen only by merging to `main`. The Railway CLI is fine for logs and variables.
+- Never deploy with `railway up`. Deploys happen only by merging to `main`.
+- Don't use the Railway CLI here at all, even for logs or variables: it may be logged in to a different Railway account. Use `gh` for CI runs and checks, and ask me to read anything from the Railway dashboard.
+- If a Railway build fails with `tsc` or `vite` not found, check for a `NODE_ENV=production` variable: it makes `npm ci` skip dev dependencies. A failed deploy has no Redeploy option; rebuild `main` from the dashboard with Ctrl+K, "Deploy Latest Commit".
 - Don't modify `.github/workflows/ci.yml` or Railway settings unless I ask.
 - If a change is too large for one PR, propose how to split it before starting.
