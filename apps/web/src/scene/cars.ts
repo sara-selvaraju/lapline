@@ -58,16 +58,18 @@ export interface Car {
   t0: number;
   stale: boolean;
   /**
-   * Where the label is drawn, in screen pixels off its natural place, eased
-   * towards the target below. Held per car because the resolver's answer can
-   * still change abruptly and the label must not.
+   * Where the label's centre is drawn, in screen pixels off the dot, eased
+   * towards the slot the layout chose. Held per car because the layout's
+   * answer can still change abruptly and the label must not.
    */
+  labelDx: number;
   labelDy: number;
   /**
-   * The offset the resolver last settled on. Fed back to it each frame so a
-   * label that is not in anyone's way keeps the place it already has.
+   * The slot the layout last chose, or -1 when the car was folded into a
+   * "+n cars" chip. Fed back each frame so a label that is not in anyone's
+   * way keeps the place it already has. Undefined until first laid out.
    */
-  labelDyTarget: number;
+  labelSlot: number | undefined;
 }
 
 function roundRect(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
@@ -163,8 +165,9 @@ export function makeCar(n: number, code: string, colour: string): Car {
     to: null,
     t0: 0,
     stale: false,
+    labelDx: 0,
     labelDy: 0,
-    labelDyTarget: 0,
+    labelSlot: undefined,
   };
 }
 

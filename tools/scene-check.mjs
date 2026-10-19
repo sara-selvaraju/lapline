@@ -2,7 +2,9 @@
 // The acceptance checks that need a real browser: tapping a bunch opens the
 // picker, selection stays in sync between the track and the tower, the frame
 // rate with a full field (M2), and the circuit detail layout — no turn badge
-// overlapping a car label or the camera group (M3).
+// overlapping a car label or the camera group (M3), and a crowded field with
+// every car labelled: nothing overlapping, every label beside its own car,
+// and the "+n cars" chip opening the picker.
 //
 //   node tools/scene-check.mjs [--url ...] [--seek ms]
 
@@ -248,6 +250,114 @@ if (!layout) {
         : 'clear',
   );
 }
+
+// ---- a crowded field ----
+// With every car labelled the field cannot all fit, which is where labels
+// used to go wrong: the old resolver walked them upwards without limit, and
+// in a pack they ended up a column of names 200px from the cars they named.
+// Now a label sits beside its own car or not at all, and the cars that did
+// not fit share a "+n cars" chip, as SafetyCar.dc.html draws it.
+console.log('\ncrowded field, every car labelled');
+await page.getByRole('button', { name: 'Settings' }).click();
+await page.getByLabel('Label every car').first().click();
+await page.getByRole('button', { name: 'Done' }).click();
+await fetch(`${URLBASE}/api/control`, {
+  method: 'POST',
+  headers: { ...headers, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ playing: false }),
+});
+let chipTried = false;
+// 'Far' is Tilt with the camera as far back as the controls allow (about
+// twice the Tilt distance on a phone), which shrinks the whole
+// field into a small patch of screen. Whether the three presets happen to
+// show a pack depends on where the race is, which is a property of the data;
+// this makes one regardless, so the chip is always exercised.
+for (const preset of ['Tilt', 'Map', 'Chase', 'Far']) {
+  await page.getByRole('button', { name: preset === 'Far' ? 'Tilt' : preset, exact: true }).click();
+  if (preset === 'Far') {
+    await page.waitForTimeout(300);
+    await page.evaluate(() => {
+      const scene = window.__lapline?.scene;
+      if (!scene) return;
+      const to = scene.controls.target;
+      scene.camera.position.sub(to).setLength(scene.controls.maxDistance).add(to);
+    });
+  }
+  await page.waitForTimeout(2000);
+  const crowd = await page.evaluate(() => {
+    const scene = window.__lapline?.scene;
+    if (!scene) return null;
+    const canvas = document.querySelector('.track-canvas').getBoundingClientRect();
+    const { boxes, bunches } = scene.layout();
+    const rect = (b) => ({ left: b.x - b.width / 2, right: b.x + b.width / 2, top: b.y - b.height / 2, bottom: b.y + b.height / 2 });
+    const hits = (a, b) => a.right - b.left > 1 && b.right - a.left > 1 && a.bottom - b.top > 1 && b.bottom - a.top > 1;
+    const shown = boxes.filter((b) => b.kind === 'label' || b.kind === 'chip');
+    const overlaps = [];
+    for (let i = 0; i < shown.length; i++)
+      for (let j = i + 1; j < shown.length; j++)
+        if (hits(rect(shown[i]), rect(shown[j]))) overlaps.push(`${shown[i].kind} ${shown[i].key} on ${shown[j].kind} ${shown[j].key}`);
+    // How far each label is from the edge of its own dot.
+    const right = new scene.camera.position.constructor(1, 0, 0).applyQuaternion(scene.camera.quaternion);
+    let worst = 0;
+    let worstCar = null;
+    for (const b of boxes.filter((x) => x.kind === 'label')) {
+      const car = scene.cars.get(b.key);
+      const at = (p) => {
+        const v = p.clone().project(scene.camera);
+        return [((v.x + 1) / 2) * canvas.width, ((1 - v.y) / 2) * canvas.height];
+      };
+      const [x, y] = at(car.group.position);
+      const [ex] = at(car.group.position.clone().addScaledVector(right, car.dot.geometry.parameters.radius));
+      const r = Math.abs(ex - x);
+      const r2 = rect(b);
+      const gap = Math.hypot(Math.max(r2.left - x, 0, x - r2.right), Math.max(r2.top - y, 0, y - r2.bottom)) - r;
+      if (gap > worst) {
+        worst = gap;
+        worstCar = car.code;
+      }
+    }
+    return {
+      labels: boxes.filter((b) => b.kind === 'label').length,
+      chips: bunches.map((b) => b.cars.length),
+      overlaps,
+      worst,
+      worstCar,
+    };
+  });
+  if (!crowd) {
+    say(`${preset}: scene layout is readable`, false, 'window.__lapline.scene missing');
+    continue;
+  }
+  say(
+    `${preset}: nothing overlaps`,
+    crowd.overlaps.length === 0,
+    crowd.overlaps.length ? crowd.overlaps.join(', ') : `${crowd.labels} labels, chips of ${crowd.chips.join(', ') || 'none'}`,
+  );
+  // The furthest slot is a second row: the gap, a label's height and the gap
+  // again, 3 + 19 + 3, with a little for the selected label being taller.
+  say(`${preset}: every label beside its own car`, crowd.worst <= 30, `furthest ${crowd.worst.toFixed(0)}px (${crowd.worstCar ?? 'none'})`);
+
+  if (!chipTried && crowd.chips.length) {
+    chipTried = true;
+    const want = crowd.chips[0];
+    await page.locator('.bunch-chip:not([hidden])').first().click();
+    await page.waitForTimeout(400);
+    const rows = await page.evaluate(() => document.querySelectorAll('.picker-row').length);
+    say('a "+n cars" chip opens the picker with its cars', rows === want, `chip of ${want}, picker of ${rows}`);
+    await page.evaluate(() => document.querySelector('.picker-scrim')?.click());
+    await page.waitForTimeout(300);
+  }
+}
+if (!chipTried) say('a "+n cars" chip opens the picker with its cars', false, 'no chip appeared, even with the field pulled into a small space');
+await page.getByRole('button', { name: 'Tilt', exact: true }).click();
+await page.getByRole('button', { name: 'Settings' }).click();
+await page.getByLabel('Label every car').first().click();
+await page.getByRole('button', { name: 'Done' }).click();
+await fetch(`${URLBASE}/api/control`, {
+  method: 'POST',
+  headers: { ...headers, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ playing: true }),
+});
 
 // ---- the scene gives back what it rebuilds (M9) ----
 // `setCircuit` runs on every nudge of the elevation slider and every layer

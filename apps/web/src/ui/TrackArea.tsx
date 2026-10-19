@@ -93,6 +93,8 @@ export function TrackArea(): React.JSX.Element {
           </button>
         ))}
       </div>
+      {/* The scene draws the "+n cars" chips in here and moves them each frame. */}
+      <div className="bunch-layer" />
       {rc && <p className="race-control">{sentence(rc)}</p>}
       <CarPicker />
       <RedFlagCard />

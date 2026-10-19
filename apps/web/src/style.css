@@ -239,6 +239,36 @@ button {
   text-overflow: ellipsis;
 }
 
+/* "+n cars", SafetyCar.dc.html. Placed by the scene, which sets the width
+   from the text and a transform each frame; the layer itself takes no taps. */
+.bunch-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.bunch-chip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgb(21 33 58 / 0.95);
+  color: var(--flood);
+  font-size: var(--fs-field);
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+/* The chip is drawn 32px tall, as the artboard has it, but takes a 44px tap. */
+.bunch-chip::before {
+  content: '';
+  position: absolute;
+  inset: calc((32px - var(--tap)) / 2) 0;
+}
+
 /* ---------- driver strip ---------- */
 
 .strip {
