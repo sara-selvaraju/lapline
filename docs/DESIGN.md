@@ -167,6 +167,18 @@ VSC, VSC ending, safety car ending and yellow use the safety car layout with the
 
 ## Open design questions
 
+- **Where a car label may sit, and when it gives up.** "Labels avoid each
+  other in screen space" does not say how far a label may go to do so. A
+  label now sits beside its own car — above it by preference, then below,
+  either side, the corners, or a second row up or down — and never further.
+  One with no room is not drawn, and the cars left over share the "+n cars"
+  chip `SafetyCar.dc.html` draws, placed beside the pack where there is room
+  and over it where there is not. A single car is not a bunch: its label had
+  no room, so a wider chip has none either and would only push other labels
+  out, so it goes unlabelled and can still be tapped. With every car
+  labelled, a tight pack therefore shows some names and a chip, not twenty
+  names. Judge it on a device with a real pack.
+
 - **The glance type sizes were missing from the table above** until M8. The
   artboard has always used 40, 34, 30, 26 and 22, and this file's prose named
   the 40; the table simply had not caught up. Added rather than argued with,

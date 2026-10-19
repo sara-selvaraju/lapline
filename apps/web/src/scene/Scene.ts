@@ -14,7 +14,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { Circuit, MarshalSectorFlag, Point3, Tick, Timing, Transform } from '@lapline/shared';
 import { storeState } from '../store/store.js';
 import { applyStale, DOT_RADIUS, makeCar, setLabelSelected, SHARED_GEOMETRY, type Car } from './cars.js';
-import { applyPixelSizes, fitToTexture, liftPx, pixelSize, setLiftPx } from './sprites.js';
+import { applyPixelSizes, fitToTexture, pixelSize, screenOffset, setScreenOffset } from './sprites.js';
 import { COLORS, FRAME_MS } from './colours.js';
 import {
   buildMarshalTicks,
@@ -29,7 +29,9 @@ import {
 import {
   labelledDrivers,
   visibleBadges,
-  resolveCollisions,
+  placeLabels,
+  type Bunch,
+  type CarLabel,
   type LabelBox,
   type Obstacle,
 } from './labels.js';
@@ -70,8 +72,10 @@ const BADGE_UNBLOCK_PAD = 2;
 /** How quickly a car label slides to the position the resolver chose. */
 const LABEL_EASE_PER_S = 10;
 
-/** Clear space between the top of a car's dot and the bottom of its label. */
-const LABEL_GAP_PX = 3;
+/** docs/DESIGN.md and SafetyCar.dc.html: the "+n cars" chip, 14px 600, 32px tall. */
+const CHIP_FONT = '600 14px "Barlow Semi Condensed", system-ui, sans-serif';
+const CHIP_HEIGHT = 32;
+const CHIP_PAD_X = 10;
 
 /** How long a badge must stay clear before it starts coming back, in ms. */
 const BADGE_RETURN_MS = 400;
@@ -86,6 +90,14 @@ const PRESETS: Record<CameraPreset, { dir: THREE.Vector3; fit: number }> = {
   // Low and behind the selected car; distance is handled by the follow code.
   chase: { dir: new THREE.Vector3(0, 0.22, 0.97).normalize(), fit: 0.22 },
 };
+
+/** A laid-out box, as `layout()` reports it for the checks in tools/. */
+type LayoutBox = { kind: 'badge' | 'label' | 'chip'; key: number; x: number; y: number; width: number; height: number };
+
+/** "+16 cars", or "+1 car". */
+function chipText(count: number): string {
+  return `+${count} ${count === 1 ? 'car' : 'cars'}`;
+}
 
 export class Scene {
   readonly scene = new THREE.Scene();
@@ -341,6 +353,8 @@ export class Scene {
 
   dispose(): void {
     this.clearCars();
+    for (const chip of this.chips) chip.remove();
+    this.chips.length = 0;
     cancelAnimationFrame(this.frameHandle);
     this.resizeObserver.disconnect();
     this.controls.dispose();
@@ -571,64 +585,82 @@ export class Scene {
     const leader = rows.find((row) => row.p === 1)?.n;
     const obstacles = this.obstacles();
 
-    // Car labels first, as M2 placed them: they hold the positions, and the
-    // selected car holds its place ahead of the leader, ahead of the rest.
-    this.labelBoxes.length = 0;
-    this.labelLift.clear();
+    // Car labels first: they hold the positions, and the selected car holds
+    // its place ahead of the leader, ahead of the rest.
+    const wanted: CarLabel[] = [];
     for (const [n, car] of this.cars) {
-      if (!car.label.visible) continue;
+      if (!car.label.visible) {
+        car.labelSlot = undefined;
+        continue;
+      }
       this.projected.copy(car.group.position).project(this.camera);
-      // Behind the camera: nothing sensible to lay out.
-      if (this.projected.z > 1) {
+      const x = ((this.projected.x + 1) / 2) * r.width;
+      const y = ((1 - this.projected.y) / 2) * r.height;
+      // Behind the camera or off the canvas: nothing to label, and nothing to
+      // count in a chip either.
+      if (this.projected.z > 1 || x < 0 || x > r.width || y < 0 || y > r.height) {
         car.label.visible = false;
+        car.labelSlot = undefined;
         continue;
       }
       const size = pixelSize(car.label)!;
-      // Sat just clear of the dot. The dot is world-sized, so how far that is
-      // depends on depth: a car close under the chase camera has a large dot.
-      const dotPx = DOT_RADIUS / this.worldPerPixelAt(car.group.position, r.height);
-      const lift = dotPx + LABEL_GAP_PX + size.height / 2;
-      this.labelLift.set(n, lift);
-      this.labelBoxes.push({
+      wanted.push({
         n,
-        x: ((this.projected.x + 1) / 2) * r.width,
-        y: ((1 - this.projected.y) / 2) * r.height - lift,
+        x,
+        y,
+        // The dot is world-sized, so how far a label must sit to clear it
+        // depends on depth: a car close under the chase camera has a big one.
+        r: DOT_RADIUS / this.worldPerPixelAt(car.group.position, r.height),
         width: size.width,
         height: size.height,
         priority: n === sel ? 0 : n === leader ? 1 : 2,
       });
     }
-    // Ease the labels into place rather than snapping. The resolver is greedy
-    // and order-dependent, so two cars drawing level can swap which of them
-    // holds its place and which gives way, and the answer jumps. Measured at
-    // Singapore, a label moved 41 world units between two frames. Easing keeps
-    // the decision while losing the teleport — and since a badge yields to
-    // whatever a label covers, a steady label is what stops badges blinking.
-    // Hand the resolver what each label settled on last frame, so one that is
-    // in nobody's way keeps the place it has instead of being re-decided.
     const held = new Map<number, number>();
-    for (const box of this.labelBoxes) {
-      const car = this.cars.get(box.n);
-      if (car) held.set(box.n, car.labelDyTarget);
+    for (const l of wanted) {
+      const slot = this.cars.get(l.n)?.labelSlot;
+      if (slot !== undefined) held.set(l.n, slot);
     }
-    const labelOffsets = resolveCollisions(this.labelBoxes, 2, obstacles, held, { top: 0, bottom: r.height });
+    const { placed, bunches } = placeLabels(wanted, {
+      obstacles,
+      held,
+      bounds: { top: 0, left: 0, bottom: r.height, right: r.width },
+      chipSize: (count) => this.chipSize(count),
+      dots: this.dotRects(r),
+    });
+
+    // Ease the labels into place rather than snapping. The layout is greedy
+    // and order-dependent, so two cars drawing level can swap which of them
+    // keeps its slot, and the answer jumps. Easing keeps the decision while
+    // losing the teleport, and since a badge yields to whatever a label
+    // covers, a steady label is what stops badges blinking. A label that has
+    // just appeared goes straight to its slot: there is nowhere to ease from.
     const ease = Math.min(1, (dt / 1000) * LABEL_EASE_PER_S);
-    for (const [n, dyPx] of labelOffsets) {
-      const car = this.cars.get(n);
-      if (!car) continue;
-      car.labelDyTarget = dyPx;
-      car.labelDy += (dyPx - car.labelDy) * ease;
-      // Offsets are screen pixels, and so is the lift, so the label lands
-      // exactly where the resolver put it whatever the camera is doing.
-      setLiftPx(car.label, (this.labelLift.get(n) ?? 0) - car.labelDy);
+    const labelRects: Obstacle[] = [];
+    for (const l of wanted) {
+      const car = this.cars.get(l.n)!;
+      const p = placed.get(l.n);
+      if (!p) {
+        car.label.visible = false;
+        car.labelSlot = -1;
+        continue;
+      }
+      const fresh = car.labelSlot === undefined || car.labelSlot === -1;
+      car.labelSlot = p.slot;
+      car.labelDx = fresh ? p.dx : car.labelDx + (p.dx - car.labelDx) * ease;
+      car.labelDy = fresh ? p.dy : car.labelDy + (p.dy - car.labelDy) * ease;
+      setScreenOffset(car.label, car.labelDx, car.labelDy);
+      // Where the label is drawn, not where it is heading: a badge has to
+      // clear the position the viewer sees.
+      labelRects.push(this.rect(l.x + car.labelDx, l.y + car.labelDy, l.width, l.height));
     }
-    // Where the labels ended up, not where they started: a badge has to clear
-    // the label's resolved position, which is the one the viewer sees.
-    const labelBoxes = this.labelBoxes.map((b) => this.rectAfter(b, this.cars.get(b.n)?.labelDy ?? 0));
+    this.drawBunches(bunches);
+    const chipRects = bunches.map((b) => this.rect(b.x, b.y, b.width, b.height));
 
     // Badges next, against each other and the camera group only. Nothing in
     // that set moves unless the camera does, so a badge's position is steady.
-    this.labelBoxes.length = 0;
+    const badgeBoxes = this.labelBoxes;
+    badgeBoxes.length = 0;
     for (let i = 0; i < this.badges.length; i++) {
       const b = this.badges[i]!;
       this.projected.copy(b.base).project(this.camera);
@@ -638,7 +670,7 @@ export class Scene {
         b.clearSince = 0;
         continue;
       }
-      this.labelBoxes.push({
+      badgeBoxes.push({
         n: BADGE_KEY - i,
         x: ((this.projected.x + 1) / 2) * r.width,
         y: ((1 - this.projected.y) / 2) * r.height,
@@ -654,14 +686,14 @@ export class Scene {
     // Hysteresis: a hidden badge is measured a little larger, so it has to be
     // clear by a margin before it returns and a car label sliding along its
     // edge cannot toggle it frame by frame.
-    const padded = this.labelBoxes.map((box) => {
+    const padded = badgeBoxes.map((box) => {
       const b = this.badges[BADGE_KEY - box.n];
       if (!b || b.fade > 0.02) return box;
       return { ...box, width: box.width + BADGE_UNBLOCK_PAD * 2, height: box.height + BADGE_UNBLOCK_PAD * 2 };
     });
-    const shown = visibleBadges(padded, [...labelBoxes, ...obstacles]);
+    const shown = visibleBadges(padded, [...labelRects, ...chipRects, ...obstacles]);
 
-    for (const box of this.labelBoxes) {
+    for (const box of badgeBoxes) {
       const b = this.badges[BADGE_KEY - box.n];
       if (!b) continue;
       // Always exactly on its corner. The only question is whether it is drawn.
@@ -690,14 +722,85 @@ export class Scene {
     }
   }
 
-  /** A laid-out box as a screen rectangle, once its offset is applied. */
-  private rectAfter(box: LabelBox, dyPx: number): Obstacle {
-    return {
-      left: box.x - box.width / 2,
-      right: box.x + box.width / 2,
-      top: box.y - box.height / 2 + dyPx,
-      bottom: box.y + box.height / 2 + dyPx,
-    };
+  /** Every placed car's dot on screen, as a square around it. */
+  private dotRects(r: DOMRect): Obstacle[] {
+    const out: Obstacle[] = [];
+    for (const car of this.cars.values()) {
+      if (!car.to) continue;
+      this.projected.copy(car.group.position).project(this.camera);
+      if (this.projected.z > 1) continue;
+      const d = (2 * DOT_RADIUS) / this.worldPerPixelAt(car.group.position, r.height);
+      out.push(this.rect(((this.projected.x + 1) / 2) * r.width, ((1 - this.projected.y) / 2) * r.height, d, d));
+    }
+    return out;
+  }
+
+  /** A box on screen, from its centre and size. */
+  private rect(x: number, y: number, width: number, height: number): Obstacle {
+    return { left: x - width / 2, right: x + width / 2, top: y - height / 2, bottom: y + height / 2 };
+  }
+
+  private readonly chipWidths = new Map<number, number>();
+  private chipMeasure: CanvasRenderingContext2D | null = null;
+
+  /** The "+n cars" chip's size, measured from its text as the button draws it. */
+  private chipSize(count: number): { width: number; height: number } {
+    let width = this.chipWidths.get(count);
+    if (width === undefined) {
+      this.chipMeasure ??= document.createElement('canvas').getContext('2d');
+      let text = 0;
+      if (this.chipMeasure) {
+        this.chipMeasure.font = CHIP_FONT;
+        text = this.chipMeasure.measureText(chipText(count)).width;
+      }
+      // Padding either side and the 1px border.
+      width = Math.ceil(text) + CHIP_PAD_X * 2 + 2;
+      this.chipWidths.set(count, width);
+    }
+    return { width, height: CHIP_HEIGHT };
+  }
+
+  private readonly chips: HTMLButtonElement[] = [];
+  private shownBunches: Bunch[] = [];
+
+  /**
+   * Draws the "+n cars" chips as buttons over the canvas.
+   *
+   * Real buttons rather than sprites: the chip is a control, so it wants a
+   * proper tap target and an accessible name. The scene positions them
+   * directly, as it does the sprites, so per-frame data still never passes
+   * through React; TrackArea only provides the empty layer.
+   */
+  private drawBunches(bunches: Bunch[]): void {
+    this.shownBunches = bunches;
+    const layer = this.canvas.parentElement?.querySelector<HTMLElement>('.bunch-layer');
+    if (!layer) return;
+    const offsetX = this.canvas.offsetLeft;
+    const offsetY = this.canvas.offsetTop;
+    for (let i = 0; i < bunches.length; i++) {
+      const b = bunches[i]!;
+      let chip = this.chips[i];
+      if (!chip) {
+        chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'bunch-chip';
+        chip.addEventListener('click', () => {
+          const cars = (chip!.dataset.cars ?? '').split(',').filter(Boolean).map(Number);
+          if (cars.length) storeState().openPicker(cars);
+        });
+        layer.append(chip);
+        this.chips.push(chip);
+      }
+      const n = b.cars.length;
+      const text = chipText(n);
+      if (chip.textContent !== text) chip.textContent = text;
+      chip.dataset.cars = b.cars.join(',');
+      chip.setAttribute('aria-label', `${n} more ${n === 1 ? 'car' : 'cars'} bunched here. Open car picker.`);
+      chip.style.width = `${b.width}px`;
+      chip.style.transform = `translate(${offsetX + b.x - b.width / 2}px, ${offsetY + b.y - b.height / 2}px)`;
+      chip.hidden = false;
+    }
+    for (let i = bunches.length; i < this.chips.length; i++) this.chips[i]!.hidden = true;
   }
 
   /**
@@ -708,13 +811,15 @@ export class Scene {
    * screen furniture labels keep off, so a check can judge the whole layout.
    */
   layout(): {
-    boxes: Array<{ kind: 'badge' | 'label'; key: number; x: number; y: number; width: number; height: number }>;
+    boxes: LayoutBox[];
+    /** Each "+n cars" chip, with the cars it stands for. */
+    bunches: Array<{ cars: number[]; x: number; y: number; width: number; height: number }>;
     obstacles: Obstacle[];
   } {
     const r = this.canvas?.getBoundingClientRect();
-    const boxes: Array<{ kind: 'badge' | 'label'; key: number; x: number; y: number; width: number; height: number }> =
-      [];
-    if (!r) return { boxes, obstacles: [] };
+    const boxes: LayoutBox[] = [];
+    const bunches = this.shownBunches.map((b) => ({ ...b, cars: [...b.cars] }));
+    if (!r) return { boxes, bunches, obstacles: [] };
     const at = new THREE.Vector3();
     const push = (kind: 'badge' | 'label', key: number, sprite: THREE.Sprite): void => {
       if (!sprite.visible) return;
@@ -722,42 +827,69 @@ export class Scene {
       if (!size) return;
       sprite.getWorldPosition(at).project(this.camera);
       if (at.z > 1) return;
+      const off = screenOffset(sprite);
       boxes.push({
         kind,
         key,
-        x: ((at.x + 1) / 2) * r.width,
-        y: ((1 - at.y) / 2) * r.height - liftPx(sprite),
+        x: ((at.x + 1) / 2) * r.width + off.dx,
+        y: ((1 - at.y) / 2) * r.height + off.dy,
         width: size.width,
         height: size.height,
       });
     };
     for (let i = 0; i < this.badges.length; i++) push('badge', this.badges[i]!.number, this.badges[i]!.sprite);
     for (const [n, car] of this.cars) push('label', n, car.label);
-    return { boxes, obstacles: this.obstacles() };
+    bunches.forEach((b, i) => boxes.push({ kind: 'chip', key: i, x: b.x, y: b.y, width: b.width, height: b.height }));
+    return { boxes, bunches, obstacles: this.obstacles() };
   }
 
   /**
    * Screen furniture labels and badges must keep off. docs/DESIGN.md asks for
-   * turn badges "nudged clear of car labels and controls", and the camera group
-   * is the control that sits over the track.
+   * turn badges "nudged clear of car labels and controls". The camera group is
+   * the control that sits over the track; the race control line along its
+   * bottom edge and the safety car's chip are read as text, and a car label
+   * drawn over either makes both illegible.
    */
   private obstacles(): Obstacle[] {
-    const group = this.canvas?.parentElement?.querySelector('.camera-group');
+    const parent = this.canvas?.parentElement;
     const canvasBox = this.canvas?.getBoundingClientRect();
-    if (!group || !canvasBox) return [];
-    const b = group.getBoundingClientRect();
-    return [
-      {
+    if (!parent || !canvasBox) return [];
+    const out: Obstacle[] = [];
+    const add = (b: DOMRect): void => {
+      if (b.width === 0 || b.height === 0) return;
+      out.push({
         top: b.top - canvasBox.top,
         bottom: b.bottom - canvasBox.top,
         left: b.left - canvasBox.left,
         right: b.right - canvasBox.left,
-      },
-    ];
+      });
+    };
+    const group = parent.querySelector('.camera-group');
+    if (group) add(group.getBoundingClientRect());
+    // The line is as wide as the track, but only its text is in the way.
+    const rc = parent.querySelector('.race-control');
+    if (rc?.firstChild) {
+      const range = document.createRange();
+      range.selectNodeContents(rc);
+      add(range.getBoundingClientRect());
+    }
+    for (const o of this.scGroup.children) {
+      const size = pixelSize(o);
+      if (!size || !(o instanceof THREE.Sprite)) continue;
+      o.getWorldPosition(this.projected).project(this.camera);
+      if (this.projected.z > 1) continue;
+      out.push(
+        this.rect(
+          ((this.projected.x + 1) / 2) * canvasBox.width,
+          ((1 - this.projected.y) / 2) * canvasBox.height,
+          size.width,
+          size.height,
+        ),
+      );
+    }
+    return out;
   }
 
-  /** Each laid-out label's lift off its car this frame, in pixels. */
-  private readonly labelLift = new Map<number, number>();
   private readonly camWorld = new THREE.Vector3();
 
   /** World units per screen pixel at a point, for turning offsets back. */
