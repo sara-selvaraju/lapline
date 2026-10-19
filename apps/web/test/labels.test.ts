@@ -2,7 +2,16 @@
 
 import { describe, expect, it } from 'vitest';
 import type { TowerRow } from '@lapline/shared';
-import { labelledDrivers, resolveCollisions, type LabelBox, visibleBadges, type Obstacle } from '../src/scene/labels.js';
+import {
+  type CarLabel,
+  labelledDrivers,
+  labelSlots,
+  type LabelBox,
+  type Obstacle,
+  type Placement,
+  placeLabels,
+  visibleBadges,
+} from '../src/scene/labels.js';
 
 const row = (n: number, p: number | null, gap: number | string | null): TowerRow => ({
   n,
@@ -68,180 +77,175 @@ describe('labelledDrivers', () => {
   });
 });
 
-describe('resolveCollisions', () => {
-  const box = (n: number, x: number, y: number, priority = 2): LabelBox => ({
-    n,
-    x,
-    y,
-    width: 40,
-    height: 16,
-    priority,
+// A car at (x, y) with a 5px dot and a 40 by 19 label, as the scene gives them.
+const car = (n: number, x: number, y: number, priority = 2): CarLabel => ({ n, x, y, r: 5, width: 40, height: 19, priority });
+const rectOf = (l: CarLabel, p: Placement): Obstacle => ({
+  left: l.x + p.dx - l.width / 2,
+  right: l.x + p.dx + l.width / 2,
+  top: l.y + p.dy - l.height / 2,
+  bottom: l.y + p.dy + l.height / 2,
+});
+const clash = (a: Obstacle, b: Obstacle): boolean =>
+  a.right > b.left + 0.001 && a.left < b.right - 0.001 && a.bottom > b.top + 0.001 && a.top < b.bottom - 0.001;
+const canvas = { top: 0, left: 0, bottom: 290, right: 390 };
+const chipSize = (count: number) => ({ width: 40 + String(count).length * 8, height: 32 });
+
+describe('labelSlots', () => {
+  it('puts the first slot directly above the dot, just clear of it', () => {
+    const [above] = labelSlots({ r: 5, width: 40, height: 19 }, 3);
+    expect(above).toEqual({ dx: 0, dy: -(5 + 3 + 9.5) });
   });
 
-  it('leaves labels that do not overlap where they are', () => {
-    const out = resolveCollisions([box(1, 100, 100), box(2, 100, 200)]);
-    expect(out.get(1)).toBe(0);
-    expect(out.get(2)).toBe(0);
-  });
-
-  it('leaves labels side by side alone, since they do not overlap', () => {
-    const out = resolveCollisions([box(1, 100, 100), box(2, 200, 100)]);
-    expect(out.get(2)).toBe(0);
-  });
-
-  it('pushes an overlapping label clear', () => {
-    const out = resolveCollisions([box(1, 100, 100), box(2, 100, 108)]);
-    expect(out.get(1)).toBe(0);
-    expect(out.get(2)).toBeLessThan(0);
-    // Clear of the first box, which spans 92 to 108.
-    expect(108 + out.get(2)! - 8).toBeLessThanOrEqual(92);
-  });
-
-  it('keeps the highest-priority label in place and moves the others', () => {
-    // The selected car is priority 0 even though it sorts later by y.
-    const out = resolveCollisions([box(1, 100, 100, 2), box(2, 100, 104, 0)]);
-    expect(out.get(2)).toBe(0);
-    expect(out.get(1)).toBeLessThan(0);
-  });
-
-  it('separates a whole stack, as a bunch of cars produces', () => {
-    const stack = [box(1, 100, 100), box(2, 100, 102), box(3, 100, 104), box(4, 100, 106)];
-    const out = resolveCollisions(stack);
-    const spans = stack
-      .map((b) => ({ top: b.y - b.height / 2 + out.get(b.n)!, bottom: b.y + b.height / 2 + out.get(b.n)! }))
-      .sort((a, b) => a.top - b.top);
-    for (let i = 1; i < spans.length; i++) {
-      expect(spans[i]!.top).toBeGreaterThanOrEqual(spans[i - 1]!.bottom - 0.001);
+  it('keeps every slot within two label heights of the car', () => {
+    for (const s of labelSlots({ r: 5, width: 40, height: 19 })) {
+      expect(Math.abs(s.dy)).toBeLessThanOrEqual(5 + 3 + 9.5 + 19 + 3);
+      expect(Math.abs(s.dx)).toBeLessThanOrEqual(5 + 3 + 20);
     }
   });
 
-  it('terminates even when asked to place more labels than can possibly fit', () => {
-    const many = Array.from({ length: 40 }, (_, i) => box(i, 100, 100));
-    expect(() => resolveCollisions(many)).not.toThrow();
-    expect(resolveCollisions(many).size).toBe(40);
+  it('clears a bigger dot, as a car close under the chase camera has', () => {
+    expect(labelSlots({ r: 40, width: 40, height: 19 })[0]!.dy).toBeLessThan(-40 - 9.5);
   });
 });
 
-describe('fixed obstacles', () => {
-  const box = (n: number, x: number, y: number): LabelBox => ({ n, x, y, width: 40, height: 16, priority: 2 });
-
-  it('moves a label out from under the camera group', () => {
-    const camera = { top: 8, bottom: 52, left: 240, right: 378 };
-    const out = resolveCollisions([box(1, 300, 30)], 2, [camera]);
-    const moved = 30 + out.get(1)!;
-    expect(moved + 8).toBeLessThanOrEqual(camera.top);
+describe('placeLabels', () => {
+  it('puts a lone label above its car', () => {
+    const { placed } = placeLabels([car(1, 100, 100)]);
+    expect(placed.get(1)?.slot).toBe(0);
   });
 
-  it('leaves a label clear of the obstacle alone', () => {
-    const camera = { top: 8, bottom: 52, left: 240, right: 378 };
-    expect(resolveCollisions([box(1, 100, 200)], 2, [camera]).get(1)).toBe(0);
+  it('never lets two placed labels overlap', () => {
+    const pack = Array.from({ length: 12 }, (_, i) => car(i + 1, 100 + i * 6, 100 + i * 3));
+    const { placed } = placeLabels(pack, { bounds: canvas });
+    const rects = pack.filter((l) => placed.has(l.n)).map((l) => rectOf(l, placed.get(l.n)!));
+    for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) expect(clash(rects[i]!, rects[j]!)).toBe(false);
   });
 
-  it('leaves a label below the obstacle where it is', () => {
-    // The resolver only pushes upwards, and a label clear underneath is clear.
-    const camera = { top: 8, bottom: 52, left: 240, right: 378 };
-    expect(resolveCollisions([box(1, 300, 70)], 2, [camera]).get(1)).toBe(0);
+  it('keeps every label beside its own car, never far away', () => {
+    const pack = Array.from({ length: 20 }, (_, i) => car(i + 1, 80 + i * 4, 120 + i * 2));
+    const { placed } = placeLabels(pack, { bounds: canvas, chipSize });
+    for (const [, p] of placed) expect(Math.hypot(p.dx, p.dy)).toBeLessThan(50);
   });
 
-  it('keeps labels off each other and off the furniture at once', () => {
+  it('labels the selected car and the leader before anyone else', () => {
+    const pack = [car(1, 100, 100, 2), car(2, 101, 100, 2), car(3, 102, 100, 1), car(4, 103, 100, 0)];
+    const { placed } = placeLabels(pack, { bounds: canvas, chipSize });
+    expect(placed.get(4)?.slot).toBe(0);
+    expect(placed.has(3)).toBe(true);
+  });
+
+  it('tries beside and below when above is taken', () => {
+    const blocked = { left: 60, right: 140, top: 60, bottom: 92 };
+    const { placed } = placeLabels([car(1, 100, 100)], { obstacles: [blocked] });
+    expect(placed.get(1)?.slot).toBe(1);
+  });
+
+  it('keeps labels off the furniture', () => {
     const camera = { top: 8, bottom: 52, left: 240, right: 378 };
-    const ys = { 1: 30, 2: 34 } as Record<number, number>;
-    const out = resolveCollisions([box(1, 300, ys[1]!), box(2, 300, ys[2]!)], 2, [camera]);
-    const spans = [1, 2]
-      .map((n) => ({ top: ys[n]! - 8 + out.get(n)!, bottom: ys[n]! + 8 + out.get(n)! }))
-      .sort((a, b) => a.top - b.top);
-    // Both clear the camera group, and neither sits on the other.
-    for (const s of spans) expect(s.bottom).toBeLessThanOrEqual(camera.top + 0.001);
-    expect(spans[1]!.top).toBeGreaterThanOrEqual(spans[0]!.bottom - 0.001);
+    const l = car(1, 300, 60);
+    const { placed } = placeLabels([l], { obstacles: [camera], bounds: canvas });
+    expect(clash(rectOf(l, placed.get(1)!), camera)).toBe(false);
+  });
+
+  it('keeps labels on the canvas rather than pushing them off the top', () => {
+    const l = car(1, 100, 6);
+    const { placed } = placeLabels([l], { bounds: canvas });
+    expect(rectOf(l, placed.get(1)!).top).toBeGreaterThanOrEqual(0);
+  });
+
+  it('terminates and accounts for every car when far too many crowd one spot', () => {
+    // Every car is in one place, so every car left over is in the one chip.
+    const many = Array.from({ length: 40 }, (_, i) => car(i + 1, 100, 100));
+    const { placed, bunches } = placeLabels(many, { bounds: canvas, chipSize });
+    expect(placed.size + bunches.reduce((s, b) => s + b.cars.length, 0)).toBe(40);
   });
 });
 
-describe('resolveCollisions, keeping positions between frames', () => {
-  const box = (n: number, y: number, priority = 2): LabelBox => ({
-    n,
-    x: 100,
-    y,
-    width: 40,
-    height: 16,
-    priority,
+describe('placeLabels, keeping positions between frames', () => {
+  it('keeps a held slot that still works, even when a better one is free', () => {
+    // Slot 2 is to the right. Above is free, but not by the homing margin.
+    const near = { left: 60, right: 140, top: 60, bottom: 71 };
+    const { placed } = placeLabels([car(1, 100, 100)], { obstacles: [near], held: new Map([[1, 2]]) });
+    expect(placed.get(1)?.slot).toBe(2);
   });
 
-  it('places a blocked label just above its blocker, not past it', () => {
-    // Two labels dead on top of each other. The one that gives way should end
-    // up resting on the other, not flung a whole box-height clear of it.
-    const offsets = resolveCollisions([box(1, 100, 0), box(2, 100, 2)], 2);
-    expect(offsets.get(1)).toBe(0);
-    // Its bottom (100 + 8 + dy) should sit a 2px gap above the other's top (92).
-    expect(offsets.get(2)).toBeCloseTo(92 - 2 - 108);
+  it('goes back above once there is comfortable room', () => {
+    const { placed } = placeLabels([car(1, 100, 100)], { held: new Map([[1, 2]]) });
+    expect(placed.get(1)?.slot).toBe(0);
   });
 
-  it('keeps a held position that is still clear', () => {
-    const held = new Map([[2, -40]]);
-    const offsets = resolveCollisions([box(1, 100, 0), box(2, 100, 2)], 2, [], held);
-    expect(offsets.get(2)).toBe(-40);
+  it('moves a held label whose slot has stopped working', () => {
+    const blocker = { left: 110, right: 160, top: 85, bottom: 115 };
+    const { placed } = placeLabels([car(1, 100, 100)], { obstacles: [blocker], held: new Map([[1, 2]]) });
+    expect(placed.get(1)?.slot).not.toBe(2);
   });
 
-  it('re-solves a held position that has stopped working', () => {
-    // Something has moved into where this label was sitting.
-    const held = new Map([[2, -40]]);
-    const offsets = resolveCollisions([box(1, 60, 0), box(2, 100, 2)], 2, [], held);
-    expect(offsets.get(2)).not.toBe(-40);
-  });
-
-  it('comes home once there is comfortable room', () => {
-    // Nothing in the way at all, so a displaced label returns to its car.
-    const held = new Map([[1, -40]]);
-    const offsets = resolveCollisions([box(1, 100, 2)], 2, [], held);
-    expect(offsets.get(1)).toBe(0);
-  });
-
-  it('does not come home into a tight gap it would only be pushed out of', () => {
-    // Clear at dead-on, but only barely: homing needs a margin, or the label
-    // would return and be displaced again on the next frame.
-    const held = new Map([[2, -40]]);
-    const offsets = resolveCollisions([box(1, 118, 0), box(2, 100, 2)], 2, [], held);
-    expect(offsets.get(2)).toBe(-40);
-  });
-
-  it('behaves as before when no held positions are given', () => {
-    const withNone = resolveCollisions([box(1, 100, 0), box(2, 100, 2)], 2);
-    const withEmpty = resolveCollisions([box(1, 100, 0), box(2, 100, 2)], 2, [], new Map());
-    expect([...withEmpty]).toEqual([...withNone]);
+  it('needs the margin to come back out of a chip, so it does not blink', () => {
+    // Above is free by 2px only: enough to fit, not enough to return. The
+    // slot above spans 73 to 92; the rest are boxed in.
+    const tight = { left: 60, right: 140, top: 40, bottom: 71 };
+    const box = [tight, { left: 60, right: 140, top: 104, bottom: 140 }, { left: 0, right: 74, top: 79, bottom: 140 }, { left: 126, right: 200, top: 79, bottom: 140 }];
+    const fresh = placeLabels([car(1, 100, 100)], { obstacles: box });
+    const returning = placeLabels([car(1, 100, 100)], { obstacles: box, held: new Map([[1, -1]]) });
+    expect(fresh.placed.has(1)).toBe(true);
+    expect(returning.placed.has(1)).toBe(false);
   });
 });
 
-describe('resolveCollisions, inside the canvas', () => {
-  const box = (n: number, x: number, y: number, priority = 2): LabelBox => ({ n, x, y, width: 40, height: 16, priority });
-  const canvas = { top: 0, bottom: 290 };
+describe('placeLabels, bunches', () => {
+  const pack = Array.from({ length: 16 }, (_, i) => car(i + 1, 150 + (i % 4) * 3, 150 + Math.floor(i / 4) * 3));
 
-  it('pushes a label down rather than off the top of the canvas', () => {
-    // The first sits at 4 to 20; going up from 12 would put the second above 0.
-    const out = resolveCollisions([box(1, 100, 12, 0), box(2, 100, 14)], 2, [], undefined, canvas);
-    const top = 14 - 8 + out.get(2)!;
-    expect(out.get(2)).toBeGreaterThan(0);
-    expect(top).toBeGreaterThanOrEqual(20);
+  it('gathers the cars it could not label into one chip', () => {
+    const { placed, bunches } = placeLabels(pack, { bounds: canvas, chipSize });
+    expect(bunches).toHaveLength(1);
+    expect(placed.size + bunches[0]!.cars.length).toBe(16);
+    for (const n of bunches[0]!.cars) expect(placed.has(n)).toBe(false);
   });
 
-  it('still prefers up when there is room above', () => {
-    const out = resolveCollisions([box(1, 100, 100, 0), box(2, 100, 104)], 2, [], undefined, canvas);
-    expect(out.get(2)).toBeLessThan(0);
+  it('keeps the chip off the labels and on the canvas', () => {
+    const { placed, bunches } = placeLabels(pack, { bounds: canvas, chipSize });
+    const b = bunches[0]!;
+    const chip = { left: b.x - b.width / 2, right: b.x + b.width / 2, top: b.y - b.height / 2, bottom: b.y + b.height / 2 };
+    expect(chip.top).toBeGreaterThanOrEqual(0);
+    for (const l of pack) if (placed.has(l.n)) expect(clash(chip, rectOf(l, placed.get(l.n)!))).toBe(false);
   });
 
-  it('leaves alone a label whose car is itself past the edge', () => {
-    // Nothing to collide with, so its natural place stands even though it is
-    // partly above the canvas: the car is up there too.
-    expect(resolveCollisions([box(1, 100, 2)], 2, [], undefined, canvas).get(1)).toBe(0);
+  it('makes separate chips for packs in different places', () => {
+    const two = [
+      ...Array.from({ length: 10 }, (_, i) => car(i + 1, 80, 80)),
+      ...Array.from({ length: 10 }, (_, i) => car(i + 11, 300, 220)),
+    ];
+    const { bunches } = placeLabels(two, { bounds: canvas, chipSize });
+    expect(bunches).toHaveLength(2);
   });
 
-  it('gives up a held position that has gone off the canvas', () => {
-    const held = new Map([[2, -20]]);
-    const out = resolveCollisions([box(1, 100, 12, 0), box(2, 100, 14)], 2, [], held, canvas);
-    expect(14 - 8 + out.get(2)!).toBeGreaterThanOrEqual(0);
+  it('folds ordinary labels under a chip into it, but never the selected car', () => {
+    // So tight a pack that the chip has nowhere clear to go.
+    const tight = Array.from({ length: 30 }, (_, i) => car(i + 1, 100 + (i % 3), 100, i === 0 ? 0 : 2));
+    const { placed, bunches } = placeLabels(tight, { bounds: canvas, chipSize });
+    expect(placed.has(1)).toBe(true);
+    expect(placed.size + bunches.reduce((s, b) => s + b.cars.length, 0)).toBe(30);
   });
 
-  it('behaves as before when no bounds are given', () => {
-    const out = resolveCollisions([box(1, 100, 12, 0), box(2, 100, 14)]);
-    expect(out.get(2)).toBeLessThan(0);
+  it('makes no chip for a single car, which would only crowd out other labels', () => {
+    // Boxed in on every side, far from any other car.
+    const walls = [{ left: 0, right: 390, top: 0, bottom: 290 }];
+    const { placed, bunches } = placeLabels([car(1, 100, 100)], { obstacles: walls, chipSize });
+    expect(placed.has(1)).toBe(false);
+    expect(bunches).toHaveLength(0);
+  });
+
+  it('sets the chip beside the pack rather than over it, when there is room', () => {
+    const dots = pack.map((l) => ({ left: l.x - 5, right: l.x + 5, top: l.y - 5, bottom: l.y + 5 }));
+    const { bunches } = placeLabels(pack, { bounds: canvas, chipSize, dots });
+    const b = bunches[0]!;
+    const chip = { left: b.x - b.width / 2, right: b.x + b.width / 2, top: b.y - b.height / 2, bottom: b.y + b.height / 2 };
+    for (const d of dots) expect(clash(chip, d)).toBe(false);
+  });
+
+  it('draws no chip when nothing is left over, or when no size is given', () => {
+    expect(placeLabels([car(1, 100, 100)], { chipSize }).bunches).toHaveLength(0);
+    expect(placeLabels(pack, { bounds: canvas }).bunches).toHaveLength(0);
   });
 });
 

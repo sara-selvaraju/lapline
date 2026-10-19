@@ -2,7 +2,8 @@
 //
 // docs/DESIGN.md: the leader, the selected car, and cars within 1.0 s of the
 // selected car. The "label every car" setting overrides it. Labels avoid each
-// other in screen space.
+// other in screen space, and cars bunched too tightly to label share a
+// "+n cars" chip.
 
 import type { TowerRow } from '@lapline/shared';
 
@@ -45,9 +46,10 @@ export function labelledDrivers(
   return out;
 }
 
+/** A box on screen, centre and size in CSS pixels. Badges are laid out as these. */
 export interface LabelBox {
   n: number;
-  /** Screen position of the label's centre, in CSS pixels. */
+  /** Screen position of the box's centre, in CSS pixels. */
   x: number;
   y: number;
   width: number;
@@ -56,12 +58,6 @@ export interface LabelBox {
   priority: number;
 }
 
-/**
- * Pushes overlapping labels apart vertically and returns the offset each one
- * needs, in pixels. Greedy and single-pass: with at most a handful of labels
- * visible this is cheaper and steadier than anything cleverer, and a label that
- * jitters between frames is worse than one slightly out of place.
- */
 export interface Obstacle {
   top: number;
   bottom: number;
@@ -69,104 +65,223 @@ export interface Obstacle {
   right: number;
 }
 
-/**
- * How much clear space a label needs above and below its natural place before
- * it will drop back to it, in pixels. Without this margin a label that was
- * just pushed off its car would return the moment it was free, collide again,
- * and oscillate.
- */
-const HOMING_MARGIN = 6;
-
-/** The visible band a label must stay inside, top and bottom in pixels. */
+/** The part of the screen labels and chips must stay inside, in pixels. */
 export interface Bounds {
   top: number;
   bottom: number;
+  left: number;
+  right: number;
 }
 
-export function resolveCollisions(
-  boxes: readonly LabelBox[],
-  gap = 2,
-  obstacles: readonly Obstacle[] = [],
-  current?: ReadonlyMap<number, number>,
-  bounds?: Bounds,
-): Map<number, number> {
-  const offsets = new Map<number, number>();
-  // Fixed furniture the labels must avoid, such as the camera group.
-  const placed: Obstacle[] = [...obstacles];
+/** A car wanting a label: where its dot is on screen, and the label's size. */
+export interface CarLabel {
+  n: number;
+  /** The dot's centre on screen, in CSS pixels. */
+  x: number;
+  y: number;
+  /** The dot's radius on screen. Dots are world-sized, so this varies. */
+  r: number;
+  width: number;
+  height: number;
+  /** Lower is placed first: 0 the selected car, 1 the leader, 2 the rest. */
+  priority: number;
+}
 
-  const rect = (b: LabelBox, dy: number, pad = 0): Obstacle => ({
-    top: b.y - b.height / 2 + dy - pad,
-    bottom: b.y + b.height / 2 + dy + pad,
-    left: b.x - b.width / 2 - pad,
-    right: b.x + b.width / 2 + pad,
-  });
-  const hit = (r: Obstacle): Obstacle | undefined =>
-    placed.find((p) => r.right > p.left && r.left < p.right && r.bottom > p.top && r.top < p.bottom);
-  // A label that starts outside the band is left to it: its car is off the
-  // edge too. One pushed out of it is not, which is what `fits` judges.
-  const fits = (r: Obstacle, natural: Obstacle): boolean =>
-    !bounds ||
-    ((r.top >= bounds.top || r.top >= natural.top) && (r.bottom <= bounds.bottom || r.bottom <= natural.bottom));
+/** Where a label went: which slot, and its centre's offset from the dot. */
+export interface Placement {
+  slot: number;
+  dx: number;
+  dy: number;
+}
 
-  // Walks one way until the box clears everything already placed, stopping
-  // just past each blocker rather than clearing its whole height. The
-  // overshoot that caused threw labels much further than they needed to go.
-  // Only ever the one way, so the walk cannot circle between two blockers.
-  const walk = (b: LabelBox, dir: -1 | 1): number => {
-    let dy = 0;
-    for (let guard = 0; guard < 24; guard++) {
-      const blocker = hit(rect(b, dy));
-      if (!blocker) break;
-      const next =
-        dir < 0 ? blocker.top - gap - (b.y + b.height / 2) : blocker.bottom + gap - (b.y - b.height / 2);
-      if (dir < 0 ? next >= dy : next <= dy) break;
-      dy = next;
-    }
-    return dy;
+/** Two or more cars whose labels did not fit, drawn as one "+n cars" chip. */
+export interface Bunch {
+  cars: number[];
+  /** The chip's centre, in CSS pixels. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Clear space between a dot and its label, and between neighbouring boxes. */
+export const LABEL_GAP = 3;
+
+/**
+ * How much clear space a label needs before it returns to a better slot, or
+ * comes back at all after being folded into a chip. Without this margin a
+ * label would flip back the moment it had exactly enough room, be crowded
+ * out again by the next frame's movement, and blink.
+ */
+const HOMING_MARGIN = 6;
+
+/** Cars without a label this close together share one chip. */
+const BUNCH_LINK_PX = 56;
+
+/**
+ * Where a label may sit, best first, as offsets of its centre from the dot.
+ *
+ * Every slot touches the dot it names, or nearly: above it, below it, to
+ * either side, then the corners, then a second row above and below. The old
+ * resolver only ever walked upwards and had no limit, which in a pack sent
+ * labels 230px from their cars, in a column down the middle of the circuit
+ * where they named nothing. A label that has no slot here is not drawn at
+ * all; its car is counted in a chip instead, which DESIGN.md asks for.
+ */
+export function labelSlots(l: Pick<CarLabel, 'r' | 'width' | 'height'>, gap = LABEL_GAP): Array<{ dx: number; dy: number }> {
+  const v = l.r + gap + l.height / 2;
+  const h = l.r + gap + l.width / 2;
+  const row = l.height + gap;
+  return [
+    { dx: 0, dy: -v },
+    { dx: 0, dy: v },
+    { dx: h, dy: 0 },
+    { dx: -h, dy: 0 },
+    { dx: l.width / 2, dy: -v },
+    { dx: -l.width / 2, dy: -v },
+    { dx: l.width / 2, dy: v },
+    { dx: -l.width / 2, dy: v },
+    { dx: 0, dy: -v - row },
+    { dx: 0, dy: v + row },
+  ];
+}
+
+const overlaps = (a: Obstacle, b: Obstacle): boolean =>
+  a.right > b.left && a.left < b.right && a.bottom > b.top && a.top < b.bottom;
+
+const inside = (r: Obstacle, b: Bounds): boolean =>
+  r.top >= b.top && r.bottom <= b.bottom && r.left >= b.left && r.right <= b.right;
+
+function box(x: number, y: number, width: number, height: number, pad = 0): Obstacle {
+  return {
+    left: x - width / 2 - pad,
+    right: x + width / 2 + pad,
+    top: y - height / 2 - pad,
+    bottom: y + height / 2 + pad,
   };
-  const works = (b: LabelBox, dy: number): boolean => !hit(rect(b, dy)) && fits(rect(b, dy), rect(b, 0));
-
-  for (const b of [...boxes].sort((a, c) => a.priority - c.priority || a.y - c.y)) {
-    // Where this label sat last frame, when the caller is tracking that.
-    //
-    // Solving afresh every frame is what made labels flit: the walk below is
-    // greedy and order-dependent, so two cars drawing level swap which of them
-    // gives way, and the answer moves a long way for a tiny change in input.
-    // Measured at Singapore, one label swung through 132px and changed
-    // direction 17 times in ten seconds. Keeping a position that still works
-    // is what stops that, so a label moves only when something is actually in
-    // its way.
-    const held = current?.get(b.n);
-    if (held !== undefined) {
-      // Home if there is comfortable room for it, so a label that was pushed
-      // aside comes back once the car that displaced it has gone.
-      if (held !== 0 && !hit(rect(b, 0, HOMING_MARGIN))) {
-        placed.push(rect(b, 0));
-        offsets.set(b.n, 0);
-        continue;
-      }
-      if (works(b, held)) {
-        placed.push(rect(b, held));
-        offsets.set(b.n, held);
-        continue;
-      }
-    }
-
-    // Upwards by preference, as labels sit above their cars. Downwards only
-    // when up would leave the canvas: near the top edge, walking up was
-    // throwing labels clean off it, 52px above the top in the Map view.
-    // With nowhere that works, it keeps the upward answer, as it always has.
-    let dy = walk(b, -1);
-    if (!works(b, dy)) {
-      const down = walk(b, 1);
-      if (works(b, down)) dy = down;
-    }
-    if (!hit(rect(b, dy))) placed.push(rect(b, dy));
-    offsets.set(b.n, dy);
-  }
-  return offsets;
 }
 
+/**
+ * Places car labels beside their cars, and gathers the ones that do not fit
+ * into "+n cars" chips.
+ *
+ * Greedy, in priority order, so the selected car and the leader are always
+ * labelled. `held` is what each label did last frame — the slot it used, or
+ * -1 if it was folded into a chip — and a label keeps that while it still
+ * works. Solving afresh every frame is what made labels flit at Singapore:
+ * the greedy answer moves a long way for a tiny change in input.
+ *
+ * `chipSize` gives a chip's size for a count, since the text sets its width.
+ */
+export function placeLabels(
+  labels: readonly CarLabel[],
+  opts: {
+    obstacles?: readonly Obstacle[];
+    held?: ReadonlyMap<number, number>;
+    bounds?: Bounds;
+    chipSize?: (count: number) => { width: number; height: number };
+    /** Every car's dot on screen. A chip avoids covering the cars it stands for. */
+    dots?: readonly Obstacle[];
+    gap?: number;
+  } = {},
+): { placed: Map<number, Placement>; bunches: Bunch[] } {
+  const gap = opts.gap ?? LABEL_GAP;
+  const placedRects: Array<{ n: number; rect: Obstacle; priority: number }> = [];
+  const fixed: Obstacle[] = [...(opts.obstacles ?? [])];
+  const placed = new Map<number, Placement>();
+  const left: CarLabel[] = [];
+
+  const free = (r: Obstacle, pad: number): boolean => {
+    const padded = { left: r.left - pad, right: r.right + pad, top: r.top - pad, bottom: r.bottom + pad };
+    if (opts.bounds && !inside(r, opts.bounds)) return false;
+    return !fixed.some((o) => overlaps(padded, o)) && !placedRects.some((p) => overlaps(padded, p.rect));
+  };
+
+  for (const l of [...labels].sort((a, c) => a.priority - c.priority || a.y - c.y || a.n - c.n)) {
+    const slots = labelSlots(l, gap);
+    const rectAt = (i: number): Obstacle => box(l.x + slots[i]!.dx, l.y + slots[i]!.dy, l.width, l.height);
+    const held = opts.held?.get(l.n);
+
+    let chosen = -1;
+    if (held !== undefined && held >= 0 && held < slots.length) {
+      // Back to the best slot once there is comfortable room for it, so a
+      // label pushed aside returns when the car that displaced it has gone.
+      if (held !== 0 && free(rectAt(0), HOMING_MARGIN)) chosen = 0;
+      else if (free(rectAt(held), 0)) chosen = held;
+    }
+    if (chosen < 0) {
+      // A label folded into a chip last frame needs the margin to come back.
+      const pad = held === -1 ? HOMING_MARGIN : 0;
+      chosen = slots.findIndex((_, i) => free(rectAt(i), pad));
+    }
+
+    if (chosen < 0) {
+      left.push(l);
+      continue;
+    }
+    placedRects.push({ n: l.n, rect: rectAt(chosen), priority: l.priority });
+    placed.set(l.n, { slot: chosen, dx: slots[chosen]!.dx, dy: slots[chosen]!.dy });
+  }
+
+  const bunches: Bunch[] = [];
+  if (!opts.chipSize) return { placed, bunches };
+
+  // Cars left without a label, grouped by how close they are on screen.
+  const groups: CarLabel[][] = [];
+  for (const l of left) {
+    const near = groups.filter((g) => g.some((o) => Math.hypot(o.x - l.x, o.y - l.y) <= BUNCH_LINK_PX));
+    const merged = [l, ...near.flat()];
+    for (const g of near) groups.splice(groups.indexOf(g), 1);
+    groups.push(merged);
+  }
+
+  for (const g of groups.sort((a, c) => c.length - a.length)) {
+    // One car is not a bunch. Its label had nowhere to go, so a wider chip
+    // has nowhere either and would only push other labels out to make room;
+    // the car goes unlabelled and can still be tapped.
+    if (g.length < 2) continue;
+    const cars = g.map((l) => l.n);
+    const size = opts.chipSize(cars.length);
+    const cx = g.reduce((s, l) => s + l.x, 0) / g.length;
+    const cy = g.reduce((s, l) => s + l.y, 0) / g.length;
+    const r = Math.max(...g.map((l) => l.r));
+    const slots = labelSlots({ r, width: size.width, height: size.height }, gap);
+    const rects = slots.map((s) => box(cx + s.dx, cy + s.dy, size.width, size.height));
+
+    // Beside the pack rather than on it, if there is room: a chip covering
+    // the cars it counts hides the very thing it is pointing at.
+    const dots = opts.dots ?? [];
+    let at = rects.findIndex((rect) => free(rect, 0) && !dots.some((d) => overlaps(rect, d)));
+    if (at < 0) at = rects.findIndex((rect) => free(rect, 0));
+    if (at < 0) {
+      // Nowhere clear: take the first slot that only covers ordinary labels
+      // and fold those cars into the chip too. A chip standing for its whole
+      // pack says more than a heap of labels it would otherwise sit on.
+      at = rects.findIndex(
+        (rect) =>
+          (!opts.bounds || inside(rect, opts.bounds)) &&
+          !fixed.some((o) => overlaps(rect, o)) &&
+          !placedRects.some((p) => p.priority < 2 && overlaps(rect, p.rect)),
+      );
+      if (at < 0) at = 0;
+      for (let i = placedRects.length - 1; i >= 0; i--) {
+        const p = placedRects[i]!;
+        if (p.priority >= 2 && overlaps(rects[at]!, p.rect)) {
+          placedRects.splice(i, 1);
+          placed.delete(p.n);
+          cars.push(p.n);
+        }
+      }
+    }
+    // The count may have grown, and with it the chip.
+    const final = opts.chipSize(cars.length);
+    const s = slots[at]!;
+    const bunch = { cars, x: cx + s.dx, y: cy + s.dy, width: final.width, height: final.height };
+    fixed.push(box(bunch.x, bunch.y, bunch.width, bunch.height));
+    bunches.push(bunch);
+  }
+  return { placed, bunches };
+}
 
 /**
  * Which turn badges can be drawn where they belong.

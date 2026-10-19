@@ -33,19 +33,21 @@ export function pixelSize(sprite: THREE.Object3D): PixelSize | null {
 }
 
 /**
- * How far the sprite is drawn above its position, in pixels, from its centre.
- * A label is lifted off its car this way, so the lift is in screen space and
- * does not depend on how far away the camera is or which way it looks.
+ * Draws the sprite this many pixels off its position, right and down, by
+ * moving its anchor. A label is placed beside its car this way, so the offset
+ * is in screen space and does not depend on how far away the camera is or
+ * which way it looks.
  */
-export function setLiftPx(sprite: THREE.Sprite, px: number): void {
+export function setScreenOffset(sprite: THREE.Sprite, dx: number, dy: number): void {
   const size = pixelSize(sprite);
-  if (!size || size.height === 0) return;
-  sprite.center.set(0.5, 0.5 - px / size.height);
+  if (!size || size.width === 0 || size.height === 0) return;
+  sprite.center.set(0.5 - dx / size.width, 0.5 + dy / size.height);
 }
 
-export function liftPx(sprite: THREE.Sprite): number {
+export function screenOffset(sprite: THREE.Sprite): { dx: number; dy: number } {
   const size = pixelSize(sprite);
-  return size ? (0.5 - sprite.center.y) * size.height : 0;
+  if (!size) return { dx: 0, dy: 0 };
+  return { dx: (0.5 - sprite.center.x) * size.width, dy: (sprite.center.y - 0.5) * size.height };
 }
 
 /**
