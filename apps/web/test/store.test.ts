@@ -1,6 +1,6 @@
 // The store's rules, independent of any component.
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Hello, Tick, Timing } from '@lapline/shared';
 import { loadPrefs } from '../src/store/prefs.js';
 import { useStore } from '../src/store/store.js';
@@ -354,5 +354,30 @@ describe('prefs validation of the remembered delays', () => {
 
   it('defaults to none when nothing has been stored', () => {
     expect(withStored({}).delays).toEqual({});
+  });
+});
+
+describe('replayFromStart', () => {
+  const sent: unknown[] = [];
+  beforeEach(() => {
+    sent.length = 0;
+    vi.stubGlobal('fetch', async (_url: string, init: { body: string }) => {
+      sent.push(JSON.parse(init.body));
+      return new Response('{}');
+    });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  // The server drops `mode` without a session, so a replay parked at the
+  // chequered flag used to stay there.
+  it('reselects the session in replay, which is what restarts it', () => {
+    useStore.getState().applyHello(hello({ mode: 'replay' }));
+    useStore.getState().replayFromStart();
+    expect(sent).toEqual([{ session: 1002, mode: 'replay' }]);
+  });
+
+  it('sends nothing before there is a session', () => {
+    useStore.getState().replayFromStart();
+    expect(sent).toEqual([]);
   });
 });
