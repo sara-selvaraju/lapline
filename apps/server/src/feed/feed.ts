@@ -22,7 +22,7 @@ import type {
   Timing,
   Transform,
 } from '@lapline/shared';
-import { LockedError, type OpenF1 } from '../openf1/client.js';
+import { LockedError, UpstreamError, type OpenF1 } from '../openf1/client.js';
 import { LiveMqtt } from '../openf1/live-mqtt.js';
 import { createBuffers, num, prune, type Buffers } from './buffers.js';
 import { applyReplayControl, clock, newReplayState, replayNow, type ReplayState } from './clock.js';
@@ -131,6 +131,8 @@ export class Feed {
   private lockedRetryAt = 0;
   private readonly lockRetryMs: number;
   private lockedTries = 0;
+  /** The status on screen is a fetch failure, for the next good fetch to clear. */
+  private fetchFailed = false;
   private stopped = false;
 
   constructor(api: OpenF1, opts: FeedOptions = {}) {
@@ -664,21 +666,7 @@ export class Feed {
   private loop(): void {
     // One fetch decision per second, chained so a slow request cannot overlap itself.
     const tickFetch = async (): Promise<void> => {
-      try {
-        await this.fetchStep();
-        // A step that got through means any earlier lock is behind us, so the
-        // next one starts its backoff from 30 s rather than carrying on from
-        // wherever the last run of failures reached.
-        this.lockedTries = 0;
-      } catch (e) {
-        if (e instanceof LockedError) {
-          this.lock(e.message);
-          this.broadcastHello();
-        } else {
-          console.error('fetch', message(e));
-          this.setStatus('error', `Fetch problem: ${message(e)}`);
-        }
-      }
+      await this.runFetchStep();
       // One handle, replaced each second. Pushing onto `timers` kept every
       // settled Timeout alive: two hours is 7,200 of them, a weekend far more.
       if (!this.stopped) this.fetchTimer = setTimeout(() => void tickFetch(), 1000);
@@ -723,6 +711,34 @@ export class Feed {
       return false;
     }
     return Date.now() - this.lastClients > IDLE_MS;
+  }
+
+  /** One turn of the fetch loop: a step, and what its failure puts on screen. */
+  async runFetchStep(): Promise<void> {
+    try {
+      await this.fetchStep();
+      // A step that got through means any earlier lock is behind us, so the
+      // next one starts its backoff from 30 s rather than carrying on from
+      // wherever the last run of failures reached.
+      this.lockedTries = 0;
+      // And any earlier fetch failure. Nothing else cleared it, so one bad
+      // minute from OpenF1 left its error over the track for the rest of the
+      // session while the cars moved underneath. An idle step fetched
+      // nothing, so it proves nothing either way.
+      if (this.fetchFailed && !this.idle()) {
+        this.fetchFailed = false;
+        if (this.status.level === 'error') this.setReadyStatus();
+      }
+    } catch (e) {
+      if (e instanceof LockedError) {
+        this.lock(e.message);
+        this.broadcastHello();
+      } else {
+        console.error('fetch', message(e), e instanceof UpstreamError ? e.detail : '');
+        this.fetchFailed = true;
+        this.setStatus('error', fetchProblemText(e));
+      }
+    }
   }
 
   async fetchStep(): Promise<void> {
@@ -956,6 +972,16 @@ export class Feed {
     this.listeners.delete(res);
     this.lastClients = Date.now();
   }
+}
+
+/**
+ * What a failed fetch says on screen. OpenF1's own 5xx pages are nginx HTML,
+ * which is no use to anyone watching a race, and the client has already
+ * retried by the time it gets here.
+ */
+function fetchProblemText(e: unknown): string {
+  if (e instanceof UpstreamError && e.status >= 500) return 'OpenF1 is not responding. Trying again.';
+  return `Fetch problem: ${message(e)}`;
 }
 
 function message(e: unknown): string {

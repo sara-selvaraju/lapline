@@ -6,7 +6,7 @@
 //
 // Ported from reference/prototype/lib/openf1.js.
 
-import { LockedError } from './errors.js';
+import { LockedError, UpstreamError } from './errors.js';
 import { buildUrl, normaliseBase, type Filter } from './url.js';
 
 export interface OpenF1Options {
@@ -181,7 +181,7 @@ export class OpenF1 {
         await sleep(3000);
         return this.request<T>(path, filters, attempt + 1);
       }
-      throw new Error(`OpenF1 ${res.status} on ${path}: ${(await res.text()).slice(0, 200)}`);
+      throw new UpstreamError(res.status, path, (await res.text()).slice(0, 200));
     }
 
     const data = (await res.json()) as unknown;
@@ -189,5 +189,5 @@ export class OpenF1 {
   }
 }
 
-export { LockedError } from './errors.js';
+export { LockedError, UpstreamError } from './errors.js';
 export type { Filter, FilterOp } from './url.js';
