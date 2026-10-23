@@ -28,8 +28,14 @@ afterEach(() => {
  * demand is the whole point: a 401 that later stops happening is exactly the
  * transient these tests are about.
  */
-async function upstream(): Promise<{ base: string; refuse: (on: boolean) => void; calls: () => number }> {
+async function upstream(): Promise<{
+  base: string;
+  refuse: (on: boolean) => void;
+  fail: (on: boolean) => void;
+  calls: () => number;
+}> {
   let refusing = true;
+  let failing = false;
   let calls = 0;
   const now = Date.now();
   const session = {
@@ -57,6 +63,12 @@ async function upstream(): Promise<{ base: string; refuse: (on: boolean) => void
       return;
     }
     calls++;
+    if (failing) {
+      // What OpenF1's nginx actually sent on 23 October, mid-replay.
+      res.writeHead(502, { 'content-type': 'text/html' });
+      res.end('<html> <head><title>502 Bad Gateway</title></head> <body> <center><h1>502 Bad Gateway</h1></center> </body> </html>');
+      return;
+    }
     if (refusing) {
       res.writeHead(401, { 'content-type': 'application/json' });
       res.end('{"detail":"Not authenticated"}');
@@ -73,6 +85,9 @@ async function upstream(): Promise<{ base: string; refuse: (on: boolean) => void
     base: `http://127.0.0.1:${port}`,
     refuse: (on: boolean) => {
       refusing = on;
+    },
+    fail: (on: boolean) => {
+      failing = on;
     },
     calls: () => calls,
   };
@@ -145,6 +160,32 @@ describe('a lock is a wait, not an ending', () => {
     expect(feed.idle()).toBe(true);
     await feed.fetchStep();
     expect(loc.get(1)!.some((r) => r[0] === old)).toBe(false);
+  }, 30_000);
+});
+
+describe('a fetch failure is cleared by the next good fetch', () => {
+  it('puts a readable line on screen for a 502, and takes it down once OpenF1 answers', async () => {
+    // Before this nothing cleared a fetch error but selecting a session, so
+    // one bad minute from OpenF1 left nginx's HTML over the track for the
+    // rest of the race while the cars kept moving underneath it.
+    const up = await upstream();
+    const feed = feedFor(up.base, 0);
+    feed.listeners.add({ write: () => {} });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    up.refuse(false);
+    await feed.loadSessionList();
+    await feed.selectSession(9001);
+    expect(feed.mode).toBe('live');
+
+    up.fail(true);
+    await feed.runFetchStep();
+    expect(feed.status.level).toBe('error');
+    expect(feed.status.text).toBe('OpenF1 is not responding. Trying again.');
+
+    up.fail(false);
+    await feed.runFetchStep();
+    expect(feed.status).toMatchObject({ level: 'ok', text: 'Live' });
   }, 30_000);
 });
 
