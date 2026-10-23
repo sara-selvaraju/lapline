@@ -367,8 +367,12 @@ export const useStore = create<StoreState>((set, get) => ({
     set({ sessionsOpen: false });
     void post({ session: key });
   },
+  // The server only reads `mode` alongside a session key: on its own it was
+  // dropped, leaving `playing`, which does nothing to a replay parked at the
+  // chequered flag. Reselecting the session in replay restarts it from the top.
   replayFromStart: () => {
-    void post({ mode: 'replay', playing: true });
+    const key = get().session?.key;
+    if (key != null) void post({ session: key, mode: 'replay' });
   },
 
   openPicker: (picker) => set({ picker }),
