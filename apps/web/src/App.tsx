@@ -81,7 +81,8 @@ export function App(): React.JSX.Element {
 
       <SyncSheet />
       <Settings />
-      <Overlay />
+      {/* Its "loading car positions" is about the track, which this screen drops. */}
+      {!finished && <Overlay />}
       <WakeLock />
     </>
   );
