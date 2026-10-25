@@ -13,11 +13,24 @@ A personal, non-commercial, phone-first second screen for F1 sessions: a 3D circ
 
 ## Status
 
-M9 built, and complete only after the Austin weekend. The hardening and the
-instruments are in; the acceptance check itself — a full live session watched
-on a phone with no manual intervention — needs a live session and a phone, and
-neither is here. See "Austin, 23 to 25 October" below for what to do that
-weekend.
+M9 done. A full live session watched on a phone with no manual intervention —
+the Austin race on 26 October 2026 — kept up with the broadcast from start to
+finish, and nothing was seen to go wrong. The frame rate read off the settings
+page during the race, with a full field, Tilt view and all three detail layers
+on, was a steady 60 fps, which closes "60 fps on a recent iPhone", open since
+M2. Railway showed resident memory flat at about 150 to 157 MB, in line with
+the mock soak's peak.
+
+**Not done at Austin:** the soak against the real feed. The request rate
+against the sponsor budget, frame size on a live race and the reconnect count
+over a real weekend are still the mock's and the Singapore replay's. Run it at
+the next race:
+
+```
+npm run soak -- --url https://lapline.live --minutes 240 --out race.ndjson
+```
+
+and add the numbers to "Measured" in `docs/ARCHITECTURE.md`.
 
 What M9 found and fixed is in six commits. On the server: a lock could not be
 left, so a single 401 from a token refresh ended the session for good; pruning
@@ -32,7 +45,7 @@ Dedupe keys were also capped at a flat 200,000, which was 45 minutes of keys
 against buffers holding 90 seconds of rows; the cap now scales to what is
 retained, and the clear gave back 10.7 MB of heap.
 
-**The mock soak ran for 2.8 hours and is the number to beat at Austin.** One
+**The mock soak ran for 2.8 hours and is the baseline for the real feed.** One
 listener held open throughout: no reconnects, no errors, 4.0 ticks a second
 from start to finish, and a worst gap between ticks of 0.3 s against a 0.25 s
 cadence. Resident memory rose 92.5 to 132.5 MB through the live session as it
@@ -68,12 +81,8 @@ Landscape was not merely plain before this — it was broken. The fixed regions
 totalled 506 px against 390 of height with nothing allowed to shrink, so the
 tower collapsed to nothing and the controls bar was clipped off the screen.
 
-**Unverified:** "60 fps on the target iPhone", carried over from M2, and the home-screen half of M7's password check. There is
-no device here, so it is measured in headless Chrome instead — a steady 60 fps
-with a full field, which shows the scene is fast enough algorithmically but
-says nothing about Safari on A-series hardware. Run it on a phone before
-trusting it. `npm run soak` and the settings page now report the frame rate,
-so at Austin it can be read off the phone.
+**Unverified:** the home-screen half of M7's password check. The frame rate,
+also once unverified, was measured on a phone at Austin: 60 fps.
 
 **Flaky, and not M3's doing:** `npm run scene`'s "the picker offers four or
 more" check depends on the field happening to bunch where it sweeps. It passes
@@ -93,38 +102,9 @@ file's corners land on it, the sectors and the pit lane. Run it for a circuit
 new to the calendar before its first race weekend. Checked across eighteen
 circuits on 12 October 2026: fourteen clean, Madrid and Kuala Lumpur on the
 curvature fallback because they have no circuit file, Monaco and Hungary with
-no usable positions. Austin, the next race, is clean on its 2025 data — all 20
+no usable positions. Austin was clean on its 2025 data — all 20
 corners placed, worst 0.51% of span, pit lane derived. See `docs/OPENF1.md`
 for what the failures look like and how a trace is judged.
-
-### Austin, 23 to 25 October
-
-M9's acceptance check needs a live session and a phone. Three things close it,
-and until they are done this milestone is built but not complete.
-
-1. **Watch a full session on the phone, start to finish, without touching it.**
-   Practice is the cheap one to get wrong on; the race is the one that counts.
-   What to watch for: the tower still filling, the cars still moving, no stale
-   banner that does not clear, and the screen awake if "keep awake" is on.
-2. **Read the frame rate off the settings page** during the busiest part — a
-   full field, Tilt view, all three detail layers on. That number is the last
-   thing standing between this project and "60 fps on a recent iPhone", which
-   has been an unverified target since M2. Write it down, with the phone.
-3. **Run the soak against the real feed**, from a machine that can stay up:
-
-   ```
-   npm run soak -- --url https://lapline.live --minutes 240 --out austin.ndjson
-   ```
-
-   It samples from outside the server, so it changes nothing about what the
-   phone sees. Without `--pid` it cannot read memory or file descriptors —
-   those come from Railway's own metrics instead. What it is for: the request
-   rate against the sponsor budget, the frame size on the wire, the worst gap
-   between ticks, how many times the stream reconnected, and whether the feed
-   survived the chequered flag and the handover from live to replay.
-
-Then record the numbers in `docs/ARCHITECTURE.md` under "Measured" and update
-the status above.
 
 `npm run layout` measures the rendered screen against the artboard,
 `npm run scene` runs the scene checks, `npm run states` checks every race
