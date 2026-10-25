@@ -15,6 +15,7 @@ const row = (over: Partial<TowerRow>): TowerRow => ({
   pit: false,
   lapFlag: null,
   stops: 0,
+  outIn: null,
   ...over,
 });
 

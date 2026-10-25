@@ -57,7 +57,7 @@ username=…&password=…
 | `laps` | `driver_number`, `lap_number`, `date_start` (approximate), `lap_duration`, `duration_sector_1..3`, `is_pit_out_lap`, `i1_speed`, `i2_speed`, `st_speed`, `segments_sector_*` | Mini-sector segments are not available during races |
 | `stints` | `driver_number`, `stint_number`, `compound`, `lap_start`, `lap_end`, `tyre_age_at_start` | `lap_end` null while running |
 | `pit` | `date`, `driver_number`, `lap_number`, `lane_duration`, `stop_duration` | `pit_duration` is deprecated and goes at the end of the 2026 season; use `lane_duration` |
-| `race_control` | `date`, `category`, `flag`, `scope`, `sector`, `driver_number`, `lap_number`, `message` | Categories include `Flag`, `SafetyCar`, `SessionStatus`, `CarEvent`. Scope `Track`, `Sector` or `Driver`. `sector` is the marshal sector |
+| `race_control` | `date`, `category`, `flag`, `scope`, `sector`, `driver_number`, `lap_number`, `message`, `qualifying_phase` | Categories include `Flag`, `SafetyCar`, `SessionStatus`, `CarEvent`. Scope `Track`, `Sector` or `Driver`. `sector` is the marshal sector. `qualifying_phase` is 1 to 3 in qualifying and sprint qualifying only |
 
 Not used yet, but available: `weather`, `team_radio` (coverage dropped sharply in 2026), `overtakes`, `session_result`, `starting_grid`, `championship_drivers` and `championship_teams` (both beta).
 
@@ -112,6 +112,37 @@ Checked across eighteen circuits on 12 October 2026 with `npm run circuits`, whi
 - **Free-tier replay:** opening a session costs about 8 requests (drivers, laps, stints, position, intervals, race control, pit, one reference-lap trace), which is around 20 s at 2.1 s spacing.
 - **Live REST fallback:** 44.5 requests a minute, measured against the mock, confirmed from two independent counts.
 - **Live over MQTT:** 2.5 requests a minute, measured against the real Singapore race. With the broker carrying the stream the scheduler drops to a slow repair sweep, so it spends about 4% of the sponsor budget rather than 73%.
+
+## Practice and qualifying
+
+Checked against Austin 2026 (session 11392) on 25 October.
+
+- **`intervals` is a 404 outside races.** Practice and qualifying have no
+  interval or gap to read, so the tower works its gaps out from best laps.
+- **`position` in qualifying follows the segment.** In Q3 the order is by Q3
+  times alone: NOR was eighth on 1:35.049 while his 1:34.539 from Q2 would
+  have been third. Drivers already knocked out keep the place their segment
+  gave them. In practice it is by best lap over the whole session.
+- **Segments are marked in `race_control`.** Each starts with a
+  `SessionStatus` row, "SESSION STARTED", carrying its `qualifying_phase`,
+  and ends with "SESSION FINISHED" and a chequered flag. So a qualifying
+  session has three chequered flags, not one.
+- **Deleted laps stay in `laps`.** A time deleted for track limits keeps its
+  `lap_duration`; only race control says it is gone, as "CAR 87 (BEA) TIME
+  1:35.592 DELETED - TRACK LIMITS AT TURN 11 LAP 15". **That lap number is
+  one ahead of OpenF1's:** the message goes out while the car is on its next
+  lap, and the 1:35.592 is OpenF1's lap 14. This held for all eight
+  deletions that session, and the time matched to the millisecond, so
+  `deletedLaps` matches by time and falls back to the lap before the one
+  named. "LAP DELETED" messages carry no time.
+- **`session_result` holds a time per segment** in qualifying: `duration`
+  and `gap_to_leader` are three-element arrays, null for segments not
+  reached. With deleted laps removed and each driver timed from the segment
+  that placed them, the tower matched it for all 22 cars at the end of Q1, Q2
+  and Q3.
+- **Out-laps are not always flagged.** BOR's lap 10 was a 2:02.898 with
+  `is_pit_out_lap` false. It was his only Q2 lap at the time, so for a while
+  it stood as his Q2 best.
 
 ## 2026 changes worth knowing
 

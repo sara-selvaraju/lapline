@@ -129,6 +129,11 @@ server stuck on the wrong version must not loop the page.
 `ApiStats.auth`, because a boolean could only say whether credentials were
 configured, so a rejected credential reported as authenticated and the UI
 promised live data it could not deliver.
+v7 added `timing.phase`, the qualifying segment running, and `outIn` on each
+tower row, the segment a driver was knocked out in. It also changed what a
+row's `best` means in qualifying: the best lap in the segment that decides
+that driver's place, not over the whole session, because that is how OpenF1
+orders the tower. Deleted laps no longer count anywhere.
 
 | Event | Rate | Carries |
 |---|---|---|

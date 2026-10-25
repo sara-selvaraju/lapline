@@ -22,6 +22,7 @@ import { TelemetryPanel } from './ui/TelemetryPanel.js';
 import { TimingTower } from './ui/TimingTower.js';
 import { TrackArea } from './ui/TrackArea.js';
 import { useStore } from './store/store.js';
+import { showsFinished } from './ui/session.js';
 
 export function App(): React.JSX.Element {
   // DriverDetail.dc.html: expanded, the panel takes the place of both the
@@ -32,7 +33,7 @@ export function App(): React.JSX.Element {
   // Finished.dc.html drops the track and the strip for the podium and the
   // classification. Only once the result is actually in: a chequered flag with
   // nothing to show would be a worse screen than the one it replaces.
-  const finished = useStore((s) => s.timing?.flag === 'CHEQUERED' && s.result != null);
+  const finished = useStore(showsFinished);
   const locked = useStore((s) => s.mode === 'locked');
   // Nothing has arrived yet: no outline and no cars. Once either lands the
   // ordinary screen has something to show, so the staged list gets out of the

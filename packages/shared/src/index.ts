@@ -3,3 +3,4 @@
 export * from './protocol.js';
 export * from './openf1-rows.js';
 export * from './control.js';
+export * from './qualifying.js';

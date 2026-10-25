@@ -18,7 +18,10 @@
     "Locked.dc.html": { "x": 940, "y": 2448, "w": 390, "h": 844, "title": "Locked: no live access" },
     "Settings.dc.html": { "x": 1410, "y": 2448, "w": 390, "h": 844, "title": "Settings" },
     "LiveLandscape.dc.html": { "x": 0, "y": 3672, "w": 844, "h": 390, "title": "Live, landscape" },
-    "Glance.dc.html": { "x": 924, "y": 3672, "w": 844, "h": 390, "title": "Glance mode, landscape" }
+    "Glance.dc.html": { "x": 924, "y": 3672, "w": 844, "h": 390, "title": "Glance mode, landscape" },
+    "QualifyingTop.dc.html": { "x": 0, "y": 5222, "w": 390, "h": 844, "title": "Qualifying, Q2" },
+    "QualifyingDropZone.dc.html": { "x": 470, "y": 5222, "w": 390, "h": 844, "title": "Qualifying, Q2: drop zone and knocked out" },
+    "Practice.dc.html": { "x": 940, "y": 5222, "w": 390, "h": 844, "title": "Practice" }
   },
   "order": [
     "Main.dc.html",
@@ -34,13 +37,17 @@
     "Locked.dc.html",
     "Settings.dc.html",
     "LiveLandscape.dc.html",
-    "Glance.dc.html"
+    "Glance.dc.html",
+    "QualifyingTop.dc.html",
+    "QualifyingDropZone.dc.html",
+    "Practice.dc.html"
   ],
   "notes": {
     "row1": { "x": 0, "y": -300, "text": "Live: the everyday screens", "kind": "title1", "maxW": 1800 },
     "row2": { "x": 0, "y": 924, "text": "Race states", "kind": "title1", "maxW": 1800 },
     "row3": { "x": 0, "y": 2148, "text": "System states", "kind": "title1", "maxW": 1800 },
-    "row4": { "x": 0, "y": 3372, "text": "Landscape", "kind": "title1", "maxW": 1768 }
+    "row4": { "x": 0, "y": 3372, "text": "Landscape", "kind": "title1", "maxW": 1768 },
+    "row5": { "x": 0, "y": 4922, "text": "Practice and qualifying", "kind": "title1", "maxW": 1800 }
   },
   "designSystems": []
 }

@@ -7,12 +7,15 @@
 import type { CarTuple } from '@lapline/shared';
 import { useStore } from '../store/store.js';
 import { TYRE_LETTER, fmtGap, tyreVar } from './format.js';
+import { fastestBest, sessionKind, timedGap } from './session.js';
 
 export function DriverStrip(): React.JSX.Element {
   const sel = useStore((s) => s.sel);
   const driver = useStore((s) => (s.sel == null ? undefined : s.drivers.get(s.sel)));
   const row = useStore((s) => (s.sel == null ? undefined : s.timingByN.get(s.sel)));
   const gapMode = useStore((s) => s.gapMode);
+  const timed = useStore((s) => sessionKind(s.session?.name) !== 'race');
+  const fastest = useStore((s) => (s.timing ? fastestBest(s.timing.rows) : null));
   const expanded = useStore((s) => s.expanded);
   const setExpanded = useStore((s) => s.setExpanded);
   // One selector, one array reference per frame, rather than four subscriptions.
@@ -32,7 +35,9 @@ export function DriverStrip(): React.JSX.Element {
       <div className="strip-who">
         <span className="strip-pos">{row?.p ? `P${row.p}` : '–'}</span>
         <span className="strip-code">{driver?.code ?? (sel == null ? 'Tap a car' : String(sel))}</span>
-        <span className="strip-gap">{row ? fmtGap(gapMode === 'int' ? row.int : row.gap, row.p) : '–'}</span>
+        <span className="strip-gap">
+          {!row ? '–' : timed ? timedGap(row, fastest) || `Out in Q${row.outIn}` : fmtGap(gapMode === 'int' ? row.int : row.gap, row.p)}
+        </span>
       </div>
 
       <div className="strip-speed">

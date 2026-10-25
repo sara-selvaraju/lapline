@@ -26,6 +26,7 @@ const row = (n: number, p: number | null, gap: number | string | null): TowerRow
   pit: false,
   lapFlag: null,
   stops: 0,
+  outIn: null,
 });
 
 // Leader, then a pack, then one a long way back.

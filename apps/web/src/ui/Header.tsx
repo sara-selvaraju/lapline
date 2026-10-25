@@ -1,11 +1,12 @@
 // Circuit, lap count, the live pill and the menu. 56px.
 
 import { useStore } from '../store/store.js';
+import { sessionLabel, showsFinished } from './session.js';
 
 function LivePill(): React.JSX.Element | null {
   const mode = useStore((s) => s.mode);
   const delayS = useStore((s) => s.live?.delayS ?? null);
-  const finished = useStore((s) => s.timing?.flag === 'CHEQUERED' && s.result != null);
+  const finished = useStore(showsFinished);
   const openSync = useStore((s) => s.openSync);
 
   // Finished.dc.html replaces the pill with plain text: there is nothing live
@@ -39,10 +40,13 @@ export function Header(): React.JSX.Element | null {
   const glance = useStore((s) => s.glance);
   const setGlance = useStore((s) => s.setGlance);
   const lap = useStore((s) => s.timing?.lap ?? null);
-  const finished = useStore((s) => s.timing?.flag === 'CHEQUERED' && s.result != null);
+  const finished = useStore(showsFinished);
   // OpenF1 publishes no total-lap figure, so the artboard's "23/62" shows as
   // "23" until a source for the total turns up.
   const totalLaps = useStore((s) => s.timing?.totalLaps ?? null);
+  const phase = useStore((s) => s.timing?.phase ?? null);
+  // Practice and qualifying name the session where a race counts laps.
+  const timed = sessionLabel(session?.name, phase);
 
   // Glance shows the race and nothing else: no circuit name, no pill, no
   // settings. Its own corner carries the only two things left. After the
@@ -53,7 +57,12 @@ export function Header(): React.JSX.Element | null {
     <header className="header">
       <div className="header-title">
         <span className="circuit">{session ? session.circuit || session.country : 'Connecting'}</span>
-        {lap != null &&
+        {timed ? (
+          <span className="lap">
+            {timed.text} {timed.bold && <b>{timed.bold}</b>}
+          </span>
+        ) : (
+          lap != null &&
           (finished ? (
             // A finished race is a distance, not a position in one.
             <span className="lap">
@@ -64,7 +73,8 @@ export function Header(): React.JSX.Element | null {
               Lap <b>{lap}</b>
               {totalLaps != null && `/${totalLaps}`}
             </span>
-          ))}
+          ))
+        )}
       </div>
       <div className="header-right">
         <LivePill />

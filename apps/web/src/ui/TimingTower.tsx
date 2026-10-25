@@ -6,9 +6,10 @@
 // one correctly: a battle is about the interval whatever column is on show,
 // and a lap colour is about the lap just completed, which the view cannot see.
 
-import type { TrackFlag } from '@lapline/shared';
+import { qualifyingCut, type TowerRow, type TrackFlag } from '@lapline/shared';
 import { useStore } from '../store/store.js';
 import { fmtGap, fmtLap, tyreVar, TYRE_LETTER } from './format.js';
+import { fastestBest, sessionKind, timedGap } from './session.js';
 
 /**
  * What the tower shows changes with the race state, per docs/DESIGN.md:116.
@@ -26,6 +27,14 @@ function towerMode(flag: TrackFlag): TowerMode {
 }
 
 export function TimingTower(): React.JSX.Element {
+  const timed = useStore((s) => sessionKind(s.session?.name) !== 'race');
+  // Practice and qualifying are ordered by best laps, not by the road, so
+  // none of the race's modes apply: a red flag there stops the clock, not the
+  // order, and the best laps still stand.
+  return timed ? <TimedTower /> : <RaceTower />;
+}
+
+function RaceTower(): React.JSX.Element {
   const rows = useStore((s) => s.timing?.rows);
   const flag = useStore((s) => s.timing?.flag ?? 'GREEN');
   const battling = useStore((s) => s.timing?.battles);
@@ -94,5 +103,108 @@ export function TimingTower(): React.JSX.Element {
         })}
       </ol>
     </section>
+  );
+}
+
+/**
+ * Practice and qualifying: the gap to the fastest and each best lap, built
+ * to the "Practice and qualifying" boards. In qualifying a line marks the
+ * last car going through, and drivers already knocked out sit below a divider
+ * with the time from the segment that put them out.
+ */
+function TimedTower(): React.JSX.Element {
+  const rows = useStore((s) => s.timing?.rows);
+  const phase = useStore((s) => s.timing?.phase ?? null);
+  const drivers = useStore((s) => s.drivers);
+  const sel = useStore((s) => s.sel);
+  const select = useStore((s) => s.select);
+
+  const list = rows ?? [];
+  const fastest = fastestBest(list);
+  const cars = list.filter((r) => r.p != null).length;
+  const cut = phase == null ? null : qualifyingCut(cars, phase);
+
+  const items: React.JSX.Element[] = [];
+  let lastOut: number | null = null;
+  for (const r of list) {
+    if (r.outIn != null && r.outIn !== lastOut) {
+      items.push(
+        <li key={`out-${r.outIn}`} className="tower-divider">
+          Out in Q{r.outIn}
+        </li>,
+      );
+    }
+    lastOut = r.outIn;
+    items.push(
+      <TimedRow
+        key={r.n}
+        row={r}
+        code={drivers.get(r.n)?.code ?? String(r.n)}
+        colour={drivers.get(r.n)?.colour ?? 'var(--haze)'}
+        selected={r.n === sel}
+        fastest={fastest}
+        cut={cut != null && r.p === cut}
+        onSelect={() => select(r.n)}
+      />,
+    );
+  }
+
+  return (
+    <section className="tower tower-timed" aria-label="Timing">
+      <div className="tower-head">
+        <span className="col-pos">Pos</span>
+        <span />
+        <span>Driver</span>
+        <span className="col-gap">Gap</span>
+        <span>Tyre</span>
+        <span className="col-last">Best lap</span>
+      </div>
+      <ol className="tower-rows">{items}</ol>
+    </section>
+  );
+}
+
+function TimedRow({
+  row: r,
+  code,
+  colour,
+  selected,
+  fastest,
+  cut,
+  onSelect,
+}: {
+  row: TowerRow;
+  code: string;
+  colour: string;
+  selected: boolean;
+  fastest: number | null;
+  cut: boolean;
+  onSelect: () => void;
+}): React.JSX.Element {
+  const out = r.outIn != null;
+  // The fastest time still in the running stays purple; a best just improved
+  // goes green for the lap after, as a last lap does in the race.
+  const tone = out ? '' : r.best != null && r.best === fastest ? ' is-fastest' : r.lapFlag ? ' is-pb' : '';
+  const gap = timedGap(r, fastest);
+  return (
+    <li
+      className={`tower-row${selected ? ' is-selected' : ''}${out ? ' is-out' : ''}${cut ? ' is-cut' : ''}`}
+      onClick={onSelect}
+    >
+      <span className="col-pos">{r.p ?? ''}</span>
+      <span className="row-swatch" style={{ background: colour }} />
+      <span className="row-code">
+        {code}
+        {r.pit && <span className="pit-badge">Pit</span>}
+      </span>
+      <span className={`row-gap${gap === 'Fastest' || gap === 'No time' ? ' is-quiet' : ''}`}>{gap}</span>
+      <span className="row-tyre">
+        <span className="tyre-ring" style={{ borderColor: tyreVar(r.tyre), color: tyreVar(r.tyre) }}>
+          {r.tyre ? (TYRE_LETTER[r.tyre] ?? r.tyre[0]) : '?'}
+        </span>
+        {r.age ?? ''}
+      </span>
+      <span className={`col-last col-best${tone}`}>{fmtLap(r.best)}</span>
+    </li>
   );
 }

@@ -63,7 +63,7 @@ const tick = {
 const timing = {
   t: 1_760_000_000_000,
   rows: [
-    { n: 4, p: 1, gap: null, int: null, lap: 7, last: 92.4, best: 92.4, tyre: 'SOFT', age: 3, pit: false, lapFlag: 'pb', stops: 1 },
+    { n: 4, p: 1, gap: null, int: null, lap: 7, last: 92.4, best: 92.4, tyre: 'SOFT', age: 3, pit: false, lapFlag: 'pb', stops: 1, outIn: null },
   ],
   lap: 7,
   totalLaps: null,
@@ -73,11 +73,12 @@ const timing = {
   battles: [],
   flagSince: null,
   flagSinceLap: null,
+  phase: null,
 };
 
 describe('the protocol surface', () => {
-  it('is version 6', () => {
-    expect(PROTOCOL_VERSION).toBe(6);
+  it('is version 7', () => {
+    expect(PROTOCOL_VERSION).toBe(7);
   });
 
   it('names six events, and has a schema for each', () => {

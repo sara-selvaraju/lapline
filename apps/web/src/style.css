@@ -501,6 +501,30 @@ button {
   color: var(--pb);
 }
 
+/* Practice and qualifying. Best laps read a step brighter than the race's
+   last laps, because here they are the order rather than a footnote to it. */
+.tower-row .col-best {
+  color: var(--text-2);
+}
+.row-gap.is-quiet,
+.tower-row.is-out .col-best {
+  color: var(--haze);
+}
+/* The last car going through to the next segment. */
+.tower-row.is-cut {
+  border-bottom-color: var(--haze);
+}
+.tower-divider {
+  height: 26px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-end;
+  padding: 0 var(--gutter) 4px;
+  font-size: var(--fs-unit);
+  color: var(--haze);
+  border-bottom: 1px solid var(--line);
+}
+
 /* ---------- controls ---------- */
 
 .controls {

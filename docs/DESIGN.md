@@ -121,6 +121,16 @@ Columns in portrait: position 26 (right-aligned, `haze`), team swatch 4 × 20, c
 - **Selected row:** `panel` background.
 - **State variants:** "Pits" column under a safety car, "Gap at red flag" under a red flag, "Gap to winner" and "Stops" when finished.
 
+### Practice and qualifying
+
+Ordered by best laps rather than by the road, so the columns change: **Gap**, **Tyre** and **Best lap**, at the same widths (`QualifyingTop.dc.html`, `QualifyingDropZone.dc.html`, `Practice.dc.html`). The race's flag variants do not apply; the finished screen is for races only.
+
+- **Best lap:** in qualifying, the best lap in the segment that decides the driver's place — the one running, or the one they went out in — because that is how the order is decided. Deleted laps never count. `text-2` by default; `purple` stays on the fastest time still in the running; `pb` on a best just improved, for the lap after.
+- **Gap:** to the fastest time still in the running, in `text-2`. "Fastest" on that row and "No time" before a driver has one, both in `haze`. Three decimals everywhere, glance mode included: a pole is often decided by hundredths.
+- **Cut line:** in Q1 and Q2 a `haze` rule under the last car going through.
+- **Knocked out:** below an "Out in Q1" or "Out in Q2" divider, 26 px, `fs-unit`, `haze`. Their times are from that segment and in `haze`; the gap is blank.
+- **Header:** "Qualifying **Q2**", "Sprint qualifying **SQ1**" or "Practice **2**" where a race shows the lap.
+
 ## Interactions
 
 | Control | Behaviour |
@@ -155,6 +165,9 @@ Motion: car positions interpolate between 4 Hz frames; the flag band changes hei
 | Settings | `Settings.dc.html` |
 | Live, landscape | `LiveLandscape.dc.html` |
 | Glance mode, landscape | `Glance.dc.html` |
+| Qualifying, top of the tower | `QualifyingTop.dc.html` |
+| Qualifying, the cut line and knocked-out drivers | `QualifyingDropZone.dc.html` |
+| Practice | `Practice.dc.html` |
 
 VSC, VSC ending, safety car ending and yellow use the safety car layout with their own band label and colour.
 
@@ -166,6 +179,18 @@ VSC, VSC ending, safety car ending and yellow use the safety car layout with the
 - Errors say what happened and what to do next, for example "No new data for 18 s. Showing the last known positions. Trying again every 3 s."
 
 ## Open design questions
+
+- **The band between qualifying segments.** Each segment ends with a
+  chequered flag, so for the few minutes between Q1 and Q2 the band reads
+  "Chequered flag", which is accurate but reads like the end of the session.
+  "Q1 finished" may be better. No artboard draws it, so it is left as it is.
+
+- **No finished screen for practice or qualifying.** `Finished.dc.html` is a
+  race's ending: a podium, "Gap to winner" and stops. Qualifying's result
+  carries three times a driver and no single gap, and its chequered flag
+  falls three times, so that screen came and went between segments. The
+  timed tower stays up instead; by the flag it already matches the official
+  classification. A pole screen would need an artboard of its own.
 
 - **Where a car label may sit, and when it gives up.** "Labels avoid each
   other in screen space" does not say how far a label may go to do so. A

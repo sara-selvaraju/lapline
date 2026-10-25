@@ -34,8 +34,8 @@ const tick = (over: Partial<Tick> = {}): Tick => ({
 const timing = (over: Partial<Timing> = {}): Timing => ({
   t: T,
   rows: [
-    { n: 81, p: 1, gap: null, int: null, lap: 5, last: 92, best: 92, tyre: 'SOFT', age: 2, pit: false, lapFlag: null, stops: 1 },
-    { n: 4, p: 2, gap: 1.2, int: 1.2, lap: 5, last: 93, best: 92.5, tyre: 'HARD', age: 9, pit: false, lapFlag: null, stops: 1 },
+    { n: 81, p: 1, gap: null, int: null, lap: 5, last: 92, best: 92, tyre: 'SOFT', age: 2, pit: false, lapFlag: null, stops: 1, outIn: null },
+    { n: 4, p: 2, gap: 1.2, int: 1.2, lap: 5, last: 93, best: 92.5, tyre: 'HARD', age: 9, pit: false, lapFlag: null, stops: 1, outIn: null },
   ],
   lap: 5,
   totalLaps: null,
@@ -45,6 +45,7 @@ const timing = (over: Partial<Timing> = {}): Timing => ({
   battles: [],
   flagSince: null,
   flagSinceLap: null,
+  phase: null,
   ...over,
 });
 
@@ -235,9 +236,9 @@ describe('selectByOffset', () => {
   const field = (): Timing =>
     timing({
       rows: [
-        { n: 81, p: 1, gap: null, int: null, lap: 5, last: 92, best: 92, tyre: 'SOFT', age: 2, pit: false, lapFlag: 'fastest', stops: 1 },
-        { n: 4, p: 2, gap: 1.2, int: 1.2, lap: 5, last: 93, best: 92.5, tyre: 'HARD', age: 9, pit: false, lapFlag: null, stops: 1 },
-        { n: 16, p: 3, gap: 2.4, int: 1.2, lap: 5, last: 94, best: 93.5, tyre: 'HARD', age: 9, pit: false, lapFlag: null, stops: 1 },
+        { n: 81, p: 1, gap: null, int: null, lap: 5, last: 92, best: 92, tyre: 'SOFT', age: 2, pit: false, lapFlag: 'fastest', stops: 1, outIn: null },
+        { n: 4, p: 2, gap: 1.2, int: 1.2, lap: 5, last: 93, best: 92.5, tyre: 'HARD', age: 9, pit: false, lapFlag: null, stops: 1, outIn: null },
+        { n: 16, p: 3, gap: 2.4, int: 1.2, lap: 5, last: 94, best: 93.5, tyre: 'HARD', age: 9, pit: false, lapFlag: null, stops: 1, outIn: null },
       ],
     });
 

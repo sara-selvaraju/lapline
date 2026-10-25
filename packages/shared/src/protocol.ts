@@ -10,7 +10,7 @@
 import { z } from 'zod';
 
 /** Bump on any incompatible change to the messages below. */
-export const PROTOCOL_VERSION = 6;
+export const PROTOCOL_VERSION = 7;
 
 export const SSE_EVENTS = ['hello', 'tick', 'timing', 'status', 'circuit', 'ping'] as const;
 export type SseEvent = (typeof SSE_EVENTS)[number];
@@ -259,7 +259,14 @@ export const TowerRowSchema = z.object({
   int: z.union([z.number(), z.string()]).nullable(),
   lap: z.number().int().nullable(),
   last: z.number().nullable(),
+  /**
+   * The best lap that counts, less any race control deleted. In qualifying
+   * that is the segment that decides this driver's place: the one running,
+   * or the one they were knocked out in. Otherwise the whole session.
+   */
   best: z.number().nullable(),
+  /** In qualifying, the segment this driver was knocked out in; else null. */
+  outIn: z.number().int().nullable(),
   tyre: z.string().nullable(),
   age: z.number().int().nullable(),
   pit: z.boolean(),
@@ -313,6 +320,8 @@ export const TimingSchema = z.object({
    *  band and the red flag card both name these. */
   flagSince: z.number().nullable(),
   flagSinceLap: z.number().int().nullable(),
+  /** The qualifying segment running, 1 to 3, or null outside qualifying. */
+  phase: z.number().int().nullable(),
 });
 export type Timing = z.infer<typeof TimingSchema>;
 

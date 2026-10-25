@@ -13,6 +13,7 @@
 import { useEffect } from 'react';
 import type { Circuit, TowerRow } from '@lapline/shared';
 import { useStore } from '../store/store.js';
+import { fastestBest, sessionKind, sessionLabel, timedGap } from './session.js';
 
 /** The five rows the artboard shows, leader first. */
 export function topFive(rows: readonly TowerRow[]): TowerRow[] {
@@ -61,6 +62,8 @@ export function Glance(): React.JSX.Element {
   const rows = useStore((s) => s.timing?.rows);
   const lap = useStore((s) => s.timing?.lap ?? null);
   const totalLaps = useStore((s) => s.timing?.totalLaps ?? null);
+  const phase = useStore((s) => s.timing?.phase ?? null);
+  const name = useStore((s) => s.session?.name);
   const drivers = useStore((s) => s.drivers);
   const sel = useStore((s) => s.sel);
   const circuit = useStore((s) => s.circuit);
@@ -81,6 +84,12 @@ export function Glance(): React.JSX.Element {
   }, [setGlance]);
 
   const five = topFive(rows ?? []);
+  // Practice and qualifying gaps stay at three decimals even here: a pole is
+  // often won by hundredths, and "+0.1" for 0.068 would be wrong, not short.
+  const timed = sessionKind(name) !== 'race';
+  const fastest = timed ? fastestBest(rows ?? []) : null;
+  const label = sessionLabel(name, phase);
+  const gapOf = (r: TowerRow): string => (timed ? timedGap(r, fastest) : glanceGap(r));
   const map = flatPath(circuit);
   const code = (n: number): string => drivers.get(n)?.code ?? String(n);
   const colour = (n: number): string => drivers.get(n)?.colour ?? 'var(--haze)';
@@ -103,17 +112,23 @@ export function Glance(): React.JSX.Element {
   return (
     <section className="glance" aria-label="Glance">
       <div className="glance-order" aria-label="Top five">
-        <p className="glance-lap">
-          Lap <b>{lap ?? '–'}</b>
-          {totalLaps != null && <span className="glance-of">of {totalLaps}</span>}
-        </p>
+        {label ? (
+          <p className="glance-lap">
+            {label.text} {label.bold && <b>{label.bold}</b>}
+          </p>
+        ) : (
+          <p className="glance-lap">
+            Lap <b>{lap ?? '–'}</b>
+            {totalLaps != null && <span className="glance-of">of {totalLaps}</span>}
+          </p>
+        )}
         <ol>
           {five.map((r) => (
             <li key={r.n} className={r.n === sel ? 'is-selected' : ''}>
               <span className="glance-pos">{r.p}</span>
               <span className="glance-swatch" style={{ background: colour(r.n) }} />
               <span className="glance-code">{code(r.n)}</span>
-              <span className={`glance-gap${r.p === 1 ? ' is-leader' : ''}`}>{glanceGap(r)}</span>
+              <span className={`glance-gap${r.p === 1 ? ' is-leader' : ''}`}>{gapOf(r)}</span>
             </li>
           ))}
         </ol>

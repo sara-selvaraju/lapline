@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<title>Lapline, practice</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0E1626}
+a{color:#F2EBDD}a:hover{color:#FFFFFF}
+button{font:inherit;color:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; display: flex; flex-direction: column; background: #0E1626; color: #F2EBDD; font-family: 'Barlow Semi Condensed', sans-serif; font-variant-numeric: tabular-nums; overflow: hidden">
+
+  <div role="status" aria-label="Track green" style="height: 4px; background: #2BB673; flex: none"></div>
+
+  <header style="height: 56px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 4px 0 16px; gap: 8px">
+    <div style="display: flex; align-items: baseline; gap: 8px; min-width: 0">
+      <span style="font-size: 21px; font-weight: 600">Harbourfront</span>
+      <span style="font-size: 17px; color: #8C9AB5">Practice <b style="color: #F2EBDD; font-weight: 600">2</b></span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 2px">
+      <button aria-label="Live, 10 seconds behind real time. Open sync." style="display: flex; align-items: center; gap: 7px; height: 44px; padding: 0 10px; background: none; border: 0">
+        <span style="width: 8px; height: 8px; border-radius: 50%; background: #E5383B"></span>
+        <span style="font-size: 16px; font-weight: 600">Live</span>
+        <span style="font-size: 15px; color: #8C9AB5">10 s behind</span>
+      </button>
+      <button aria-label="Settings" style="width: 44px; height: 44px; display: grid; place-items: center; background: none; border: 0">
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="#F2EBDD" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <section aria-label="Track" style="position: relative; height: 290px; flex: none">
+    <svg width="390" height="290" viewBox="0 0 390 290" role="img" aria-label="3D track view with cars, turn numbers, sectors and pit lane" style="position: absolute; inset: 0">
+      <ellipse cx="195" cy="160" rx="200" ry="92" fill="none" stroke="#283857" stroke-width="1" opacity="0.6"/>
+      <ellipse cx="195" cy="160" rx="130" ry="60" fill="none" stroke="#283857" stroke-width="1" opacity="0.45"/>
+      <path d="{{ground}}" fill="none" stroke="#283857" stroke-width="1.2"/>
+      <path d="{{posts}}" stroke="#F2EBDD" stroke-width="1" opacity="0.14"/>
+      <path d="{{track}}" fill="none" stroke="#F2EBDD" stroke-width="11" stroke-linejoin="round" opacity="0.1"/>
+      <path d="{{track}}" fill="none" stroke="#F2EBDD" stroke-width="3.4" stroke-linejoin="round"/>
+    </svg>
+
+    <sc-if value="{{showPit}}" hint-placeholder-val="{{true}}">
+      <svg width="390" height="290" viewBox="0 0 390 290" aria-hidden="true" style="position: absolute; inset: 0">
+        <path d="M281 158L286 156L292 155L298 153L304 152L310 150L316 148L322 145L329 143L334 140L340 136L345 133L349 130L352 126L354 123L355 121L356 119L356 117L355 116L354 115L352 113" fill="none" stroke="#8C9AB5" stroke-width="1.6" stroke-dasharray="3 3"/>
+        <text x="300" y="143" fill="#8C9AB5" font-size="12" font-family="Barlow Semi Condensed, sans-serif">Pit lane</text>
+      </svg>
+    </sc-if>
+
+    <sc-if value="{{showSectors}}" hint-placeholder-val="{{true}}">
+      <svg width="390" height="290" viewBox="0 0 390 290" aria-hidden="true" style="position: absolute; inset: 0">
+        <path d="M361 122L367 125M352 106L355 100M315 96L317 89M276 88L278 81M244 80L245 73M210 77L210 70M172 80L171 74M140 88L138 81M116 98L113 92M91 108L89 102M69 115L66 109M58 123L52 120M53 137L47 135M40 156L35 152M21 178L15 174M22 204L16 207M59 226L57 232M117 226L118 233M168 213L170 219M204 203L205 209M231 195L233 202M251 182L255 187M270 168L273 174M299 159L301 165M337 144L340 151" stroke="#8C9AB5" stroke-width="1" opacity="0.45"/>
+        <path d="M80 115L76 102M144 217L148 230" stroke="#F2EBDD" stroke-width="2.2" stroke-linecap="round"/>
+        <text x="83" y="131" fill="#C9D1DE" font-size="12" font-weight="600" font-family="Barlow Semi Condensed, sans-serif">S2</text>
+        <text x="133" y="210" fill="#C9D1DE" font-size="12" font-weight="600" font-family="Barlow Semi Condensed, sans-serif">S3</text>
+        <path d="M294 96L297 82" stroke="#8C9AB5" stroke-width="1.6" stroke-linecap="round"/>
+        <text x="300" y="80" fill="#8C9AB5" font-size="12" font-family="Barlow Semi Condensed, sans-serif">Speed trap</text>
+        <path d="M27 164L24 168L21 172L18 176L16 181L15 185L14 190L15 195L16 200" fill="none" stroke="#F5B700" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span style="position: absolute; left: 30px; top: 184px; padding: 1px 6px; border-radius: 4px; background: #F5B700; color: #0E1626; font-size: 12px; font-weight: 700">Yellow</span>
+    </sc-if>
+
+    <svg width="390" height="290" viewBox="0 0 390 290" aria-hidden="true" style="position: absolute; inset: 0">
+      <path d="M350 130L360 142" stroke="#0E1626" stroke-width="4"/>
+      <path d="M350 130L360 142" stroke="#F2EBDD" stroke-width="4" stroke-dasharray="2 2"/>
+      <text x="363" y="154" fill="#C9D1DE" font-size="11" font-weight="600" font-family="Barlow Semi Condensed, sans-serif">S1</text>
+      <path d="M338 84l-8 3 8 4z" fill="#8C9AB5"/>
+    </svg>
+
+    <sc-if value="{{showTurns}}" hint-placeholder-val="{{true}}">
+      <sc-for list="{{turns}}" as="tn" hint-placeholder-count="9">
+        <span style="position: absolute; left: {{tn.l}}px; top: {{tn.t}}px; width: 17px; height: 17px; box-sizing: border-box; border-radius: 50%; border: 1px solid #3A4D74; background: #15213A; color: #C9D1DE; font-size: 10px; font-weight: 700; display: grid; place-items: center">{{tn.n}}</span>
+      </sc-for>
+    </sc-if>
+
+    <sc-for list="{{cars}}" as="c" hint-placeholder-count="20">
+      <span style="position: absolute; left: {{c.l}}px; top: {{c.t}}px; width: 10px; height: 10px; border-radius: 50%; background: {{c.col}}; box-shadow: 0 0 0 1.5px #0E1626"></span>
+    </sc-for>
+    <span aria-hidden="true" style="position: absolute; left: 146px; top: 72px; width: 16px; height: 16px; border-radius: 50%; border: 2px solid #F2EBDD; box-sizing: border-box"></span>
+
+    <span style="position: absolute; left: 98px; top: 66px; padding: 1px 5px; border-radius: 4px; background: rgba(14,22,38,.88); font-size: 13px; font-weight: 700; border-bottom: 2px solid #E8702A">AVA</span>
+    <span style="position: absolute; left: 134px; top: 50px; padding: 1px 5px; border-radius: 4px; background: rgba(14,22,38,.88); font-size: 13px; font-weight: 700; border-bottom: 2px solid #E8702A">BEN</span>
+    <span style="position: absolute; left: 138px; top: 94px; padding: 2px 7px; border-radius: 4px; background: #F2EBDD; color: #0E1626; font-size: 15px; font-weight: 700; border-bottom: 3px solid #E80020">EMI</span>
+
+    <div role="group" aria-label="Camera" style="position: absolute; top: 8px; right: 12px; display: flex; padding: 3px; gap: 2px; border-radius: 12px; background: rgba(21,33,58,.92); border: 1px solid #283857">
+      <button style="height: 38px; padding: 0 12px; border: 0; border-radius: 9px; background: none; color: #8C9AB5; font-size: 15px">Map</button>
+      <button aria-pressed="true" style="height: 38px; padding: 0 12px; border: 0; border-radius: 9px; background: #F2EBDD; color: #0E1626; font-size: 15px; font-weight: 600">Tilt</button>
+      <button style="height: 38px; padding: 0 12px; border: 0; border-radius: 9px; background: none; color: #8C9AB5; font-size: 15px">Chase</button>
+    </div>
+
+    <p style="position: absolute; left: 16px; right: 16px; bottom: 8px; margin: 0; font-size: 15px; color: #8C9AB5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Practice 2: car 9 (ISL) stopped at turn 4, now recovered</p>
+  </section>
+
+  <section aria-label="Selected driver" style="flex: none; height: 88px; box-sizing: border-box; padding: 10px 4px 10px 16px; background: #15213A; border-top: 1px solid #283857; border-bottom: 1px solid #283857; display: flex; align-items: center; gap: 12px">
+    <span style="width: 4px; align-self: stretch; border-radius: 2px; background: #E80020"></span>
+    <div style="display: flex; flex-direction: column; gap: 2px; width: 74px">
+      <span style="font-size: 15px; color: #8C9AB5">P3</span>
+      <span style="font-size: 24px; font-weight: 700; line-height: 1">EMI</span>
+      <span style="font-size: 14px; color: #8C9AB5">+0.146</span>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: flex-end; width: 62px">
+      <span style="font-size: 36px; font-weight: 700; line-height: 1">287</span>
+      <span style="font-size: 13px; color: #8C9AB5">km/h</span>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center; width: 26px">
+      <span style="font-size: 36px; font-weight: 500; line-height: 1">7</span>
+      <span style="font-size: 13px; color: #8C9AB5">gear</span>
+    </div>
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 9px; min-width: 0">
+      <div aria-label="Throttle 92 percent" style="height: 7px; border-radius: 4px; background: #0E1626; overflow: hidden"><div style="width: 92%; height: 100%; background: #2BB673; border-radius: 4px"></div></div>
+      <div aria-label="Brake off" style="height: 7px; border-radius: 4px; background: #0E1626; overflow: hidden"><div style="width: 0%; height: 100%; background: #E5383B"></div></div>
+      <span style="display: flex; align-items: center; gap: 5px; font-size: 14px; color: #8C9AB5"><span style="width: 18px; height: 18px; box-sizing: border-box; border-radius: 50%; border: 2.5px solid #FFD12E; color: #FFD12E; font-size: 10px; font-weight: 700; display: grid; place-items: center">M</span>15 laps</span>
+    </div>
+    <button aria-label="Show telemetry" style="width: 44px; height: 44px; display: grid; place-items: center; background: none; border: 0">
+      <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6" stroke="#F2EBDD" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </section>
+
+  <section aria-label="Timing" style="flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column"><div style="flex: none; height: 30px; display: grid; grid-template-columns: 26px 4px 1fr 78px 52px 70px; gap: 10px; align-items: center; padding: 0 16px; font-size: 14px; color: #8C9AB5; border-bottom: 1px solid #283857"><span style="text-align: right">Pos</span><span></span><span>Driver</span><span style="text-align: right">Gap</span><span>Tyre</span><span style="text-align: right">Best lap</span></div><ol style="list-style: none; margin: 0; padding: 0"><li style="height: 36px; display: grid; grid-template-columns: 26px 4px 1fr 78px 52px 70px; gap: 10px; align-items: center; padding: 0 16px; font-size: 17px; border-bottom: 1px solid rgba(40,56,87,.55); background: transparent"><span style="text-align: right; color: #8C9AB5">1</span><span style="height: 20px; border-radius: 2px; background: #E8702A"></span><span style="font-weight: 700; display: flex; align-items: center; gap: 6px">AVA</span><span style="justify-self: end; color: #8C9AB5">Fastest</span><span style="display: flex; align-items: center; gap: 4px; font-size: 13px; color: #8C9AB5"><span style="width: 19px; height: 19px; box-sizing: border-box; border-radius: 50%; border: 2.5px solid #FF4D4F; color: #FF4D4F; font-size: 10px; font-weight: 700; display: grid; place-items: center">S</span>4</span><span style="text-align: right; color: #B794FF">1:35.118</span></li><li style="height: 36px; display: grid; grid-template-columns: 26px 4px 1fr 78px 52px 70px; gap: 10px; align-items: center; padding: 0 16px; font-size: 17px; border-bottom: 1px solid rgba(40,56,87,.55); background: #15213A"><span style="text-align: right; color: #8C9AB5">2</span><span style="height: 20px; border-radius: 2px; background: #E80020"></span><span style="font-weight: 700; display: flex; align-items: center; gap: 6px">EMI</span><span style="justify-self: end; color: #C9D1DE">+0.146</span><span style="display: flex; align-items: center; gap: 4px; font-size: 13px; color: #8C9AB5"><span style="width: 19px; height: 19px; box-sizing: border-box; border-radius: 50%; border: 2.5px solid #FF4D4F; color: #FF4D4F; font-size: 10px; font-weight: 700; display: grid; place-items: center">S</span>5</span><span style="text-align: right; color: #C9D1DE">1:35.264</span></li><li style="height: 36px; display: grid; grid-template-columns: 26px 4px 1fr 78px 52px 70px; gap: 10px; align-items: center; padding: 0 16px; font-size: 17px; border-bottom: 1px solid rgba(40,56,87,.55); background: transparent"><span style="text-align: right; color: #8C9AB5">3</span><span style="height: 20px; border-radius: 2px; background: #E8702A"></span><span style="font-weight: 700; display: flex; align-items: center; gap: 6px">BEN</span><span style="justify-self: end; color: #C9D1DE">+0.203</span><span style="display: flex; align-items: center; gap: 4px; font-size: 13px; color: #8C9AB5"><span style="width: 19px; height: 19px; box-sizing: border-box; border-radius: 50%; border: 2.5px solid #FFD12E; color: #FFD12E; font-size: 10px; font-weight: 700; display: grid; place-items: center">M</span>9</span><span style="text-align: right; color: #4CD08E">1:35.321</span></li><li style="height: 36px; display: grid; grid-template-columns: 26px 4px 1fr 78px 52px 70px; gap: 10px; align-items: center; padding: 0 16px; font-size: 17px; border-bottom: 1px solid rgba(40,56,87,.55); background: transparent"><span style="text-align: right; color: #8C9AB5">4</span><span style="height: 20px; border-radius: 2px; background: #27F4D2"></span><span style="font-weight: 700; display: flex; align-items: center; gap: 6px">GIO</span><span style="justify-self: end; color: #C9D1DE">+0.388</span><span style="display: flex; align-items: center; gap: 4px; font-size: 13px; color: #8C9AB5"><span style="width: 19px; height: 19px; box-sizing: border-box; border-radius: 50%; border: 2.5px solid #FF4D4F; color: #FF4D4F; font-size: 10px; font-weight: 700; display: grid; place-items: center">S</span>4</span><span style="text-align: right; color: #C9D1DE">1:35.506</span></li><li style="height: 36px; display: grid; grid-template-columns: 26px 4px 1fr 78px 52px 70px; gap: 10px; align-items: center; padding: 0 16px; font-size: 17px; border-bottom: 1px solid rgba(40,56,87,.55); background: transparent"><span style="text-align: right; color: #8C9AB5">5</span><span style="height: 20px; border-radius: 2px; background: #3671C6"></span><span style="font-weight: 700; display: flex; align-items: center; gap: 6px">CRU</span><span style="justify-self: end; color: #C9D1DE">+0.415</span><span style="display: flex; align-items: center; gap: 4px; font-size: 13px; color: #8C9AB5"><span style="width: 19px; height: 19px; box-sizing: border-box; border-radius: 50%; border: 2.5px solid #F2EBDD; color: #F2EBDD; font-size: 10px; font-weight: 700; display: grid; place-items: center">H</span>14</span><span style="text-align: right; color: #C9D1DE">1:35.533</span></li><li style="height: 36px; display: grid; grid-template-columns: 26px 4px 1fr 78px 52px 70px; gap: 10px; align-items: center; padding: 0 16px; font-size: 17px; border-bottom: 1px solid rgba(40,56,87,.55); background: transparent"><span style="text-align: right; color: #8C9AB5">6</span><span style="height: 20px; border-radius: 2px; background: #3671C6"></span><span style="font-weight: 700; display: flex; align-items: center; gap: 6px">DEL<span style="font-size: 12px; font-weight: 600; padding: 0 5px; border-radius: 4px; background: #F2EBDD; color: #0E1626">Pit</span></span><span style="justify-self: end; color: #C9D1DE">+0.597</span><span style="display: flex; align-items: center; gap: 4px; font-size: 13px; color: #8C9AB5"><span style="width: 19px; height: 19px; box-sizing: border-box; border-radius: 50%; border: 2.5px solid #FF4D4F; color: #FF4D4F; font-size: 10px; font-weight: 700; display: grid; place-items: center">S</span>6</span><span style="text-align: right; color: #C9D1DE">1:35.715</span></li><li style="height: 36px; display: grid; grid-template-columns: 26px 4px 1fr 78px 52px 70px; gap: 10px; align-items: center; padding: 0 16px; font-size: 17px; border-bottom: 1px solid rgba(40,56,87,.55); background: transparent"><span style="text-align: right; color: #8C9AB5">7</span><span style="height: 20px; border-radius: 2px; background: #27F4D2"></span><span style="font-weight: 700; display: flex; align-items: center; gap: 6px">HUX</span><span style="justify-self: end; color: #C9D1DE">+0.702</span><span style="display: flex; align-items: center; gap: 4px; font-size: 13px; color: #8C9AB5"><span style="width: 19px; height: 19px; box-sizing: border-box; border-radius: 50%; border: 2.5px solid #FFD12E; color: #FFD12E; font-size: 10px; font-weight: 700; display: grid; place-items: center">M</span>11</span><span style="text-align: right; color: #C9D1DE">1:35.820</span></li><li style="height: 36px; display: grid; grid-template-columns: 26px 4px 1fr 78px 52px 70px; gap: 10px; align-items: center; padding: 0 16px; font-size: 17px; border-bottom: 1px solid rgba(40,56,87,.55); background: transparent"><span style="text-align: right; color: #8C9AB5">8</span><span style="height: 20px; border-radius: 2px; background: #E80020"></span><span style="font-weight: 700; display: flex; align-items: center; gap: 6px">FIN</span><span style="justify-self: end; color: #C9D1DE">+0.844</span><span style="display: flex; align-items: center; gap: 4px; font-size: 13px; color: #8C9AB5"><span style="width: 19px; height: 19px; box-sizing: border-box; border-radius: 50%; border: 2.5px solid #F2EBDD; color: #F2EBDD; font-size: 10px; font-weight: 700; display: grid; place-items: center">H</span>12</span><span style="text-align: right; color: #C9D1DE">1:35.962</span></li><li style="height: 36px; display: grid; grid-template-columns: 26px 4px 1fr 78px 52px 70px; gap: 10px; align-items: center; padding: 0 16px; font-size: 17px; border-bottom: 1px solid rgba(40,56,87,.55); background: transparent"><span style="text-align: right; color: #8C9AB5">9</span><span style="height: 20px; border-radius: 2px; background: #229971"></span><span style="font-weight: 700; display: flex; align-items: center; gap: 6px">ISL</span><span style="justify-self: end; color: #C9D1DE">+1.091</span><span style="display: flex; align-items: center; gap: 4px; font-size: 13px; color: #8C9AB5"><span style="width: 19px; height: 19px; box-sizing: border-box; border-radius: 50%; border: 2.5px solid #FF4D4F; color: #FF4D4F; font-size: 10px; font-weight: 700; display: grid; place-items: center">S</span>3</span><span style="text-align: right; color: #C9D1DE">1:36.209</span></li></ol></section>
+
+  <footer style="flex: none; height: 68px; box-sizing: border-box; padding: 0 8px 8px 16px; display: flex; align-items: center; gap: 8px; background: #15213A; border-top: 1px solid #283857">
+    <span style="flex: 1; font-size: 16px; color: #8C9AB5">Matching TV at <b style="color: #F2EBDD; font-weight: 600">10 s</b> behind</span>
+    <button aria-label="One second less delay" style="width: 44px; height: 44px; border-radius: 12px; border: 1px solid #283857; background: #0E1626; font-size: 20px">−</button>
+    <button aria-label="One second more delay" style="width: 44px; height: 44px; border-radius: 12px; border: 1px solid #283857; background: #0E1626; font-size: 20px">+</button>
+    <button style="height: 44px; padding: 0 14px; border-radius: 12px; border: 0; background: #F2EBDD; color: #0E1626; font-size: 16px; font-weight: 600">Sync</button>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"showTurns":{"editor":"boolean","default":true,"section":"Track detail"},"showSectors":{"editor":"boolean","default":true,"section":"Track detail"},"showPit":{"editor":"boolean","default":true,"section":"Track detail"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const tyre = { S: '#FF4D4F', M: '#FFD12E', H: '#F2EBDD' };
+    const pos = '139,84 149,82 154,80 165,78 178,76 184,75 197,74 216,74 222,74 234,75 239,76 250,78 277,85 283,86 296,89 302,90 309,91 323,94 330,95 343,99'.split(' ').map((p) => p.split(',').map(Number));
+    const field = [
+      ['AVA', '#E8702A', 'Leader', 'M', 15, '1:42.318'],
+      ['BEN', '#E8702A', '+1.204', 'H', 6, '1:41.902', 'fastest'],
+      ['EMI', '#E80020', '+0.812', 'M', 15, '1:42.690'],
+      ['CRU', '#3671C6', '+0.684', 'M', 15, '1:42.551'],
+      ['GIO', '#27F4D2', '+2.305', 'H', 6, '1:42.988'],
+      ['DEL', '#3671C6', '+0.433', 'H', 7, '1:42.871', 'pb'],
+      ['FIN', '#E80020', '+3.914', 'M', 15, '1:43.201'],
+      ['ISL', '#229971', '+1.008', 'M', 15, '1:43.344'],
+      ['HUX', '#27F4D2', '+0.902', 'H', 4, '1:43.120'],
+      ['KAI', '#FF87BC', '+2.611', 'M', 15, '1:43.509'],
+      ['JUN', '#229971', '+1.330', 'H', 9, '1:43.477'],
+      ['LEO', '#FF87BC', '+0.512', 'H', 9, '1:43.602'],
+      ['MAR', '#64C4FF', '+4.096', 'M', 15, '1:43.815'],
+      ['NOA', '#64C4FF', '+1.177', 'M', 15, '1:43.760'],
+      ['ORI', '#B6BABD', '+0.958', 'H', 11, '1:43.901'],
+      ['QUI', '#52E252', '+2.430', 'S', 0, '1:58.204', 'pit'],
+    ];
+    const rows = field.map((f, i) => {
+      const n = parseFloat(f[2].replace('+', ''));
+      const battle = !Number.isNaN(n) && n < 1;
+      return {
+        p: i + 1, code: f[0], col: f[1], int: f[2], t: f[3], tc: tyre[f[3]], age: f[4], last: f[5],
+        lc: f[6] === 'fastest' ? '#B794FF' : f[6] === 'pb' ? '#4CD08E' : '#8C9AB5',
+        pit: f[6] === 'pit',
+        gapBg: battle ? '#283857' : 'transparent',
+        gapCol: battle ? '#F2EBDD' : '#C9D1DE',
+        bg: f[0] === 'EMI' ? '#15213A' : 'transparent',
+      };
+    });
+    const order = ['#E8702A','#E8702A','#E80020','#3671C6','#27F4D2','#3671C6','#E80020','#229971','#27F4D2','#FF87BC','#229971','#FF87BC','#64C4FF','#64C4FF','#B6BABD','#52E252','#B6BABD','#6692FF','#52E252','#6692FF'];
+    const cars = pos.map(([x, y], i) => ({ l: x - 5, t: y - 5, col: order[i] }));
+    const turns = [[1,374,113],[2,275,70],[3,189,61],[4,102,96],[5,55,103],[6,36,133],[7,9,213],[8,247,207],[9,278,183]].map(([n, x, y]) => ({ n, l: x - 8.5, t: y - 8.5 }));
+    return {
+      rows, cars, turns,
+      showTurns: this.props.showTurns ?? true,
+      showSectors: this.props.showSectors ?? true,
+      showPit: this.props.showPit ?? true,
+      track: 'M355 136L359 132L362 128L364 124L365 120L365 116L363 112L361 109L358 106L353 103L348 101L343 99L336 97L330 95L323 94L316 93L309 91L302 90L296 89L289 88L283 86L277 85L271 83L266 82L260 80L255 79L250 78L244 77L239 76L234 75L228 74L222 74L216 74L210 74L203 74L197 74L191 75L184 75L178 76L171 77L165 78L160 79L154 80L149 82L144 83L139 84L134 86L130 88L126 89L122 91L118 93L114 95L110 97L106 98L102 100L98 102L94 103L90 105L86 106L82 108L78 109L74 110L71 111L67 112L64 113L62 115L60 116L58 118L56 119L55 121L54 123L53 126L52 128L52 131L51 133L50 136L49 139L47 142L45 145L43 148L40 151L37 154L34 157L31 161L27 164L24 168L21 172L18 176L16 181L15 185L14 190L15 195L16 200L19 206L23 210L28 215L34 219L41 223L49 226L58 229L67 231L77 232L87 232L98 232L108 231L118 230L128 228L137 226L146 223L154 221L162 218L169 216L176 214L182 212L188 210L194 209L199 207L204 206L209 205L214 204L219 203L223 201L228 200L232 198L236 197L240 194L243 192L247 190L250 187L253 185L256 182L259 180L262 177L265 175L268 173L272 171L275 169L279 168L284 166L289 165L294 163L300 162L306 160L312 158L319 156L326 154L332 151L339 148L345 144L350 140Z',
+      ground: 'M355 147L359 144L362 140L364 137L365 133L365 129L363 126L361 122L358 119L353 116L348 113L343 110L336 108L330 105L323 103L316 102L309 100L302 99L296 97L289 96L283 95L277 93L271 92L266 91L260 89L255 88L250 86L244 85L239 83L234 82L228 80L222 79L216 78L210 77L203 77L197 76L191 76L184 77L178 77L171 78L165 79L160 81L154 82L149 84L144 86L139 88L134 90L130 91L126 93L122 95L118 97L114 99L110 100L106 102L102 104L98 105L94 107L90 108L86 110L82 111L78 113L74 115L71 117L67 119L64 121L62 123L60 125L58 128L56 130L55 132L54 135L53 137L52 140L52 142L51 145L50 147L49 150L47 152L45 155L43 158L40 161L37 164L34 168L31 171L27 175L24 179L21 184L18 188L16 193L15 198L14 203L15 208L16 212L19 217L23 221L28 225L34 228L41 231L49 234L58 235L67 237L77 237L87 237L98 237L108 235L118 234L128 232L137 230L146 228L154 226L162 223L169 221L176 219L182 216L188 214L194 212L199 210L204 209L209 207L214 205L219 204L223 202L228 201L232 199L236 197L240 196L243 194L247 192L250 190L253 189L256 187L259 185L262 183L265 181L268 180L272 178L275 177L279 175L284 174L289 172L294 171L300 169L306 168L312 166L319 164L326 162L332 159L339 157L345 154L350 151Z',
+      posts: 'M355 136V147M365 116V129M348 101V113M316 93V102M283 86V95M255 79V88M228 74V80M197 74V76M165 78V79M139 84V88M118 93V97M98 102V105M78 109V113M62 115V123M54 123V135M50 136V147M40 151V161M24 168V179M14 190V203M28 215V225M67 231V237M118 230V234M162 218V223M194 209V212M219 203V204M240 194V196M256 182V187M272 171V178M294 163V171M326 154V162',
+    };
+  }
+}
+</script>
+</body>
+</html>

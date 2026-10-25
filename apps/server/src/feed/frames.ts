@@ -22,7 +22,8 @@ import type {
 } from '@lapline/shared';
 import { lastAtOrBefore, type Buffers } from './buffers.js';
 import { battles } from '../derive/battles.js';
-import { currentLap, lapColour } from '../derive/laps.js';
+import { currentLap, deletedLaps, lapColour, WHOLE_SESSION, type LapScope } from '../derive/laps.js';
+import { knockedOut, segmentScope, segments } from '../derive/qualifying.js';
 import { flagState, marshalSectorFlags, trackFlag } from '../derive/flags.js';
 import { tyre } from '../derive/tyres.js';
 
@@ -83,12 +84,23 @@ export function buildCars(buffers: Buffers, t: number): CarTuple[] {
 export function buildTiming(buffers: Buffers, t: number): Timing {
   const rows: TowerRow[] = [];
   let leaderLap: number | null = null;
+
+  // Which laps count. In qualifying, the segment that decides each driver's
+  // place; anywhere else, the whole session. Deleted laps never.
+  const deleted = deletedLaps(buffers, t);
+  const segs = segments(buffers, t);
+  const phase = segs.length ? segs[segs.length - 1]!.phase : null;
+  const out = phase == null ? new Map<number, number>() : knockedOut(buffers, segs);
+  const running: LapScope = phase == null ? { ...WHOLE_SESSION, deleted } : segmentScope(segs, phase, deleted);
+
   for (const d of buffers.drivers.values()) {
     const pa = buffers.pos.get(d.n);
     const pi = pa ? lastAtOrBefore(pa, t) : -1;
     const ia = buffers.ivl.get(d.n);
     const ii = ia ? lastAtOrBefore(ia, t) : -1;
-    const lap = currentLap(buffers, d.n, t);
+    const outIn = out.get(d.n) ?? null;
+    const scope = outIn == null ? running : segmentScope(segs, outIn, deleted);
+    const lap = currentLap(buffers, d.n, t, scope);
     const ty = tyre(buffers, d.n, lap.lap);
     const pits = buffers.pits.get(d.n);
     let inPit = false;
@@ -112,7 +124,8 @@ export function buildTiming(buffers: Buffers, t: number): Timing {
       tyre: ty.tyre,
       age: ty.age,
       pit: inPit,
-      lapFlag: lapColour(buffers, d.n, t),
+      outIn,
+      lapFlag: lapColour(buffers, d.n, t, running),
       stops,
     });
   }
@@ -138,6 +151,7 @@ export function buildTiming(buffers: Buffers, t: number): Timing {
     battles: battles(buffers, t),
     flagSince: state.since,
     flagSinceLap: state.sinceLap,
+    phase,
   };
 }
 

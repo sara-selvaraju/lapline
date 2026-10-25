@@ -109,6 +109,8 @@ export interface RaceControlRow extends UpstreamRow {
   sector?: number | null;
   lap_number?: number | null;
   message?: string;
+  /** 1, 2 or 3 inside qualifying and sprint qualifying; absent otherwise. */
+  qualifying_phase?: number | null;
 }
 
 export interface MeetingRow {
