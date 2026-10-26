@@ -14,7 +14,7 @@ A personal, non-commercial, phone-first second screen for F1 sessions: a 3D circ
 ## Status
 
 M9 done. A full live session watched on a phone with no manual intervention —
-the Austin race on 26 October 2026 — kept up with the broadcast from start to
+the Austin race on 25 October 2026 — kept up with the broadcast from start to
 finish, and nothing was seen to go wrong. The frame rate read off the settings
 page during the race, with a full field, Tilt view and all three detail layers
 on, was a steady 60 fps, which closes "60 fps on a recent iPhone", open since

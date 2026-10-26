@@ -187,7 +187,7 @@ the frames — so nothing in the running code changes to be measured.
 | File descriptors | 24 to 26, ended at 24 | Same run |
 | Live to replay handover | survived, no reconnect | Same run, at 62 minutes. Requests dropped 46/min to 4-6/min and the stream held 4.0 ticks/s through it |
 | Worst gap between ticks over 2.8 h | 0.3 s | Same run, against a 0.25 s cadence |
-| Frame rate on a phone | 60 fps, steady | M9, Austin race, 26 October 2026, read off the settings page during the race with a full field, Tilt view and all three detail layers on. Meets the iPhone target below |
+| Frame rate on a phone | 60 fps, steady | M9, Austin race, 25 October 2026, read off the settings page during the race with a full field, Tilt view and all three detail layers on. Meets the iPhone target below |
 | Live race, start to finish | no manual intervention, nothing seen to go wrong | M9's acceptance check, same race. Tower and cars kept up with the broadcast throughout |
 | Resident memory, live race | about 150 to 157 MB, flat | Railway's own metrics around the end of the Austin race, against an 8 GB limit. In line with the mock soak's 152.5 MB peak |
 
