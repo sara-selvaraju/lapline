@@ -12,7 +12,7 @@ the code is checked against.
 |---|---|
 | `artboards/*.dc.html` | The source of each screen. Layout, sizes and colours are inline styles, so read them as the exact spec. Mock data for each screen sits in the `renderVals()` function at the bottom |
 | `artboards/canvas.json` | Canvas index: each artboard's size, title and position |
-| `screens/` | Screenshots of the app taken while it was built, named by milestone (`m5-sc.png`) or by what they show. Evidence of how each milestone looked, not the spec; the artboards are the spec |
+| `screens/` | Not committed. Where `npm run screenshot` and `npm run states -- --shots design/screens` write their captures, for comparing against the artboards locally. The artboards are the spec |
 | `sample-data.json` | Payloads from the prototype's stream against the mock, so the session, circuit and drivers are made up: a `hello`-style init, a tick with timing, and a positions-only tick. The prototype's shape, not the current protocol |
 
 ## Reading the artboards
