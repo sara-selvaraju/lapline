@@ -4,6 +4,7 @@
 // secrets, and never echo env values in /api/state or errors.
 
 import path from 'node:path';
+import { normaliseBase } from './openf1/url.js';
 
 export interface Env {
   port: number;
@@ -37,4 +38,24 @@ export function readEnv(e: NodeJS.ProcessEnv = process.env): Env {
     sessionKey: e.SESSION_KEY || 'auto',
     publicDir: e.PUBLIC_DIR || defaultPublicDir(),
   };
+}
+
+/**
+ * A warning when the app has no password and is showing real OpenF1 data, or
+ * null when there is nothing to say.
+ *
+ * An empty APP_PASSWORD turns the gate off, which is right on your own machine
+ * and wrong on a public URL: anyone who finds it can watch, change the session
+ * for every viewer, and see live data that OpenF1 sells to its sponsors. So it
+ * stays a choice, but not a silent one. Against the mock it says nothing,
+ * because that is every development run.
+ */
+export function openGateWarning(env: Pick<Env, 'appPassword' | 'openf1Base'>): string | null {
+  if (env.appPassword) return null;
+  const host = new URL(normaliseBase(env.openf1Base)).hostname;
+  if (host === 'localhost' || host === '127.0.0.1') return null;
+  return (
+    'No APP_PASSWORD is set, so anyone who can reach this server can use it. ' +
+    'Fine on your own machine; set APP_PASSWORD before deploying it anywhere public.'
+  );
 }

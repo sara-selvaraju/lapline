@@ -16,7 +16,7 @@
   "scripts": {
     "dev": "node tools/dev.mjs",
     "build": "npm run build -w @lapline/shared && npm run build -w @lapline/web && npm run build -w @lapline/server",
-    "start": "node apps/server/dist/src/index.js",
+    "start": "node --env-file-if-exists=.env apps/server/dist/src/index.js",
     "test": "vitest run",
     "typecheck": "tsc -b tsconfig.json && tsc --noEmit -p apps/web",
     "mock": "npm run start -w @lapline/mock-openf1",

@@ -1,7 +1,7 @@
 // Lapline: one Node process that talks to OpenF1 and streams frames to browsers
 // over SSE. Ported from reference/prototype/server.js.
 
-import { readEnv } from './env.js';
+import { openGateWarning, readEnv } from './env.js';
 import { Feed } from './feed/feed.js';
 import { OpenF1 } from './openf1/client.js';
 import { createServer } from './http/server.js';
@@ -26,6 +26,8 @@ process.on('uncaughtException', (e: unknown) => {
 });
 
 const env = readEnv();
+const warning = openGateWarning(env);
+if (warning) console.warn(`WARNING: ${warning}`);
 
 const api = new OpenF1({
   username: env.openf1Username,
