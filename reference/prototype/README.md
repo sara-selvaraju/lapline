@@ -1,3 +1,8 @@
+> **Historical.** This is the plain-JS prototype Lapline started from, kept
+> read-only for reference. It has been replaced by the app in `apps/` and is
+> not maintained: its access control (Basic auth), prices and instructions are
+> as they were then. Start from the README at the root of the repo.
+
 # Lapline
 
 A personal, phone-first F1 viewer. It shows the circuit in 3D (drag to rotate, pinch to zoom), every car in its team colour, a timing tower, and telemetry for the selected car. Data comes from [OpenF1](https://openf1.org).

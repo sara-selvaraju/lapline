@@ -2,7 +2,7 @@
 
 Lapline is a personal, non-commercial, phone-first second screen for Formula 1 sessions. It shows a 3D circuit with every car, a timing tower, and telemetry for one selected car, live or as a replay. Data comes from OpenF1 (see `docs/OPENF1.md`).
 
-This document records the target architecture and the decisions behind it. The working prototype in `reference/prototype/` already proves the data path end to end against a mock; the job is to rebuild it on this structure and to the design in `docs/DESIGN.md`, not to start from zero.
+This document describes the code as it stands and the decisions behind it. It began as the target for rebuilding the plain-JS prototype in `reference/prototype/` on a sturdier structure; that rebuild is done, in the milestones of `docs/BUILD-PLAN.md`, and this has been kept in step with the code since.
 
 ## Shape of the system
 
@@ -12,16 +12,19 @@ This document records the target architecture and the decisions behind it. The w
                  ┌────────────▼────────────┐
                  │  apps/server (Node 22)  │
                  │                         │
-                 │  openf1/   client, token, request queue
-                 │  feed/     session, clock, buffers, scheduler
-                 │  derive/   flags, tyres, battles, crossings
-                 │  circuit/  outline, turns, sectors, pit lane
+                 │  openf1/   client, token, request queue, MQTT
+                 │  feed/     session, clock, buffers, scheduler,
+                 │            track outline, frame building
+                 │  derive/   flags, laps, tyres, battles,
+                 │            qualifying, crossings, result
+                 │  circuit/  turns, sectors, pit lane
                  │  http/     SSE stream, controls, auth, static
                  └────────────┬────────────┘
-                              │  SSE (protocol v1, packages/shared)
+                              │  SSE (protocol in packages/shared)
                  ┌────────────▼────────────┐
                  │  apps/web (Vite, React) │
                  │                         │
+                 │  stream/   SSE client, controls, queries
                  │  store/    frame store, prefs
                  │  scene/    three.js, imperative, own render loop
                  │  ui/       screens and components from the design
@@ -37,9 +40,10 @@ apps/server/        Node service (TypeScript)
 apps/web/           Phone UI (Vite, React, TypeScript, three.js from npm)
 packages/shared/    Protocol types and zod schemas used by both apps
 tools/mock-openf1/  Development stand-in for OpenF1 (port of the prototype mock)
+tools/              Browser checks, the soak and the dev runner
 docs/               This file, OpenF1 notes, design spec, build plan
-design/             Design canvas sources, sample payloads, screen exports
-reference/prototype/ The working prototype, kept read-only for reference
+design/             Artboards, made-up sample payloads, screenshots from the build
+reference/prototype/ The original prototype, kept read-only for history
 ```
 
 npm workspaces, TypeScript strict mode throughout, Node 22.
@@ -55,8 +59,7 @@ npm workspaces, TypeScript strict mode throughout, Node 22.
 | Client state | One small store (Zustand) fed by the SSE stream | Components subscribe to slices; the scene reads the store directly each frame |
 | 3D library | `three` from npm, not a CDN | The prototype's CDN dependency failed in one environment; bundling removes it |
 | Access control | Password page that sets a signed, HttpOnly cookie | Basic auth prompts are unreliable in iOS home-screen web apps. Keep `/healthz` open |
-| Hosting | One Railway service, custom domain `lapline.live` | Simplest thing that works; no database needed |
-| DNS | Cloudflare, registration left at GoDaddy | GoDaddy cannot put a CNAME on the apex and offers no ALIAS or flattening, so `lapline.live` itself could not reach Railway. Cloudflare flattens it. The apex is proxied and routes to Railway by Host header; `www` is DNS only and goes direct |
+| Hosting | One Node service; lapline.live runs on Railway | Simplest thing that works; no database needed. Any host that runs `npm start` and does not buffer SSE will do |
 | Persistence | None server-side; per-phone preferences in `localStorage` | Replays come from OpenF1's free historical data, so nothing needs storing |
 
 Revisit a decision only with evidence, and record the change here.
@@ -88,7 +91,9 @@ Pure functions with unit tests. Inputs are buffers and a time; outputs are value
 - Interpolated car positions at time `t`; a car is stale if its newest sample is more than 8 s old.
 - Track flag state from race control: green, yellow, SC, SC ending, VSC, VSC ending, red, chequered.
 - Marshal-sector flags from race control messages that carry a `sector`.
-- Current lap, last lap, best lap, and whether the last lap was a personal or overall best set on the lap just completed.
+- Current lap, last lap, best lap, and whether the last lap was a personal or overall best set on the lap just completed. Laps race control deletes are left out of all of it (`laps.ts`).
+- Qualifying segments and who was knocked out in each, so a timed tower shows the segment that places each driver (`qualifying.ts`).
+- The final classification, from OpenF1's `session_result` once the chequered flag falls (`result.ts`).
 - Tyre compound and age from stints.
 - Pit lane status from pit records.
 - Battles: consecutive cars within 1.0 s, only under green.
@@ -98,9 +103,9 @@ Pure functions with unit tests. Inputs are buffers and a time; outputs are value
 
 Builds everything the track drawing needs, once per session, and caches it per meeting.
 
-- **Outline:** the position trace of the fastest clean lap. During a live session with no completed laps yet, the outline comes from an earlier session of the same meeting. Light smoothing is applied to z.
-- **Detail:** turn numbers and positions, marshal sectors, sector boundaries and orientation come from the meeting's `circuit_info_url` (see `docs/OPENF1.md` for the caveats). When that's unavailable, turns are derived from curvature peaks on the outline, the method used for the design mock-ups.
-- **Pit lane:** derived from the position traces of cars between pit entry and exit.
+- **Outline** (`feed/track.ts`, not here, because it is fetched alongside the session): the position trace of the fastest clean lap. During a live session with no completed laps yet, the outline comes from an earlier session of the same meeting. Light smoothing is applied to z.
+- **Detail:** turn numbers and positions, marshal sectors, sector boundaries and orientation come from the meeting's `circuit_info_url`, a file hosted by MultiViewer (`multiviewer.ts`; see `docs/OPENF1.md` for the caveats). `resolve.ts` places them onto the outline as indices. When the file is unavailable, turns are derived from curvature peaks on the outline (`curvature.ts`), the method used for the design mock-ups.
+- **Pit lane:** derived from the position traces of cars between pit entry and exit (`pitlane.ts`).
 - **Transform:** centre, scale to 100 world units across, and rotation, sent once with the outline. Positions stay in OpenF1's raw coordinates on the wire.
 
 ### http/
@@ -113,9 +118,9 @@ Builds everything the track drawing needs, once per session, and caches it per m
 - Auth: `GET /login` serves a self-contained page and `POST /login` sets a signed cookie, or the site is open when `APP_PASSWORD` is unset. A page request without one is redirected to the form; a fetch gets a plain 401, so a stale tab cannot feed HTML to a JSON parser.
 - Static: the built web app, with long cache headers for hashed assets.
 
-## Protocol v2 (SSE)
+## Protocol (SSE)
 
-All types live in `packages/shared/src/protocol.ts`, as zod schemas. Both sides
+All types live in `packages/shared/src/protocol.ts`, as zod schemas, and the version is `PROTOCOL_VERSION` there: 7 at the time of writing. Bump it for any change to the wire. Both sides
 validate: the client checks every inbound message and drops malformed frames
 rather than letting them reach the store, and the tests validate what the server
 sends, since validating at 4 Hz in the hot path is work for no benefit when the
@@ -129,6 +134,13 @@ server stuck on the wrong version must not loop the page.
 `ApiStats.auth`, because a boolean could only say whether credentials were
 configured, so a rejected credential reported as authenticated and the UI
 promised live data it could not deliver.
+v3 put circuit detail on the wire — turns, sector boundaries, marshal sectors
+and the pit lane — addressed by index into the outline rather than by
+coordinate. v4 moved the lap colour (`lapFlag`) and battles to the server,
+because both rules need history the client cannot see. v5 added each row's
+`stops`, `flagSince` and `flagSinceLap`, and the final classification. v6 gave
+each entry in the session list its own name and meeting, for the settings
+page.
 v7 added `timing.phase`, the qualifying segment running, and `outIn` on each
 tower row, the segment a driver was knocked out in. It also changed what a
 row's `best` means in qualifying: the best lap in the segment that decides
@@ -145,18 +157,44 @@ orders the tower. Deleted laps no longer count anywhere.
 
 `timing` also carries `flagSince` and `flagSinceLap`, which say when the standing flag began and on which lap, and each tower row carries a `stops` count. The final classification comes from OpenF1's `session_result`, fetched once when the chequered flag falls and sent on `hello` rather than on every timing frame. `timing` carries `battles` and `marshalSectors`, both filled since M4 and M3, and `totalLaps`, which stays null because OpenF1 publishes no total-lap figure. Each tower row also carries `lapFlag`, the lap colour decided server-side: the rule is about the lap just completed, which the client cannot see from a row's values alone.
 
-The prototype sent timing inside every fourth tick; v1 split it out. A positions tick is about 1 KB and a timing frame about 2 KB, so a two-hour race costs about 45 MB of mobile data.
+The prototype sent timing inside every fourth tick; v1 split it out. Measured with a full field, the whole stream is about 7.7 kB/s, so a two-hour race costs about 56 MB of mobile data (see "Measured").
 
 ## Web
 
 The live delay is one value on the feed, shared by everyone connected, and each phone remembers its own per session and re-asserts it on opening that session. With two phones watching the same session, whoever syncs last moves both views. That is the cost of a single shared clock, and it is the right trade while the design is for one viewer.
 
+- **stream/:** the SSE client (`sse.ts`), the only thing that writes to the store, which validates every message and reloads the page on a protocol mismatch; `control.ts` for `POST /api/control`; `queries.ts` for the two read-only queries.
 - **store/:** a single store, fed only by the SSE client. It holds the latest frame plus the previous one per car for interpolation, the timing state, status, circuit and preferences. Preferences (selected driver, gap mode, elevation scale, labels, camera preset and per-session sync delay) persist to `localStorage`, with every access wrapped in try/catch.
 - **scene/:** a class with `setCircuit()`, `setFrame()`, `setSelection()`, `setCamera(preset)` and `dispose()`. It owns its render loop and reads the store directly. It handles car labels with screen-space collision avoidance, picking with a generous hit radius, and tap-on-a-bunch detection that opens the car picker. Camera presets are Map (top-down), Tilt (default) and Chase (low and behind the selected car). Manual orbit, pinch and pan still work.
 - **ui/:** one component per design area: flag band, header, track overlays, driver strip, telemetry panel, timing tower, controls bar, sheets (sync, settings, car picker) and state screens. Names follow `docs/DESIGN.md`.
 - Wake lock while visible. Reconnect when the page returns to the foreground. Safe-area insets. PWA manifest.
 
-## Measured
+## Configuration
+
+Every setting is an environment variable, and all are optional: with none set,
+the server uses OpenF1's free tier, runs with no password and follows the
+latest session. The server's own are read in `apps/server/src/env.ts`;
+`npm start` also reads a `.env` at the root (see `.env.example`), and anything
+set in the shell wins over it. `npm run dev` does not read `.env`: dev always
+runs against the mock.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `APP_PASSWORD` | none: no password | The password page. **Set it on any public deploy.** With it empty the server warns at start whenever it is using real OpenF1 data |
+| `SESSION_SECRET` | derived from the password | Signs the session cookie. Set a long random string so the cookie survives a password change |
+| `OPENF1_USERNAME`, `OPENF1_PASSWORD` | none: free tier | An OpenF1 sponsor login. Needed only for live sessions; past sessions are free |
+| `OPENF1_BASE` | `https://api.openf1.org` | Where OpenF1 is. `npm run dev` sets it to the mock unless the shell sets it, so `OPENF1_BASE= npm run dev` uses the real API |
+| `LIVE_TRANSPORT` | `mqtt` | `mqtt`, or `rest` for polling. The mock only speaks REST |
+| `LIVE_DELAY_S` | `10` | The starting live delay, in seconds |
+| `SESSION_KEY` | `auto` | Pin one OpenF1 session by its key, instead of following the latest |
+| `PORT` | `3000` | The server's port |
+| `PUBLIC_DIR` | `apps/web/dist` | Where the built web app is served from |
+| `OPENF1_MIN_GAP_MS` | 2100 free, 1100 sponsor | Spacing between OpenF1 requests. For tests; lowering it breaks OpenF1's rate limit |
+| `OPENF1_MQTT_URL` | OpenF1's broker | Override the MQTT broker |
+| `MOCK_PORT` | `4001` | The mock's port, under `npm run dev` |
+| `MOCK_NO_LOCATION` | unset | `1` makes the mock serve no car positions, to test the empty states |
+| `PLAYWRIGHT_CHANNEL` | `chrome` | The browser the checks in `tools/` drive. Empty uses Playwright's own Chromium (`npx playwright install chromium`) |
+
 
 Numbers taken during M0 unless a row says otherwise, against
 `tools/mock-openf1` and against real OpenF1 data. The M9 rows come from
@@ -234,8 +272,8 @@ the code.
 `npm run soak` is the instrument for all of this: run it for hours and read the
 curve, not the snapshot. A leak is a slope.
 
-What a 2.8 hour run against the mock showed, and what to compare Austin's
-against: resident memory rises through a live session as `laps`, `pos`, `ivl`
+What a 2.8 hour run against the mock showed, and what to compare a real
+race against: resident memory rises through a live session as `laps`, `pos`, `ivl`
 and `rc` fill with history — 40 MB over an hour here — and then stops. It does
 not keep going. The replay afterwards peaked 20 MB above that and gave it back,
 and the final hour was flat to slightly down. So a run whose memory is still
@@ -245,7 +283,7 @@ rises during the session does not.
 The soak was not run against the real feed at Austin, so the request rate
 against the sponsor budget, frame size on a live (rather than replayed) race
 and the reconnect count over a real weekend are still from the mock and the
-Singapore replay above. Run it at the next race to fill those in:
+Singapore replay above. Open: run it at a race to fill those in:
 `npm run soak -- --url https://lapline.live --minutes 240 --out race.ndjson`.
 
 ## Non-functional targets

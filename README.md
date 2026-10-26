@@ -71,7 +71,7 @@ password, at [lapline.live](https://lapline.live).
 
 ## Running it
 
-You need Node 22.
+You need Node 22.12 or later.
 
 ```
 npm install
@@ -80,9 +80,19 @@ npm run dev
 
 `npm run dev` starts a mock of the OpenF1 API, the server and the web app
 together, with the app at http://localhost:5173. The mock drives a made-up
-circuit, with a sprint to replay and a race that runs live, so nothing needs
-credentials. To use real data, set `OPENF1_USERNAME` and `OPENF1_PASSWORD`;
-past sessions also work on OpenF1's free tier without them.
+circuit with a race that runs live and a sprint to replay. The first screen
+says live data is locked, because live sessions need an OpenF1 sponsor
+account; tap **Replay sprint instead** and the cars start moving.
+
+To watch real past races instead, which OpenF1 serves free, point it at the
+real API and pick a session in Settings:
+
+```
+OPENF1_BASE= npm run dev
+```
+
+[`docs/FORKING.md`](docs/FORKING.md) has more ways to run it, and how to deploy
+your own copy.
 
 ```
 npm test             # unit tests (Vitest)
@@ -96,12 +106,18 @@ running app: `layout` measures the screen against the design, `scene` checks
 the 3D view, `states` walks every race state, `stale` kills the server and
 watches the screen recover, `rotate` turns the phone mid-session, `circuits`
 tries the track pipeline on real circuits, and `soak` watches a long run from
-outside. Run any of them with `npm run <name>`.
+outside. Run any of them with `npm run <name>`. They drive Chrome; without
+it, run `npx playwright install chromium` once and set `PLAYWRIGHT_CHANNEL=`
+(empty) to use Playwright's own browser.
+
+Every setting is an environment variable, and all are optional. They are listed
+under "Configuration" in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#configuration).
 
 ## Where things are
 
 ```
-apps/server/        the Node service: OpenF1 client, feed, derivations, SSE
+apps/server/        the Node service: openf1/ client, feed/ session and clock,
+                    derive/ calculations, circuit/ track detail, http/ SSE
 apps/web/           the phone app: React UI around an imperative three.js scene
 packages/shared/    the protocol between them, as zod schemas
 tools/mock-openf1/  a stand-in for OpenF1 for development
@@ -110,21 +126,26 @@ design/             artboards, the visual source of truth
 docs/               architecture, design spec, build plan, OpenF1 notes
 ```
 
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): how it's built, why, and what
-  has been measured.
+- [`docs/FORKING.md`](docs/FORKING.md): running your own copy, and where to
+  change how it looks or what it works out.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): how it's built, why, every
+  setting, and what has been measured.
 - [`docs/DESIGN.md`](docs/DESIGN.md): tokens, layout, track drawing and every
   state.
 - [`docs/OPENF1.md`](docs/OPENF1.md): how the data source behaves, quirks
   included.
-- [`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md): the milestones it was built in.
-- [`AGENTS.md`](AGENTS.md) and [`CLAUDE.md`](CLAUDE.md): working instructions
-  for coding agents, and the detailed status.
+- [`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md) and [`docs/HISTORY.md`](docs/HISTORY.md):
+  the milestones it was built in, and what they found.
+- [`AGENTS.md`](AGENTS.md) and [`CLAUDE.md`](CLAUDE.md): the working rules,
+  written for coding agents, and what is still open.
 
 ## Status
 
 All ten milestones are done. The last check was the Austin race on
-25 October 2026: watched start to finish on a phone without touching it, at
-a steady 60 frames a second, with the server's memory steady at about 150 MB.
+25 October 2026: watched start to finish on a phone without touching it, at a
+steady 60 frames a second, with the server's memory steady at about 150 MB.
+Still open: a long soak run against the real feed rather than the mock.
+`AGENTS.md` lists the rest.
 
 ## About
 
