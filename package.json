@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Phone-first second screen for F1 sessions: 3D circuit, timing tower and telemetry from OpenF1.",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "workspaces": [
     "packages/*",

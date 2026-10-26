@@ -131,3 +131,8 @@ a steady 60 frames a second, with the server's memory steady at about 150 MB.
 A personal, non-commercial project. Lapline is unofficial and not affiliated
 with Formula 1. F1 and related marks are trademarks of Formula One Licensing
 B.V. Timing and position data come from OpenF1, which is likewise unofficial.
+
+The code is under the [MIT licence](LICENSE), so fork it and make it your own.
+The data it shows is not: OpenF1's data is licensed for non-commercial use, and
+that applies to any copy you run. [NOTICE.md](NOTICE.md) has the details,
+including the font and the circuit files.
