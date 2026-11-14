@@ -63,8 +63,12 @@ it:
   sponsor account and want live sessions. Without them, replays of past
   sessions work and live sessions show the locked screen.
 
-`railway.json` is the config for Railway, which is what lapline.live runs on.
-Elsewhere, the four lines above are all it needs. Every setting is listed under
+`.railway/railway.ts` is the config for Railway, which is what lapline.live
+runs on, in Railway's infrastructure-as-code format. Railway does not read it
+at deploy time: it is applied with `railway config apply` from the Railway CLI.
+In a fork on Railway, change the repository, project and domains in it, or
+delete it and set the same things in the dashboard. Elsewhere, the four lines
+above are all it needs. Every setting is listed under
 "Configuration" in `docs/ARCHITECTURE.md`.
 
 ## Where to change what

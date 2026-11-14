@@ -12,7 +12,7 @@ import { createServer } from './http/server.js';
 // A stray rejection — a background fetch, an MQTT restart that lost its catch —
 // is not a reason to drop everyone's stream, and under Node 22 an unhandled one
 // ends the process. So log it and carry on. An uncaught exception is different:
-// state may be inconsistent, and `railway.json` sets ON_FAILURE with ten
+// state may be inconsistent, and `.railway/railway.ts` sets ON_FAILURE with ten
 // retries, so exiting gets a clean process back in about twenty seconds.
 //
 // Only the message is logged. A thrown OpenF1 error can carry a URL, and
