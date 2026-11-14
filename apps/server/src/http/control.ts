@@ -41,7 +41,7 @@ export async function control(feed: Feed, body: ControlRequest): Promise<Control
   }
 
   if (body.follow === 'auto') {
-    feed.userPicked = false;
+    feed.pickedAt = null;
     const s = feed.pickAutoSession();
     if (s) {
       void feed

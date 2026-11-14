@@ -38,3 +38,25 @@ export function pickAutoSession(
 ): SessionRow | null {
   return sessions.find((s) => isLiveWindow(s, now)) || sessions[0] || null;
 }
+
+/**
+ * Whether the feed should move to the auto-picked session on its own.
+ *
+ * The feed is shared, so a pick by hand holds for every viewer, but only until
+ * the next session goes live. A pick is a choice about what to watch now, not
+ * a standing order: someone replaying a past race on Wednesday should not keep
+ * every phone off Friday's practice. So a pick holds against any session that
+ * was already live when it was made, and gives way to one whose live window
+ * opens after it. `pickedAt` is null when nothing was picked by hand, and
+ * Infinity for a session pinned with SESSION_KEY, which never gives way.
+ */
+export function shouldFollow(
+  current: SessionRow | null,
+  auto: SessionRow | null,
+  pickedAt: number | null,
+  now: number = Date.now(),
+): boolean {
+  if (!auto || !current || auto.session_key === current.session_key) return false;
+  if (!isLiveWindow(auto, now)) return false;
+  return pickedAt === null || ts(auto.date_start) - LIVE_PRE_MS > pickedAt;
+}

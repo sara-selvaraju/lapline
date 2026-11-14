@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SessionRow } from '@lapline/shared';
-import { filterSessionList, isLiveWindow, pickAutoSession } from '../src/feed/sessions.js';
+import { filterSessionList, isLiveWindow, pickAutoSession, shouldFollow } from '../src/feed/sessions.js';
 
 const MIN = 60_000;
 const T = 1_760_000_000_000;
@@ -71,5 +71,42 @@ describe('pickAutoSession', () => {
 
   it('returns null for an empty list', () => {
     expect(pickAutoSession([], T)).toBeNull();
+  });
+});
+
+describe('shouldFollow', () => {
+  // Watching session 1, finished two days ago; session 2 is about to start.
+  const watching = sess(1, -3000);
+  const next = sess(2, 10);
+
+  it('follows a session that has gone live when nothing was picked by hand', () => {
+    expect(shouldFollow(watching, next, null, T)).toBe(true);
+  });
+
+  it('follows the next live session even after a past one was picked by hand', () => {
+    // Picked a replay yesterday: the next session going live still wins.
+    expect(shouldFollow(watching, next, T - 1440 * MIN, T)).toBe(true);
+  });
+
+  it('keeps a pick made while the live session was already running', () => {
+    // Session 2's window opened 20 minutes ago; someone picked a replay since.
+    expect(shouldFollow(watching, next, T - 5 * MIN, T)).toBe(false);
+  });
+
+  it('never leaves a session pinned with SESSION_KEY', () => {
+    expect(shouldFollow(watching, next, Number.POSITIVE_INFINITY, T)).toBe(false);
+  });
+
+  it('does not move to a session that is not live', () => {
+    expect(shouldFollow(watching, sess(2, 600), null, T)).toBe(false);
+  });
+
+  it('does not reselect the session already showing', () => {
+    expect(shouldFollow(next, next, null, T)).toBe(false);
+  });
+
+  it('does nothing without a current or an auto session', () => {
+    expect(shouldFollow(null, next, null, T)).toBe(false);
+    expect(shouldFollow(watching, null, null, T)).toBe(false);
   });
 });
