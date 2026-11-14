@@ -45,7 +45,7 @@ import {
   replayWindow,
   STATIC_ENDPOINTS,
 } from './schedule.js';
-import { filterSessionList, isLiveWindow, LIVE_POST_MS, pickAutoSession } from './sessions.js';
+import { filterSessionList, isLiveWindow, LIVE_POST_MS, pickAutoSession, shouldFollow } from './sessions.js';
 import {
   rankedReferenceLaps,
   smoothZ,
@@ -97,7 +97,11 @@ export class Feed {
 
   sessions: SessionRow[] = [];
   session: SessionRow | null = null;
-  userPicked = false;
+  /**
+   * When the current session was picked by hand: null if the feed chose it,
+   * Infinity if SESSION_KEY pinned it. See shouldFollow in sessions.ts.
+   */
+  pickedAt: number | null = null;
   mode: Mode = 'idle';
   status: FeedStatus = { level: 'info', text: 'Starting up' };
   liveDelayMs: number;
@@ -166,6 +170,10 @@ export class Feed {
     return ingest(this.buffers, this.session.session_key as number, topic, rows);
   }
 
+  get userPicked(): boolean {
+    return this.pickedAt !== null;
+  }
+
   isLiveWindow(s: SessionRow, now = Date.now()): boolean {
     return isLiveWindow(s, now);
   }
@@ -201,27 +209,26 @@ export class Feed {
           .catch(() => [] as SessionRow[]);
         s = rows[0] ?? null;
       }
-      if (s) this.userPicked = true;
     }
+    const pinned = s !== null;
     if (!s) s = this.pickAutoSession();
-    if (s) await this.selectSession(s.session_key as number, { manual: this.userPicked });
+    if (s) {
+      await this.selectSession(s.session_key as number, {
+        manual: pinned,
+        pickedAt: pinned ? Number.POSITIVE_INFINITY : null,
+      });
+    }
     else this.setStatus('error', 'No sessions found yet.');
 
     // Every 2 minutes: refresh the list, and follow a session that has gone live
-    // unless one was picked by hand.
+    // unless one was picked by hand since it did.
     this.timers.push(
       setInterval(() => {
         void (async () => {
           try {
             await this.loadSessionList();
             const auto = this.pickAutoSession();
-            if (
-              !this.userPicked &&
-              auto &&
-              this.session &&
-              auto.session_key !== this.session.session_key &&
-              this.isLiveWindow(auto)
-            ) {
+            if (auto && shouldFollow(this.session, auto, this.pickedAt)) {
               await this.selectSession(auto.session_key as number, { manual: false });
             }
           } catch (e) {
@@ -236,7 +243,11 @@ export class Feed {
 
   async selectSession(
     key: number | string,
-    { manual = true, mode }: { manual?: boolean; mode?: Mode | undefined } = {},
+    {
+      manual = true,
+      mode,
+      pickedAt,
+    }: { manual?: boolean; mode?: Mode | undefined; pickedAt?: number | null } = {},
   ): Promise<void> {
     let s = this.sessions.find((x) => String(x.session_key) === String(key));
     if (!s) {
@@ -247,7 +258,7 @@ export class Feed {
 
     this.generation++;
     const gen = this.generation;
-    this.userPicked = manual;
+    this.pickedAt = pickedAt !== undefined ? pickedAt : manual ? Date.now() : null;
     this.stopMqtt();
     this.session = s;
     this.resetBuffers();
@@ -764,6 +775,7 @@ export class Feed {
       this.setStatus('info', 'The session has finished. Loading the replay.');
       await this.selectSession(this.session.session_key as number, {
         manual: this.userPicked,
+        pickedAt: this.pickedAt,
         mode: 'replay',
       });
       return;
