@@ -34,6 +34,7 @@
   "devDependencies": {
     "@types/node": "^22.10.2",
     "playwright": "^1.64.0",
+    "railway": "3.17.0",
     "typescript": "5.9.3",
     "vitest": "^5.0.3"
   }
