@@ -256,7 +256,7 @@ the code.
   because an unhandled `error` on a stream ends the process.
 - **An unhandled rejection is logged, not fatal; an uncaught exception exits.**
   A stray rejection is no reason to drop everyone's stream. A corrupt state is,
-  and `railway.json` restarts ON_FAILURE with ten retries, so a clean process
+  and `.railway/railway.ts` restarts ON_FAILURE with ten retries, so a clean process
   is back in about twenty seconds. Only the message is logged, never the error's
   own fields, which can carry a URL.
 - **The scene gives back what it rebuilds.** `setCircuit` runs on every nudge of
