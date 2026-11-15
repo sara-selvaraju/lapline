@@ -21,8 +21,11 @@ import {
 import { getScene } from '../scene/instance.js';
 import { useStore } from '../store/store.js';
 import { fetchPeriods } from './queries.js';
+import { noteReconnect, noteStall } from './telemetry.js';
 
 let es: EventSource | undefined;
+/** Whether the stream has been opened before, so later opens count as reconnects. */
+let opened = false;
 /** Only reload once, so a persistently wrong version cannot loop the page. */
 let reloadedForVersion = false;
 
@@ -80,6 +83,8 @@ function heard(): void {
 }
 
 export function connect(): void {
+  if (opened) noteReconnect();
+  opened = true;
   if (es) es.close();
   es = new EventSource('/events');
   const on = <E extends SseEvent>(event: E, handle: (d: never) => void): void => {
@@ -108,7 +113,10 @@ export function connect(): void {
     watch = setInterval(() => {
       const { lastEventAt, stalled, setStalled } = useStore.getState();
       const quiet = lastEventAt == null ? false : Date.now() - lastEventAt > STALL_MS;
-      if (quiet !== stalled) setStalled(quiet);
+      if (quiet !== stalled) {
+        if (quiet) noteStall();
+        setStalled(quiet);
+      }
       // A browser that has closed the stream will not reopen it on its own.
       if (quiet && es?.readyState === EventSource.CLOSED) connect();
     }, WATCH_MS);

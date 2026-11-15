@@ -21,9 +21,12 @@ three detail layers on. How each milestone went, and what it found, is in
 
 Open:
 
-- **The soak against the real feed** has not been run; the request rate, live
-  frame size and reconnect count are still the mock's and a replay's. See
-  "Surviving a long unattended run" in `docs/ARCHITECTURE.md`.
+- **The real feed's numbers** — request rate, live frame size, reconnect
+  count — are still the mock's and a replay's. The log's once-a-minute
+  `summary` line now records them at every session: read `@event:summary` in
+  Railway's logs after the next race and put the numbers under "Measured" in
+  `docs/ARCHITECTURE.md`. See "Logs" and "Surviving a long unattended run"
+  there.
 - **Unverified:** the home-screen half of M7's password check.
 - **Flaky:** `npm run scene`'s "the picker offers four or more" check depends
   on the field happening to bunch where it sweeps, so it asserts a property of

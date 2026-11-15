@@ -114,6 +114,7 @@ Builds everything the track drawing needs, once per session, and caches it per m
 - `POST /api/control`: select session, play or pause, speed, seek, live delay, follow-live-sessions.
 - `GET /api/crossings?since=`: the leader's recent line-crossing times, for the sync flow, with the lap's length in metres and where the leader is in it.
 - `GET /api/periods`: the stretches the track was not green, for the replay scrubber's markings. A query rather than a protocol field: it is asked for once, by one screen, and the scrubber only exists in replay.
+- `POST /api/telemetry`: a phone's error reports and once-a-minute summary, written to the log (see "Logs" below). Validated against `packages/shared/src/telemetry.ts`, capped at 4 kB a body and rate limited. It sits outside the versioned frame protocol: nothing is streamed back, and a page that never sends one is fine.
 - `GET /api/state`: a debug snapshot. `GET /healthz`: liveness, outside the password. Nothing in either echoes an environment value.
 - Auth: `GET /login` serves a self-contained page and `POST /login` sets a signed cookie, or the site is open when `APP_PASSWORD` is unset. A page request without one is redirected to the form; a fetch gets a plain 401, so a stale tab cannot feed HTML to a JSON parser.
 - Static: the built web app, with long cache headers for hashed assets.
@@ -285,8 +286,44 @@ rises during the session does not.
 The soak was not run against the real feed at Austin, so the request rate
 against the sponsor budget, frame size on a live (rather than replayed) race
 and the reconnect count over a real weekend are still from the mock and the
-Singapore replay above. Open: run it at a race to fill those in:
-`npm run soak -- --url https://lapline.live --minutes 240 --out race.ndjson`.
+Singapore replay above. The log's once-a-minute summary (below) now records
+all three from inside the server at every session, so the first race after it
+ships fills them in without anyone running the soak. The soak is still the
+check from outside: `npm run soak -- --url https://lapline.live --minutes 240
+--out race.ndjson`.
+
+## Logs
+
+The server writes one JSON object per line to stdout (`apps/server/src/log.ts`),
+and nothing else: no log files, no third-party service. On Railway the log
+view reads `message` as the text and `level` as the severity, and every other
+field is an attribute its search can filter on. Every line has an `event`:
+
+| `event` | When | What it says |
+|---|---|---|
+| `summary` | every minute | `openf1PerMin`, `openf1Errors`, `openf1RateLimited`, `viewers`, `connects`, `disconnects`, `tickHz`, `tickBytes`, `timingBytes`, `kBps` (what one phone receives), `rssMB`, `heapMB`, `mode`, `session`, and when live `delayS` and `mqttAgeS` |
+| `client` | each phone, about once a minute | `fps` over the time it was visible, `visibleS`, `reconnects`, `stalls`, `contextLost`, `errors`, `layout`, and a random per-page-load `viewer` id. A `warn` when anything went wrong |
+| `client-error` | a phone hit an uncaught error | its message and `where`; at most five distinct ones per page load |
+| `session` | a session is selected | key, name, mode, and whether the feed, a hand pick or `SESSION_KEY` chose it |
+| `status` | the status shown on screen changes | the same text, at its level |
+| `fetch`, `mqtt`, `track`, `pit-lane`, `circuit-info`, … | something failed | the error's message |
+| `start`, `config`, `crash` | start-up, a configuration warning, a crash | |
+
+After a race, `@event:summary` is the request rate, frame size, viewers and
+memory curve for the whole session, and `@event:client` is how each phone
+fared. A rising `rssMB` an hour after the chequered flag is the leak signal
+described above; `openf1RateLimited` above zero means the request plan is
+too close to the limit.
+
+What never goes in: credentials, OpenF1 request URLs, IP addresses (the
+telemetry rate limit uses the address and forgets it within a minute), what
+anyone typed, and the fields of a thrown error, which can carry a URL — only
+its message. Strings from phones are capped by the schema and logged as JSON
+fields, so they cannot forge a line.
+
+How long the lines are kept is Railway's retention. A number worth keeping
+goes under "Measured" in this file, as the soak's did. Forwarding the same
+lines to a log service later is a hosting setting, not a code change.
 
 ## Non-functional targets
 

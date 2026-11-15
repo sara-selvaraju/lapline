@@ -13,6 +13,7 @@
 // Ported from reference/prototype/lib/live-mqtt.js.
 
 import type { OpenF1 } from './client.js';
+import { errText, log } from '../log.js';
 
 /** Topics mirror the REST paths. */
 const TOPICS = ['location', 'car_data', 'position', 'intervals', 'race_control', 'pit', 'laps', 'stints'];
@@ -52,7 +53,7 @@ export class LiveMqtt {
     try {
       mqtt = await import('mqtt');
     } catch {
-      console.error('mqtt package not installed; using REST polling for live data');
+      log.warn('mqtt package not installed; using REST polling for live data', { event: 'mqtt' });
       return;
     }
     if (this.stopped) return;
@@ -71,11 +72,11 @@ export class LiveMqtt {
     this.client = client;
 
     client.on('connect', () => {
-      console.log('mqtt connected');
+      log.info('mqtt connected', { event: 'mqtt' });
       client.subscribe(
         TOPICS.map((t) => `v1/${t}`),
         (err: Error | null) => {
-          if (err) console.error('mqtt subscribe', err.message);
+          if (err) log.error('mqtt subscribe failed', { event: 'mqtt', error: err.message });
         },
       );
     });
@@ -85,11 +86,11 @@ export class LiveMqtt {
       try {
         this.onRow(name, JSON.parse(Buffer.from(payload).toString()));
       } catch (e) {
-        console.error('mqtt message', e instanceof Error ? e.message : String(e));
+        log.warn('mqtt message did not parse', { event: 'mqtt', topic: name, error: errText(e) });
       }
     });
 
-    client.on('error', (e: Error) => console.error('mqtt error', e.message));
+    client.on('error', (e: Error) => log.error('mqtt error', { event: 'mqtt', error: e.message }));
 
     client.on('close', () => {
       // Ignore the close of a client we have already replaced.
@@ -123,7 +124,7 @@ export class LiveMqtt {
     this.client = null;
     if (old) old.end(true);
     void this.start().catch((e: unknown) => {
-      console.error('mqtt restart', e instanceof Error ? e.message : String(e));
+      log.error('mqtt restart failed', { event: 'mqtt', error: errText(e) });
       this.scheduleRestart(15_000);
     });
   }

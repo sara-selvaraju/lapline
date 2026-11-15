@@ -59,6 +59,9 @@ it:
 - **Set `APP_PASSWORD`.** Without it the site is open to anyone who finds it,
   and anyone can change the session for every viewer. The server warns at
   start if it is empty. Set `SESSION_SECRET` to a long random string too.
+- **Read the logs on stdout.** One JSON line per event, with a summary every
+  minute and reports from the phones; "Logs" in `docs/ARCHITECTURE.md` says
+  what each line holds and what never goes in.
 - **Set `OPENF1_USERNAME` and `OPENF1_PASSWORD`** only if you have an OpenF1
   sponsor account and want live sessions. Without them, replays of past
   sessions work and live sessions show the locked screen.
