@@ -24,6 +24,7 @@ import type {
 } from '@lapline/shared';
 import { LockedError, UpstreamError, type OpenF1 } from '../openf1/client.js';
 import { LiveMqtt } from '../openf1/live-mqtt.js';
+import { log } from '../log.js';
 import { createBuffers, num, prune, type Buffers } from './buffers.js';
 import { applyReplayControl, clock, newReplayState, replayNow, type ReplayState } from './clock.js';
 import { buildTick, buildTiming, trackFlag } from './frames.js';
@@ -90,10 +91,25 @@ const LOCK_RETRY_MAX_MS = 300_000;
 const NO_POSITIONS_TEXT =
   'No usable car positions for this session, so the track and cars cannot be drawn.';
 
+/** Running totals behind the log's once-a-minute summary. */
+export interface FeedCounters {
+  /** Event streams opened, and closed, since the server started. */
+  connects: number;
+  disconnects: number;
+  /** Per SSE event: frames broadcast to at least one phone, and their total size. */
+  frames: Record<string, { sent: number; bytes: number }>;
+}
+
 export class Feed {
   readonly api: OpenF1;
   readonly liveTransport: string;
   readonly listeners = new Set<FeedListener>();
+  /**
+   * Running totals for the once-a-minute summary in the log (see
+   * apps/server/src/metrics.ts). They only ever count up; the summary works
+   * out each minute's share by difference.
+   */
+  readonly counters: FeedCounters = { connects: 0, disconnects: 0, frames: {} };
 
   sessions: SessionRow[] = [];
   session: SessionRow | null = null;
@@ -232,7 +248,7 @@ export class Feed {
               await this.selectSession(auto.session_key as number, { manual: false });
             }
           } catch (e) {
-            console.error('session refresh', message(e));
+            log.error('session refresh failed', { event: 'sessions', error: message(e) });
           }
         })();
       }, 120_000),
@@ -267,6 +283,13 @@ export class Feed {
 
     const live = this.isLiveWindow(s);
     this.mode = mode || (live ? 'live' : 'replay');
+    log.info('session selected', {
+      event: 'session',
+      session: s.session_key,
+      name: `${s.circuit_short_name ?? ''} ${s.session_name ?? ''}`.trim(),
+      mode: this.mode,
+      picked: this.pickedAt === null ? 'auto' : this.pickedAt === Number.POSITIVE_INFINITY ? 'pinned' : 'hand',
+    });
     this.sessStart = ts(s.date_start);
     this.sessEnd = ts(s.date_end);
     this.replay = newReplayState(this.sessStart);
@@ -354,7 +377,7 @@ export class Feed {
       } catch (e) {
         // A locked candidate is expected on the free tier; try the next one.
         if (e instanceof LockedError) continue;
-        console.error('track', message(e));
+        log.error('track candidate failed', { event: 'track', error: message(e) });
       }
     }
 
@@ -420,9 +443,13 @@ export class Feed {
       if (verdict.ok) {
         return { points, sectors: (lap as { sectors?: SectorDurations | null }).sectors ?? null };
       }
-      console.error(
-        `track: ${sess.session_name} lap ${lap.n} for ${lap.driver} unusable, ${verdict.reason}`,
-      );
+      log.warn('track lap unusable', {
+        event: 'track',
+        session: sess.session_name,
+        lap: lap.n,
+        driver: lap.driver,
+        reason: verdict.reason,
+      });
     }
     return { points: [], sectors: null };
   }
@@ -462,7 +489,7 @@ export class Feed {
       ]);
       url = rows[0]?.circuit_info_url;
     } catch (e) {
-      console.error('meetings', message(e));
+      log.error('meetings request failed', { event: 'meetings', error: message(e) });
     }
     if (gen !== this.generation || this.track !== track) return;
 
@@ -523,7 +550,7 @@ export class Feed {
       track.pitLane = lane;
       this.broadcast('circuit', this.circuitPayload());
     } catch (e) {
-      if (!(e instanceof LockedError)) console.error('pit lane', message(e));
+      if (!(e instanceof LockedError)) log.error('pit lane failed', { event: 'pit-lane', error: message(e) });
     }
   }
 
@@ -552,7 +579,7 @@ export class Feed {
       // Hello is how the result reaches anyone already watching.
       this.broadcastHello();
     } catch (e) {
-      if (!(e instanceof LockedError)) console.error('session result', message(e));
+      if (!(e instanceof LockedError)) log.error('session result failed', { event: 'result', error: message(e) });
     }
   }
 
@@ -745,7 +772,11 @@ export class Feed {
         this.lock(e.message);
         this.broadcastHello();
       } else {
-        console.error('fetch', message(e), e instanceof UpstreamError ? e.detail : '');
+        log.error('fetch failed', {
+          event: 'fetch',
+          error: message(e),
+          ...(e instanceof UpstreamError ? { detail: e.detail } : {}),
+        });
         this.fetchFailed = true;
         this.setStatus('error', fetchProblemText(e));
       }
@@ -834,6 +865,12 @@ export class Feed {
 
   private mqtt: LiveMqtt | null = null;
 
+  /** How long since MQTT last delivered a row, or null when MQTT is not running. */
+  mqttAgeMs(now = Date.now()): number | null {
+    if (!this.mqtt) return null;
+    return this.mqttLastMsg ? now - this.mqttLastMsg : null;
+  }
+
   /**
    * Only when MQTT is the chosen transport and credentials exist. With
    * LIVE_TRANSPORT=rest this stays null, so mqttHealthy is never true and the
@@ -849,7 +886,7 @@ export class Feed {
     // the full REST plan all race with only a log line saying why. The client
     // knows how to retry; it just was not asked to on the first attempt.
     void this.mqtt.start().catch((e: unknown) => {
-      console.error('mqtt', message(e));
+      log.error('mqtt start failed', { event: 'mqtt', error: message(e) });
       this.mqtt?.retryLater();
     });
   }
@@ -913,6 +950,13 @@ export class Feed {
   }
 
   setStatus(level: FeedStatus['level'], text: string, extra: { freeAt?: string } = {}): void {
+    // Logged on a change only: a failing fetch sets the same error every second.
+    if (level !== this.status.level || text !== this.status.text) {
+      const fields = { event: 'status', mode: this.mode, session: this.session?.session_key ?? null };
+      if (level === 'error') log.error(text, fields);
+      else if (level === 'warn') log.warn(text, fields);
+      else log.info(text, fields);
+    }
     this.status = { level, text, ...extra };
     this.broadcastStatus();
   }
@@ -961,6 +1005,13 @@ export class Feed {
 
   broadcast(event: string, data: unknown): void {
     const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+    if (this.listeners.size) {
+      const c = (this.counters.frames[event] ??= { sent: 0, bytes: 0 });
+      c.sent++;
+      // Characters, which for this ASCII JSON is bytes. Per frame, not per
+      // phone: what one viewer receives.
+      c.bytes += msg.length;
+    }
     // Each write stands alone. One phone whose socket has gone should never
     // cost another phone a frame, and a throw part-way through used to mean
     // every listener after it in the set missed that frame — and the next,
@@ -976,12 +1027,14 @@ export class Feed {
 
   addListener(res: FeedListener): void {
     this.listeners.add(res);
+    this.counters.connects++;
     this.lastClients = Date.now();
     res.write(`event: hello\ndata: ${JSON.stringify(this.helloPayload())}\n\n`);
   }
 
   removeListener(res: FeedListener): void {
-    this.listeners.delete(res);
+    // Called from both 'error' and 'close' for the same phone; count it once.
+    if (this.listeners.delete(res)) this.counters.disconnects++;
     this.lastClients = Date.now();
   }
 }

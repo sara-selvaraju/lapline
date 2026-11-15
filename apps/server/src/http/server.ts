@@ -20,6 +20,7 @@ import { control, readBody } from './control.js';
 import { crossingsPayload, periodsPayload } from './query.js';
 import { serveStatic } from './static.js';
 import { openStream } from './sse.js';
+import { ReportLimiter, telemetry } from './telemetry.js';
 
 export interface ServerOptions {
   feed: Feed;
@@ -36,6 +37,19 @@ function isSecure(req: IncomingMessage): boolean {
   return proto.split(',')[0]?.trim() === 'https';
 }
 
+/**
+ * Which phone this is. Behind Railway's proxy the socket address is the
+ * proxy, so the forwarded address is what distinguishes one phone from
+ * another. Used to limit attempts and reports, never logged.
+ */
+function clientAddress(req: IncomingMessage): string {
+  return (
+    (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() ||
+    req.socket.remoteAddress ||
+    'unknown'
+  );
+}
+
 function json(res: ServerResponse, code: number, body: unknown): void {
   res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
   res.end(JSON.stringify(body));
@@ -44,6 +58,7 @@ function json(res: ServerResponse, code: number, body: unknown): void {
 export function createServer({ feed, appPassword, sessionSecret, publicDir }: ServerOptions): Server {
   const key = signingKey(sessionSecret, appPassword);
   const attempts = new Attempts();
+  const reports = new ReportLimiter();
 
   return http.createServer((req: IncomingMessage, res: ServerResponse) => {
     void (async () => {
@@ -58,12 +73,7 @@ export function createServer({ feed, appPassword, sessionSecret, publicDir }: Se
           res.writeHead(302, { Location: '/' });
           return res.end();
         }
-        // Behind Railway's proxy the socket address is the proxy, so the
-        // forwarded address is what distinguishes one phone from another.
-        const who =
-          (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() ||
-          req.socket.remoteAddress ||
-          'unknown';
+        const who = clientAddress(req);
 
         if (req.method === 'POST') {
           const locked = attempts.lockedFor(who);
@@ -113,6 +123,10 @@ export function createServer({ feed, appPassword, sessionSecret, publicDir }: Se
         } catch (e) {
           return json(res, 400, { error: e instanceof Error ? e.message : String(e) });
         }
+      }
+
+      if (url.pathname === '/api/telemetry' && req.method === 'POST') {
+        return telemetry(req, res, reports, clientAddress(req));
       }
 
       if (url.pathname === '/api/crossings') {

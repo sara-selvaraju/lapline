@@ -144,8 +144,8 @@ docs/               architecture, design spec, build plan, OpenF1 notes
 All ten milestones are done. The last check was the Austin race on
 25 October 2026: watched start to finish on a phone without touching it, at a
 steady 60 frames a second, with the server's memory steady at about 150 MB.
-Still open: a long soak run against the real feed rather than the mock.
-`AGENTS.md` lists the rest.
+Still open: measuring the real feed over a whole race rather than the mock,
+which the server's log now records every minute. `AGENTS.md` lists the rest.
 
 ## About
 

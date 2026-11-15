@@ -5,6 +5,8 @@ import { openGateWarning, readEnv } from './env.js';
 import { Feed } from './feed/feed.js';
 import { OpenF1 } from './openf1/client.js';
 import { createServer } from './http/server.js';
+import { errText, log } from './log.js';
+import { summaryFields, SUMMARY_EVERY_MS, takeSnapshot } from './metrics.js';
 
 // Nobody is watching the logs on a race night, so say what happened and make
 // the right choice without help.
@@ -18,16 +20,16 @@ import { createServer } from './http/server.js';
 // Only the message is logged. A thrown OpenF1 error can carry a URL, and
 // nothing containing a credential goes to the log.
 process.on('unhandledRejection', (e: unknown) => {
-  console.error('unhandled rejection:', e instanceof Error ? e.message : String(e));
+  log.error('unhandled rejection', { event: 'crash', error: errText(e) });
 });
 process.on('uncaughtException', (e: unknown) => {
-  console.error('uncaught exception, exiting for a restart:', e instanceof Error ? e.message : String(e));
+  log.error('uncaught exception, exiting for a restart', { event: 'crash', error: errText(e) });
   process.exit(1);
 });
 
 const env = readEnv();
 const warning = openGateWarning(env);
-if (warning) console.warn(`WARNING: ${warning}`);
+if (warning) log.warn(warning, { event: 'config' });
 
 const api = new OpenF1({
   username: env.openf1Username,
@@ -44,6 +46,20 @@ const server = createServer({
 });
 
 server.listen(env.port, () => {
-  console.log(`Lapline on :${env.port} (OpenF1 ${api.hasCredentials ? 'sponsor' : 'free'} tier)`);
+  log.info(`Lapline on :${env.port}`, {
+    event: 'start',
+    port: env.port,
+    tier: api.hasCredentials ? 'sponsor' : 'free',
+    node: process.version,
+  });
   void feed.boot(env.sessionKey);
 });
+
+// The once-a-minute summary: see metrics.ts. unref, so it never holds the
+// process open on its own.
+let last = takeSnapshot(feed, api);
+setInterval(() => {
+  const now = takeSnapshot(feed, api);
+  log.info('summary', summaryFields(last, now, feed, api));
+  last = now;
+}, SUMMARY_EVERY_MS).unref();

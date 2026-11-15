@@ -8,6 +8,7 @@
 
 import { LockedError, UpstreamError } from './errors.js';
 import { buildUrl, normaliseBase, type Filter } from './url.js';
+import { errText, log } from '../log.js';
 
 export interface OpenF1Options {
   username?: string | undefined;
@@ -21,6 +22,8 @@ export interface OpenF1Options {
 export interface OpenF1Stats {
   requests: number;
   errors: number;
+  /** Responses that were 429, OpenF1's rate limit, retried or not. */
+  rateLimited: number;
   /** `"<status> <endpoint>"` for the most recent response. */
   last: string | null;
 }
@@ -53,7 +56,7 @@ export class OpenF1 {
   readonly baseUrl: string;
   /** Gap between request starts: 2.1 s keeps the free tier under 30/min, 1.1 s sponsors under 60/min. */
   readonly minGapMs: number;
-  readonly stats: OpenF1Stats = { requests: 0, errors: 0, last: null };
+  readonly stats: OpenF1Stats = { requests: 0, errors: 0, rateLimited: 0, last: null };
 
   private token: string | null = null;
   private tokenExp = 0;
@@ -134,7 +137,7 @@ export class OpenF1 {
     // A token failure must not take the request down: fall through unauthenticated
     // and let a 401 decide whether this is locked or a real problem.
     const token = await this.getToken().catch((e: unknown) => {
-      console.error(e instanceof Error ? e.message : String(e));
+      log.error('OpenF1 token request failed', { event: 'openf1-token', error: errText(e) });
       return null;
     });
     if (token) headers.Authorization = `Bearer ${token}`;
@@ -151,6 +154,7 @@ export class OpenF1 {
       throw e;
     }
     this.stats.last = `${res.status} ${path}`;
+    if (res.status === 429) this.stats.rateLimited++;
 
     // OpenF1 answers "no results" with 404, so it is an empty page, not an error.
     if (res.status === 404) return [];

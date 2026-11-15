@@ -17,6 +17,7 @@
 // corner coordinates share OpenF1's location frame — same origin, same scale.
 
 import { z } from 'zod';
+import { errText, log } from '../log.js';
 
 /** A point in OpenF1's own location frame. */
 const TrackPositionSchema = z.object({ x: z.number(), y: z.number() });
@@ -96,12 +97,12 @@ export async function fetchCircuitInfo(
     if (res.ok) {
       const result = CircuitInfoSchema.safeParse(await res.json());
       if (result.success) parsed = result.data;
-      else console.error(`circuit info at ${url} did not parse`);
+      else log.warn('circuit info did not parse', { event: 'circuit-info', url });
     } else {
-      console.error(`circuit info at ${url}: HTTP ${res.status}`);
+      log.warn('circuit info request failed', { event: 'circuit-info', url, status: res.status });
     }
   } catch (e) {
-    console.error(`circuit info at ${url}: ${e instanceof Error ? e.message : String(e)}`);
+    log.warn('circuit info request failed', { event: 'circuit-info', url, error: errText(e) });
   }
 
   cache.set(url, parsed);
